@@ -122,12 +122,12 @@ pub const SM4 = struct {
     fn round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
         // tau + l_transform 合并
         const t = x1 ^ x2 ^ x3 ^ rk;
-        const b0 = SBOX[@as(u8, @truncate(t >> 24))];
-        const b1 = SBOX[@as(u8, @truncate(t >> 16))];
-        const b2 = SBOX[@as(u8, @truncate(t >> 8))];
-        const b3 = SBOX[@as(u8, @truncate(t))];
-        const tt = (@as(u32, b0) << 24) | (@as(u32, b1) << 16) | (@as(u32, b2) << 8) | @as(u32, b3);
-        const l = tt ^ rotl(tt, 2) ^ rotl(tt, 10) ^ rotl(tt, 18) ^ rotl(tt, 24);
+        const sbox_out = tau(t);
+        const l = sbox_out ^
+                  rotl(sbox_out, 2) ^
+                  rotl(sbox_out, 10) ^
+                  rotl(sbox_out, 18) ^
+                  rotl(sbox_out, 24);
         return x0 ^ l;
     }
 
