@@ -302,3 +302,53 @@ test "aligned final" {
     h.update(&block);
     h.final(out[0..]);
 }
+
+// 性能测试函数
+pub fn testPerformance(allocator: std.mem.Allocator) !void {
+    const test_sizes = [_]usize{
+        1024,      // 64 blocks
+        1024 * 16, // 1KB
+        1024 * 1024, // 1MB
+        10 * 1024 * 1024, // 10MB
+    };
+
+    const print = std.debug.print;
+
+    print("\nSM3 Performance Test (ReleaseSafe build recommended)\n", .{});
+    print("------------------------------------------------\n", .{});
+
+    for (test_sizes) |size| {
+        // 分配对齐的内存以提高性能
+        const alignment = 16;
+        const buffer = try allocator.alignedAlloc(u8, alignment, size);
+        defer allocator.free(buffer);
+
+        // 填充随机数据
+        var prng = std.Random.DefaultPrng.init(0);
+        prng.random().bytes(buffer);
+
+        // 准备输出缓冲区
+        var out: [32]u8 = undefined;
+
+        // 加密性能测试
+        const hash_start = std.time.nanoTimestamp();
+        SM3.hash(buffer, &out, .{});
+        const hash_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - hash_start));
+
+        // 计算速度 (MB/s)
+        const bytes_per_mb = 1024.0 * 1024.0;
+        const ns_per_s = 1_000_000_000.0;
+        const hash_speed = (@as(f64, @floatFromInt(size)) / hash_time) * ns_per_s / bytes_per_mb;
+
+        print("Data: {d:>6.2} KB | Digest: {d:>6.2} MB/s\n", .{
+            size / 1024,
+            hash_speed,
+        });
+    }
+}
+
+// 主测试函数
+test "SM3 Performance" {
+    const allocator = std.testing.allocator;
+    try testPerformance(allocator);
+}
