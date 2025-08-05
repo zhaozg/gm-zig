@@ -227,8 +227,17 @@ pub const SM3 = struct {
 
 };
 
+
+pub fn hash(b: []const u8) [32]u8 {
+    var out: [32]u8 = undefined;
+    var d = SM3.init(.{});
+    d.update(b);
+    d.final(&out);
+    return out;
+}
+
 // Hash using the specified hasher `H` asserting `expected == H(input)`.
-pub fn assertEqualHash(comptime Hasher: anytype, comptime expected_hex: *const [Hasher.digest_length * 2:0]u8, input: []const u8) !void {
+fn assertEqualHash(comptime Hasher: anytype, comptime expected_hex: *const [Hasher.digest_length * 2:0]u8, input: []const u8) !void {
     var h: [Hasher.digest_length]u8 = undefined;
     Hasher.hash(input, &h, .{});
 
@@ -236,7 +245,7 @@ pub fn assertEqualHash(comptime Hasher: anytype, comptime expected_hex: *const [
 }
 
 // Assert `expected` == hex(`input`) where `input` is a bytestring
-pub fn assertEqual(comptime expected_hex: [:0]const u8, input: []const u8) !void {
+fn assertEqual(comptime expected_hex: [:0]const u8, input: []const u8) !void {
     var expected_bytes: [expected_hex.len / 2]u8 = undefined;
     for (&expected_bytes, 0..) |*r, i| {
         r.* = fmt.parseInt(u8, expected_hex[2 * i .. 2 * i + 2], 16) catch unreachable;
