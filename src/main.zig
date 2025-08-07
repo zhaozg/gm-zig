@@ -8,6 +8,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     try sm3.testPerformance(allocator);
-    try sm4.testPerformance(allocator);
+    try sm4.testPerformance_ecb(allocator);
+    try sm4.testPerformance_cbc(allocator);
 }
 

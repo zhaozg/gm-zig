@@ -1,11 +1,14 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const mem = std.mem;
+const builtin = @import("builtin");
+const math = std.math;
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
 const SM4_KEY_SIZE = 16;   // 128-bit keys
 const ROUNDS = 32;         // 32 rounds
+const SLICE_SIZE = 8;      // 一次处理8个块
 
 // 预计算S盒查找表 (从C代码移植)
 const SBOX_T = [256]u32{
@@ -110,7 +113,7 @@ const SBOX_T16 = [256]u32{
     0x2626ad8b, 0xa5a5cd68, 0x5e5ecb95, 0x2929624b, 0x30303c0c, 0x5a5ace94, 0xddddab76, 0xf9f9867f,
     0x9595f164, 0xe6e65dbb, 0xc7c735f2, 0x24242d09, 0x1717d1c6, 0xb9b9d66f, 0x1b1bdec5, 0x12129486,
     0x60607818, 0xc3c330f3, 0xf5f5897c, 0xb3b35cef, 0xe8e8d23a, 0x7373acdf, 0x3535794c, 0x8080a020,
-    0xe5e59d78, 0xbbbb56ed, 0x7d7d235e, 0xf8f8c63e, 0x5f5f8bd4, 0x2f2fe7c8, 0xe4e4dd39, 0x21216849,
+    0xe5e5e59d, 0xbbbb56ed, 0x7d7d235e, 0xf8f8c63e, 0x5f5f8bd4, 0x2f2fe7c8, 0xe4e4dd39, 0x21216849,
 };
 
 const SBOX_T24 = [256]u32{
@@ -237,6 +240,120 @@ pub const SM4 = struct {
         mem.writeInt(u32, output[12..16], x0, .big);
     }
 
+    // 批量加密多个块（比特切片优化）
+    pub fn encryptBlocks(ctx: *const SM4, input: []const u8, output: []u8) void {
+        const num_blocks = input.len / SM4_BLOCK_SIZE;
+        assert(output.len >= input.len);
+
+        var i: usize = 0;
+        while (i < num_blocks) : (i += SLICE_SIZE) {
+            const blocks_remaining = num_blocks - i;
+            const blocks_to_process = @min(SLICE_SIZE, blocks_remaining);
+
+            ctx.encryptSliced(
+                input[i * SM4_BLOCK_SIZE ..],
+                output[i * SM4_BLOCK_SIZE ..],
+                blocks_to_process,
+            );
+        }
+    }
+
+    // 批量解密多个块（比特切片优化）
+    pub fn decryptBlocks(ctx: *const SM4, input: []const u8, output: []u8) void {
+        const num_blocks = input.len / SM4_BLOCK_SIZE;
+        assert(output.len >= input.len);
+
+        var i: usize = 0;
+        while (i < num_blocks) : (i += SLICE_SIZE) {
+            const blocks_remaining = num_blocks - i;
+            const blocks_to_process = @min(SLICE_SIZE, blocks_remaining);
+
+            ctx.decryptSliced(
+                input[i * SM4_BLOCK_SIZE ..],
+                output[i * SM4_BLOCK_SIZE ..],
+                blocks_to_process,
+            );
+        }
+    }
+
+    // 使用比特切片技术并行处理多个块（加密）
+    fn encryptSliced(ctx: *const SM4, input: []const u8, output: []u8, num_blocks: usize) void {
+        var states: [SLICE_SIZE][4]u32 = undefined;
+
+        // 初始化状态
+        for (0..num_blocks) |i| {
+            const block = input[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
+            states[i][0] = mem.readInt(u32, block[0..4], .big);
+            states[i][1] = mem.readInt(u32, block[4..8], .big);
+            states[i][2] = mem.readInt(u32, block[8..12], .big);
+            states[i][3] = mem.readInt(u32, block[12..16], .big);
+        }
+
+        // 并行处理所有轮次
+        for (0..ROUNDS) |round| {
+            for (0..num_blocks) |i| {
+                const temp = states[i][1] ^ states[i][2] ^ states[i][3] ^ ctx.rk[round];
+                const t = sm4_T(temp);
+                const new_x0 = states[i][0] ^ t;
+
+                // 更新状态
+                states[i][0] = states[i][1];
+                states[i][1] = states[i][2];
+                states[i][2] = states[i][3];
+                states[i][3] = new_x0;
+            }
+        }
+
+        // 输出结果
+        for (0..num_blocks) |i| {
+            var block = output[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
+            mem.writeInt(u32, block[0..4], states[i][3], .big);
+            mem.writeInt(u32, block[4..8], states[i][2], .big);
+            mem.writeInt(u32, block[8..12], states[i][1], .big);
+            mem.writeInt(u32, block[12..16], states[i][0], .big);
+        }
+    }
+
+    // 使用比特切片技术并行处理多个块（解密）
+    fn decryptSliced(ctx: *const SM4, input: []const u8, output: []u8, num_blocks: usize) void {
+        var states: [SLICE_SIZE][4]u32 = undefined;
+
+        // 初始化状态
+        for (0..num_blocks) |i| {
+            const block = input[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
+            states[i][0] = mem.readInt(u32, block[0..4], .big);
+            states[i][1] = mem.readInt(u32, block[4..8], .big);
+            states[i][2] = mem.readInt(u32, block[8..12], .big);
+            states[i][3] = mem.readInt(u32, block[12..16], .big);
+        }
+
+        // 并行处理所有轮次（反向）
+        var round: usize = ROUNDS;
+        while (round > 0) {
+            round -= 1;
+            for (0..num_blocks) |i| {
+                const temp = states[i][1] ^ states[i][2] ^ states[i][3] ^ ctx.rk[round];
+                const t = sm4_T(temp);
+                const new_x0 = states[i][0] ^ t;
+
+                // 更新状态
+                states[i][0] = states[i][1];
+                states[i][1] = states[i][2];
+                states[i][2] = states[i][3];
+                states[i][3] = new_x0;
+            }
+        }
+
+        // 输出结果
+        for (0..num_blocks) |i| {
+            var block = output[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
+            mem.writeInt(u32, block[0..4], states[i][3], .big);
+            mem.writeInt(u32, block[4..8], states[i][2], .big);
+            mem.writeInt(u32, block[8..12], states[i][1], .big);
+            mem.writeInt(u32, block[12..16], states[i][0], .big);
+        }
+    }
+
     // 使用预计算表的T函数
     fn sm4_T(n: u32) u32 {
         return SBOX_T[(n >> 24) & 0xFF] ^
@@ -264,6 +381,71 @@ pub const SM4 = struct {
     }
 };
 
+// CBC模式加密
+pub const SM4_CBC = struct {
+    sm4: SM4,
+    iv: [SM4_BLOCK_SIZE]u8,
+
+    pub fn init(key: *const [SM4_KEY_SIZE]u8, iv: *const [SM4_BLOCK_SIZE]u8) SM4_CBC {
+        return .{
+            .sm4 = SM4.init(key),
+            .iv = iv.*,
+        };
+    }
+
+    pub fn encrypt(self: *SM4_CBC, input: []const u8, output: []u8) void {
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+        assert(output.len >= input.len);
+
+        var iv = self.iv;
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const block = input[i..i + SM4_BLOCK_SIZE];
+            var xored: [SM4_BLOCK_SIZE]u8 = undefined;
+
+            // XOR with IV or previous ciphertext
+            for (0..SM4_BLOCK_SIZE) |j| {
+                xored[j] = block[j] ^ iv[j];
+            }
+
+            self.sm4.encryptBlock(&xored, @as(*[16]u8, @ptrCast(output[i..].ptr)));
+            iv = @as(*[16]u8, @ptrCast(output[i..].ptr)).*;
+        }
+
+        // 更新IV为最后一个密文块
+        @memcpy(&self.iv, output[output.len - SM4_BLOCK_SIZE ..][0..SM4_BLOCK_SIZE]);
+    }
+
+    pub fn decrypt(self: *SM4_CBC, input: []const u8, output: []u8) void {
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+        assert(output.len >= input.len);
+
+        var next_iv: [SM4_BLOCK_SIZE]u8 = undefined;
+        var iv = self.iv;
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const ciphertext  = input[i..i + SM4_BLOCK_SIZE];
+            var decrypted: [SM4_BLOCK_SIZE]u8 = undefined;
+
+            // 保存下一个IV
+            @memcpy(&next_iv, ciphertext[0..SM4_BLOCK_SIZE]);
+
+            self.sm4.decryptBlock(@as(*const [16]u8, @ptrCast(ciphertext.ptr)), &decrypted);
+
+            // XOR with IV or previous ciphertext
+            for (0..SM4_BLOCK_SIZE) |j| {
+                output[i + j] = decrypted[j] ^ iv[j];
+            }
+
+            // 更新IV
+            iv = next_iv;
+        }
+
+        // 更新IV为最后一个密文块
+        @memcpy(&self.iv, &next_iv);
+    }
+};
+
 // 测试向量 (GB/T 32907-2016)
 test "SM4 Known Answer Test" {
     const key = [16]u8{
@@ -281,19 +463,36 @@ test "SM4 Known Answer Test" {
 
     const ctx = SM4.init(&key);
 
-    // 测试加密
+    // 测试单块加密
     var ciphertext: [16]u8 = undefined;
     ctx.encryptBlock(&plaintext, &ciphertext);
     try std.testing.expectEqualSlices(u8, &expected_ciphertext, &ciphertext);
 
-    // 测试解密
+    // 测试单块解密
     var decrypted: [16]u8 = undefined;
     ctx.decryptBlock(&ciphertext, &decrypted);
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
+
+    // 测试多块加密
+    const multi_plain = [2][16]u8{ plaintext, plaintext };
+    var multi_cipher: [2][16]u8 = undefined;
+    ctx.encryptBlocks(&multi_plain[0][0], &multi_cipher[0][0], 32);
+
+    for (0..2) |i| {
+        try std.testing.expectEqualSlices(u8, &expected_ciphertext, &multi_cipher[i]);
+    }
+
+    // 测试多块解密
+    var multi_decrypted: [2][16]u8 = undefined;
+    ctx.decryptBlocks(&multi_cipher[0][0], &multi_decrypted[0][0], 32);
+
+    for (0..2) |i| {
+        try std.testing.expectEqualSlices(u8, &plaintext, &multi_decrypted[i]);
+    }
 }
 
 // 性能测试函数
-pub fn testPerformance(allocator: std.mem.Allocator) !void {
+pub fn testPerformance_ecb(allocator: std.mem.Allocator) !void {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
@@ -308,7 +507,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         100 * 1024 * 1024, // 100MB
     };
 
-    std.debug.print("\nSM4 性能测试 (推荐使用ReleaseSafe构建)\n", .{});
+    std.debug.print("\nSM4_ECB 性能测试 (推荐使用ReleaseSafe构建)\n", .{});
     std.debug.print("------------------------------------------------\n", .{});
 
     for (test_sizes) |size| {
@@ -362,8 +561,78 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
     }
 }
 
+pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+    var ctx = SM4_CBC.init(&key, &key);
+
+    const test_sizes = [_]usize{
+        16 * 64,      // 1KB
+        1024 * 16,    // 16KB
+        1024 * 1024,  // 1MB
+        10 * 1024 * 1024,  // 10MB
+        100 * 1024 * 1024, // 100MB
+    };
+
+    std.debug.print("\nSM4_CBC 性能测试 (推荐使用ReleaseSafe构建)\n", .{});
+    std.debug.print("------------------------------------------------\n", .{});
+
+    for (test_sizes) |size| {
+        const buffer = try allocator.alloc(u8, size);
+        defer allocator.free(buffer);
+
+        // 填充随机数据
+        var prng = std.Random.DefaultPrng.init(0);
+        prng.random().bytes(buffer);
+
+        const out = try allocator.alloc(u8, size);
+        defer allocator.free(out);
+
+        // 预热
+        ctx.encrypt(buffer[0..16], out[0..16]);
+
+        // 加密性能测试
+        const encrypt_start = std.time.nanoTimestamp();
+        const blocks = size / SM4_BLOCK_SIZE;
+        for (0..blocks) |i| {
+            const start = i * SM4_BLOCK_SIZE;
+            ctx.encrypt(
+                buffer[start..][0..SM4_BLOCK_SIZE],
+                out[start..][0..SM4_BLOCK_SIZE],
+            );
+        }
+        const encrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - encrypt_start));
+
+        // 解密性能测试
+        const decrypt_start = std.time.nanoTimestamp();
+        for (0..blocks) |i| {
+            const start = i * SM4_BLOCK_SIZE;
+            ctx.decrypt(
+                out[start..][0..SM4_BLOCK_SIZE],
+                buffer[start..][0..SM4_BLOCK_SIZE],
+            );
+        }
+        const decrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - decrypt_start));
+
+        // 计算速度 (MB/s)
+        const bytes_per_mb = 1024.0 * 1024.0;
+        const ns_per_s = 1_000_000_000.0;
+        const encrypt_speed = (@as(f64, @floatFromInt(size)) / encrypt_time) * ns_per_s / bytes_per_mb;
+        const decrypt_speed = (@as(f64, @floatFromInt(size)) / decrypt_time) * ns_per_s / bytes_per_mb;
+
+        std.debug.print("数据: {d:>6} KB | 加密: {d:>6.2} MB/s | 解密: {d:>6.2} MB/s\n", .{
+            size / 1024,
+            encrypt_speed,
+            decrypt_speed,
+        });
+    }
+}
+
 // 主测试函数
 test "SM4 Performance" {
     const allocator = std.testing.allocator;
-    try testPerformance(allocator);
+    try testPerformance_ecb(allocator);
+    try testPerformance_cbc(allocator);
 }
