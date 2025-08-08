@@ -2,7 +2,7 @@ const std = @import("std");
 const crypto = std.crypto;
 const mem = std.mem;
 const meta = std.meta;
-
+const math = std.math;
 const EncodingError = crypto.errors.EncodingError;
 const IdentityElementError = crypto.errors.IdentityElementError;
 const NonCanonicalError = crypto.errors.NonCanonicalError;
@@ -18,7 +18,6 @@ pub const SM2 = struct {
     x: Fe,
     y: Fe,
     z: Fe = Fe.one,
-
     is_base: bool = false,
 
     /// The SM2 base point.
@@ -31,37 +30,38 @@ pub const SM2 = struct {
 
     /// The SM2 neutral element.
     pub const identityElement = SM2{ .x = Fe.zero, .y = Fe.one, .z = Fe.zero };
+
+    // SM2 curve: y² = x³ + ax + b
+    // a = -3 = 0xFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC
     pub const A = Fe.fromInt(115792089210356248756420345214020892766250353991924191454421193933289684991996) catch unreachable;
+
+    // B = 0x28E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93
     pub const B = Fe.fromInt(18505919022281880113072981827955639221458448578012075254857346196103069175443) catch unreachable;
 
     /// Reject the neutral element.
     pub fn rejectIdentity(p: SM2) IdentityElementError!void {
-    if (p.z.isZero()) {
-        return error.IdentityElement;
-    }
+        if (p.z.isZero()) {
+            return error.IdentityElement;
+        }
     }
 
     /// Create a point from affine coordinates after checking that they match the curve equation.
     pub fn fromAffineCoordinates(p: AffineCoordinates) EncodingError!SM2 {
-    const x = p.x;
-    const y = p.y;
+        const x = p.x;
+        const y = p.y;
+        if (x.isZero() and y.isZero()) {
+            return SM2.identityElement;
+        }
 
-    // 检查是否为无穷远点
-    if (x.isZero() and y.isZero()) {
-        return SM2.identityElement;
-    }
-
-    // 验证曲线方程 y² = x³ + ax + b
-    const x3 = x.sq().mul(x);
-    const ax = SM2.A.mul(x);
-    const x3axb = x3.add(ax).add(SM2.B);
-    const yy = y.sq();
-
-    if (!x3axb.equivalent(yy)) {
-        return error.InvalidEncoding;
-    }
-
-    return SM2{ .x = x, .y = y, .z = Fe.one };
+        // 验证曲线方程 y² = x³ + ax + b
+        const x3 = x.sq().mul(x);
+        const ax = A.mul(x);
+        const x3axb = x3.add(ax).add(B);
+        const yy = y.sq();
+        if (!x3axb.equivalent(yy)) {
+            return error.InvalidEncoding;
+        }
+        return SM2{ .x = x, .y = y, .z = Fe.one };
     }
 
     /// Create a point from serialized affine coordinates.
@@ -76,11 +76,8 @@ pub const SM2 = struct {
         const x3 = x.sq().mul(x);
         const ax = A.mul(x);
         const x3axb = x3.add(ax).add(B);
-
         var y = try x3axb.sqrt();
         const yn = y.neg();
-
-        // 根据奇偶性选择正确的 Y 坐标
         y.cMov(yn, @intFromBool(is_odd) ^ @intFromBool(y.isOdd()));
         return y;
     }
@@ -114,6 +111,11 @@ pub const SM2 = struct {
 
     /// Serialize a point using the compressed SEC-1 format.
     pub fn toCompressedSec1(p: SM2) [33]u8 {
+        if (p.z.isZero()) {
+            var out = [1]u8{0} ** 33;
+            out[0] = 0;
+            return out;
+        }
         var out: [33]u8 = undefined;
         const xy = p.affineCoordinates();
         out[0] = if (xy.y.isOdd()) 3 else 2;
@@ -143,113 +145,87 @@ pub const SM2 = struct {
     }
 
     /// Double a SM2 point.
-    // Algorithm 6 from https://eprint.iacr.org/2015/1060.pdf
+    // Fixed doubling algorithm for SM2
     pub fn dbl(p: SM2) SM2 {
-    if (p.z.isZero()) {
-        return SM2.identityElement;
-    }
+        if (p.z.isZero()) {
+            return SM2.identityElement;
+        }
 
-    const x = p.x;
-    const y = p.y;
-    const z = p.z;
+        const xx = p.x.sq();
+        const yy = p.y.sq();
+        const zz = p.z.sq();
+        const zzzz = zz.sq();
+        const s = p.x.mul(yy).dbl().dbl(); // 4 * X * Y²
+        const m = xx.mul(Fe.fromInt(3) catch unreachable).sub(zzzz.mul(Fe.fromInt(3) catch unreachable)); // 3X² - 3Z⁴
+        const t = m.sq().sub(s.dbl()); // M² - 2S
+        const x3 = t;
+        const y3 = m.mul(s.sub(t)).sub(yy.sq().dbl().dbl().dbl()); // M*(S-T) - 8Y⁴
+        const z3 = p.y.mul(p.z).dbl(); // 2*Y*Z
 
-    const a = SM2.A;
-
-    const xx = x.sq();
-    const yy = y.sq();
-    const yyyy = yy.sq();
-    const zz = z.sq();
-    const zzzz = zz.sq();
-
-    // S = 4*X*Y²
-    const s = x.mul(yy).dbl().dbl();
-
-    // M = 3X² + aZ⁴
-    const m = xx.dbl().add(xx).add(a.mul(zzzz));
-
-    // T = M² - 2S
-    const t = m.sq().sub(s.dbl());
-
-    // X3 = T
-    const x3 = t;
-
-    // Y3 = M*(S-T) - 8Y⁴
-    const y3 = m.mul(s.sub(t)).sub(yyyy.dbl().dbl().dbl());
-
-    // Z3 = 2Y*Z
-    const z3 = y.mul(z).dbl();
-
-    return .{ .x = x3, .y = y3, .z = z3 };
+        return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Add SM2 points, the second being specified using affine coordinates.
-    // Algorithm 5 from https://eprint.iacr.org/2015/1060.pdf
+    // Fixed mixed addition algorithm for SM2
     pub fn addMixed(p: SM2, q: AffineCoordinates) SM2 {
-    if (p.z.isZero()) return .{ .x = q.x, .y = q.y, .z = Fe.one };
-    if (q.x.isZero() and q.y.isZero()) return p;
+        if (p.z.isZero()) {
+            return .{ .x = q.x, .y = q.y, .z = Fe.one };
+        }
+        if (q.x.isZero() and q.y.isZero()) {
+            return p;
+        }
 
-    const x1 = p.x;
-    const y1 = p.y;
-    const z1 = p.z;
-    const x2 = q.x;
-    const y2 = q.y;
+        const z1z1 = p.z.sq();
+        const n2 = q.x.mul(z1z1);
+        const s2 = q.y.mul(p.z).mul(z1z1);
 
-    const z1z1 = z1.sq();
-    const n2 = x2.mul(z1z1);
-    const s2 = y2.mul(z1).mul(z1z1);
+        if (p.x.equivalent(n2)) {
+            return if (p.y.equivalent(s2)) p.dbl() else SM2.identityElement;
+        }
 
-    if (x1.equivalent(n2)) {
-        return if (y1.equivalent(s2)) dbl(p) else SM2.identityElement;
-    }
+        const h = n2.sub(p.x);
+        const hh = h.sq();
+        const i = hh.dbl().dbl(); // 4*HH
+        const j = h.mul(i);
+        const r = s2.sub(p.y).dbl();
+        const v = p.x.mul(i);
 
-    const h = n2.sub(x1);
-    const r = s2.sub(y1);
-    const hh = h.sq();
-    const hhh = h.mul(hh);
-    const v = x1.mul(hh);
+        const x3 = r.sq().sub(j).sub(v.dbl());
+        const y3 = r.mul(v.sub(x3)).sub(p.y.mul(j).dbl());
+        const z3 = p.z.mul(h).dbl(); // 2*Z1*H
 
-    const x3 = r.sq().sub(hhh).sub(v.dbl());
-    const y3 = r.mul(v.sub(x3)).sub(y1.mul(hhh));
-    const z3 = z1.mul(h);
-
-    return .{ .x = x3, .y = y3, .z = z3 };
+        return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Add SM2 points.
-    // Algorithm 4 from https://eprint.iacr.org/2015/1060.pdf
+    // Fixed addition algorithm for SM2
     pub fn add(p: SM2, q: SM2) SM2 {
-    if (p.z.isZero()) return q;
-    if (q.z.isZero()) return p;
+        if (p.z.isZero()) return q;
+        if (q.z.isZero()) return p;
 
-    const x1 = p.x;
-    const y1 = p.y;
-    const z1 = p.z;
-    const x2 = q.x;
-    const y2 = q.y;
-    const z2 = q.z;
+        const z1z1 = p.z.sq();
+        const z2z2 = q.z.sq();
+        const n1 = p.x.mul(z2z2);
+        const n2 = q.x.mul(z1z1);
+        const s1 = p.y.mul(q.z).mul(z2z2);
+        const s2 = q.y.mul(p.z).mul(z1z1);
 
-    const z1z1 = z1.sq();
-    const z2z2 = z2.sq();
-    const n1 = x1.mul(z2z2);
-    const n2 = x2.mul(z1z1);
-    const s1 = y1.mul(z2).mul(z2z2);
-    const s2 = y2.mul(z1).mul(z1z1);
+        if (n1.equivalent(n2)) {
+            return if (s1.equivalent(s2)) p.dbl() else SM2.identityElement;
+        }
 
-    if (n1.equivalent(n2)) {
-        return if (s1.equivalent(s2)) dbl(p) else SM2.identityElement;
-    }
+        const h = n2.sub(n1);
+        const hh = h.sq();
+        const i = hh.dbl().dbl(); // 4*HH
+        const j = h.mul(i);
+        const r = s2.sub(s1).dbl();
+        const v = n1.mul(i);
 
-    const h = n2.sub(n1);
-    const r = s2.sub(s1);
-    const hh = h.sq();
-    const hhh = h.mul(hh);
-    const v = n1.mul(hh);
+        const x3 = r.sq().sub(j).sub(v.dbl());
+        const y3 = r.mul(v.sub(x3)).sub(s1.mul(j).dbl());
+        const z3 = p.z.mul(q.z).mul(h).dbl().dbl(); // 4*Z1*Z2*H
 
-    const x3 = r.sq().sub(hhh).sub(v.dbl());
-    const y3 = r.mul(v.sub(x3)).sub(s1.mul(hhh));
-    const z3 = z1.mul(z2).mul(h);
-
-    return .{ .x = x3, .y = y3, .z = z3 };
+        return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Subtract SM2 points.
@@ -264,15 +240,13 @@ pub const SM2 = struct {
 
     /// Return affine coordinates.
     pub fn affineCoordinates(p: SM2) AffineCoordinates {
-    if (p.z.isZero()) {
-        return AffineCoordinates.identityElement;
-    }
-
-    const zinv = p.z.invert();
-    const x = p.x.mul(zinv);
-    const y = p.y.mul(zinv);
-
-    return .{ .x = x, .y = y };
+        if (p.z.isZero()) {
+            return AffineCoordinates.identityElement;
+        }
+        const zinv = p.z.invert();
+        const x = p.x.mul(zinv);
+        const y = p.y.mul(zinv);
+        return .{ .x = x, .y = y };
     }
 
     /// Return true if both coordinate sets represent the same point.
@@ -290,22 +264,12 @@ pub const SM2 = struct {
         p.z.cMov(a.z, c);
     }
 
-    fn pcSelect(comptime n: usize, pc: *const [n]SM2, b: u8) SM2 {
-        var t = SM2.identityElement;
-        comptime var i: u8 = 1;
-        inline while (i < pc.len) : (i += 1) {
-            t.cMov(pc[i], @as(u1, @truncate((@as(usize, b ^ i) -% 1) >> 8)));
-        }
-        return t;
-    }
-
     fn slide(s: [32]u8) [2 * 32 + 1]i8 {
         var e: [2 * 32 + 1]i8 = undefined;
         for (s, 0..) |x, i| {
             e[i * 2 + 0] = @as(i8, @as(u4, @truncate(x)));
             e[i * 2 + 1] = @as(i8, @as(u4, @truncate(x >> 4)));
         }
-        // Now, e[0..63] is between 0 and 15, e[63] is between 0 and 7
         var carry: i8 = 0;
         for (e[0..64]) |*x| {
             x.* += carry;
@@ -314,16 +278,93 @@ pub const SM2 = struct {
             std.debug.assert(x.* >= -8 and x.* <= 8);
         }
         e[64] = carry;
-        // Now, e[*] is between -8 and 8, including e[64]
         std.debug.assert(carry >= -8 and carry <= 8);
         return e;
     }
 
+    fn pcSelect(comptime n: usize, pc: *const [n]SM2, b: u8) SM2 {
+        var t = SM2.identityElement;
+        comptime var i: u8 = 1;
+        inline while (i < pc.len) : (i += 1) {
+            const select = @as(u1, @intFromBool(i == b));
+            t.cMov(pc[i], select);
+        }
+        return t;
+    }
+
+    fn precompute(p: SM2, comptime count: usize) [1 + count]SM2 {
+        var pc: [1 + count]SM2 = undefined;
+        pc[0] = SM2.identityElement;
+        pc[1] = p;
+        var i: usize = 2;
+        while (i <= count) : (i += 1) {
+            pc[i] = if (i % 2 == 0) pc[i / 2].dbl() else pc[i - 1].add(p);
+        }
+        return pc;
+    }
+
+    const basePointPc = pc: {
+        @setEvalBranchQuota(500000);
+        break :pc precompute(SM2.basePoint, 15);
+    };
+
+    fn orderSwap(s: [32]u8) [32]u8 {
+        var t = s;
+        std.mem.reverse(u8, &t);
+        return t;
+    }
+
+    /// Multiply an elliptic curve point by a scalar.
+    /// Return error.IdentityElement if the result is the identity element.
+    pub fn mul(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
+        const s = if (endian == .little) s_ else orderSwap(s_);
+        if (p.is_base) {
+            return pcMul16(&basePointPc, s, false);
+        }
+        try p.rejectIdentity();
+        const pc = precompute(p, 15);
+        return pcMul16(&pc, s, false);
+    }
+
+    fn pcMul16(pc: *const [16]SM2, s: [32]u8, comptime vartime: bool) IdentityElementError!SM2 {
+        var q = SM2.identityElement;
+        var pos: usize = 252;
+        while (true) : (pos -= 4) {
+            const slot = @as(u4, @truncate((s[pos >> 3] >> @as(u3, @truncate(pos)))));
+
+            if (vartime) {
+                if (slot != 0) {
+                    q = q.add(pc[slot]);
+                }
+            } else {
+                q = q.add(pcSelect(16, pc, slot));
+            }
+
+            if (pos == 0) break;
+            q = q.dbl().dbl().dbl().dbl();
+        }
+        try q.rejectIdentity();
+        return q;
+    }
+
+    /// Multiply an elliptic curve point by a *PUBLIC* scalar *IN VARIABLE TIME*
+    /// This can be used for signature verification.
+    pub fn mulPublic(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
+        const s = if (endian == .little) s_ else orderSwap(s_);
+        if (p.is_base) {
+            return pcMul16(&basePointPc, s, true);
+        }
+        try p.rejectIdentity();
+        const pc = precompute(p, 8);
+        return pcMul(&pc, s, true);
+    }
+
     fn pcMul(pc: *const [9]SM2, s: [32]u8, comptime vartime: bool) IdentityElementError!SM2 {
-        std.debug.assert(vartime);
         const e = slide(s);
         var q = SM2.identityElement;
-        var pos = e.len - 1;
+        var pos: usize = 64;
+        _ = vartime;
+
         while (true) : (pos -= 1) {
             const slot = e[pos];
             if (slot > 0) {
@@ -338,75 +379,11 @@ pub const SM2 = struct {
         return q;
     }
 
-    fn pcMul16(pc: *const [16]SM2, s: [32]u8, comptime vartime: bool) IdentityElementError!SM2 {
-        var q = SM2.identityElement;
-        var pos: usize = 252;
-        while (true) : (pos -= 4) {
-            const slot = @as(u4, @truncate((s[pos >> 3] >> @as(u3, @truncate(pos)))));
-            if (vartime) {
-                if (slot != 0) {
-                    q = q.add(pc[slot]);
-                }
-            } else {
-                q = q.add(pcSelect(16, pc, slot));
-            }
-            if (pos == 0) break;
-            q = q.dbl().dbl().dbl().dbl();
-        }
-        try q.rejectIdentity();
-        return q;
-    }
-
-    fn precompute(p: SM2, comptime count: usize) [1 + count]SM2 {
-    var pc: [1 + count]SM2 = undefined;
-    pc[0] = SM2.identityElement;
-    pc[1] = p;
-
-    var i: usize = 2;
-    while (i <= count) : (i += 1) {
-        pc[i] = if (i % 2 == 0)
-            pc[i / 2].dbl()
-        else
-            pc[i - 1].add(p);
-    }
-
-    return pc;
-    }
-
-    const basePointPc = pc: {
-        @setEvalBranchQuota(500000);
-        break :pc precompute(SM2.basePoint, 15);
-    };
-
-    /// Multiply an elliptic curve point by a scalar.
-    /// Return error.IdentityElement if the result is the identity element.
-    pub fn mul(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
-        const s = if (endian == .little) s_ else Fe.orderSwap(s_);
-        if (p.is_base) {
-            return pcMul16(&basePointPc, s, false);
-        }
-        try p.rejectIdentity();
-        const pc = precompute(p, 15);
-        return pcMul16(&pc, s, false);
-    }
-
-    /// Multiply an elliptic curve point by a *PUBLIC* scalar *IN VARIABLE TIME*
-    /// This can be used for signature verification.
-    pub fn mulPublic(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
-        const s = if (endian == .little) s_ else Fe.orderSwap(s_);
-        if (p.is_base) {
-            return pcMul16(&basePointPc, s, true);
-        }
-        try p.rejectIdentity();
-        const pc = precompute(p, 8);
-        return pcMul(&pc, s, true);
-    }
-
     /// Double-base multiplication of public parameters - Compute (p1*s1)+(p2*s2) *IN VARIABLE TIME*
     /// This can be used for signature verification.
     pub fn mulDoubleBasePublic(p1: SM2, s1_: [32]u8, p2: SM2, s2_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
-        const s1 = if (endian == .little) s1_ else Fe.orderSwap(s1_);
-        const s2 = if (endian == .little) s2_ else Fe.orderSwap(s2_);
+        const s1 = if (endian == .little) s1_ else orderSwap(s1_);
+        const s2 = if (endian == .little) s2_ else orderSwap(s2_);
         try p1.rejectIdentity();
         var pc1_array: [9]SM2 = undefined;
         const pc1 = if (p1.is_base) basePointPc[0..9] else pc: {
@@ -422,7 +399,7 @@ pub const SM2 = struct {
         const e1 = slide(s1);
         const e2 = slide(s2);
         var q = SM2.identityElement;
-        var pos: usize = 2 * 32;
+        var pos: usize = 64;
         while (true) : (pos -= 1) {
             const slot1 = e1[pos];
             if (slot1 > 0) {
@@ -442,22 +419,21 @@ pub const SM2 = struct {
         try q.rejectIdentity();
         return q;
     }
-};
 
-/// A point in affine coordinates.
-pub const AffineCoordinates = struct {
-    x: SM2.Fe,
-    y: SM2.Fe,
+    pub const AffineCoordinates = struct {
+        x: SM2.Fe,
+        y: SM2.Fe,
 
-    /// Identity element in affine coordinates.
-    pub const identityElement = AffineCoordinates{ .x = SM2.identityElement.x, .y = SM2.identityElement.y };
+        /// Identity element in affine coordinates.
+        pub const identityElement = AffineCoordinates{ .x = Fe.zero, .y = Fe.zero };
 
-    pub fn neg(p: AffineCoordinates) AffineCoordinates {
-        return .{ .x = p.x, .y = p.y.neg() };
-    }
+        pub fn neg(p: AffineCoordinates) AffineCoordinates {
+            return .{ .x = p.x, .y = p.y.neg() };
+        }
 
-    fn cMov(p: *AffineCoordinates, a: AffineCoordinates, c: u1) void {
-        p.x.cMov(a.x, c);
-        p.y.cMov(a.y, c);
-    }
+        fn cMov(p: *AffineCoordinates, a: AffineCoordinates, c: u1) void {
+            p.x.cMov(a.x, c);
+            p.y.cMov(a.y, c);
+        }
+    };
 };
