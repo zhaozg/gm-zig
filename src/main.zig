@@ -10,5 +10,6 @@ pub fn main() !void {
     try sm3.testPerformance(allocator);
     try sm4.testPerformance_ecb(allocator);
     try sm4.testPerformance_cbc(allocator);
+    try sm4.testPerformanceSIMD_ECB(allocator);
 }
 

@@ -3,14 +3,19 @@ const assert = std.debug.assert;
 const mem = std.mem;
 const builtin = @import("builtin");
 const math = std.math;
+const Vector = std.meta.Vector;
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
 const SM4_KEY_SIZE = 16;   // 128-bit keys
 const ROUNDS = 32;         // 32 rounds
-const SLICE_SIZE = 8;      // 一次处理8个块
 
-// 预计算S盒查找表 (从C代码移植)
+// SIMD向量类型定义
+const SIMD_WIDTH = 8;      // 一次并行处理8个块
+const u32x8 = @Vector(8, u32);
+const u8x128 = @Vector(128, u8); // 8个16字节块
+
+// 预计算S盒查找表
 const SBOX_T = [256]u32{
     0x8ED55B5B, 0xD0924242, 0x4DEAA7A7, 0x06FDFBFB, 0xFCCF3333, 0x65E28787, 0xC93DF4F4, 0x6BB5DEDE,
     0x4E165858, 0x6EB4DADA, 0x44145050, 0xCAC10B0B, 0x8828A0A0, 0x17F8EFEF, 0x9C2CB0B0, 0x11051414,
@@ -240,120 +245,137 @@ pub const SM4 = struct {
         mem.writeInt(u32, output[12..16], x0, .big);
     }
 
-    // 批量加密多个块（比特切片优化）
-    pub fn encryptBlocks(ctx: *const SM4, input: []const u8, output: []u8) void {
+    // SIMD并行加密多个块
+    pub fn encryptBlocksSIMD(ctx: *const SM4, input: []const u8, output: []u8) void {
         const num_blocks = input.len / SM4_BLOCK_SIZE;
         assert(output.len >= input.len);
+        assert(input.len % SM4_BLOCK_SIZE == 0);
 
         var i: usize = 0;
-        while (i < num_blocks) : (i += SLICE_SIZE) {
-            const blocks_remaining = num_blocks - i;
-            const blocks_to_process = @min(SLICE_SIZE, blocks_remaining);
+        // 处理SIMD_WIDTH的倍数个块
+        while (i + SIMD_WIDTH <= num_blocks) : (i += SIMD_WIDTH) {
+            ctx.encryptSIMDSlice(
+                input[i * SM4_BLOCK_SIZE..],
+                output[i * SM4_BLOCK_SIZE..],
+            );
+        }
 
-            ctx.encryptSliced(
-                input[i * SM4_BLOCK_SIZE ..],
-                output[i * SM4_BLOCK_SIZE ..],
-                blocks_to_process,
+        // 处理剩余的块
+        while (i < num_blocks) : (i += 1) {
+            const start = i * SM4_BLOCK_SIZE;
+            ctx.encryptBlock(
+                @as(*const [SM4_BLOCK_SIZE]u8, @ptrCast(input[start..].ptr)),
+                @as(*[SM4_BLOCK_SIZE]u8, @ptrCast(output[start..].ptr)),
             );
         }
     }
 
-    // 批量解密多个块（比特切片优化）
-    pub fn decryptBlocks(ctx: *const SM4, input: []const u8, output: []u8) void {
+    // SIMD并行解密多个块
+    pub fn decryptBlocksSIMD(ctx: *const SM4, input: []const u8, output: []u8) void {
         const num_blocks = input.len / SM4_BLOCK_SIZE;
         assert(output.len >= input.len);
+        assert(input.len % SM4_BLOCK_SIZE == 0);
 
         var i: usize = 0;
-        while (i < num_blocks) : (i += SLICE_SIZE) {
-            const blocks_remaining = num_blocks - i;
-            const blocks_to_process = @min(SLICE_SIZE, blocks_remaining);
+        // 处理SIMD_WIDTH的倍数个块
+        while (i + SIMD_WIDTH <= num_blocks) : (i += SIMD_WIDTH) {
+            ctx.decryptSIMDSlice(
+                input[i * SM4_BLOCK_SIZE..],
+                output[i * SM4_BLOCK_SIZE..],
+            );
+        }
 
-            ctx.decryptSliced(
-                input[i * SM4_BLOCK_SIZE ..],
-                output[i * SM4_BLOCK_SIZE ..],
-                blocks_to_process,
+        // 处理剩余的块
+        while (i < num_blocks) : (i += 1) {
+            const start = i * SM4_BLOCK_SIZE;
+            ctx.decryptBlock(
+                @as(*const [SM4_BLOCK_SIZE]u8, @ptrCast(input[start..].ptr)),
+                @as(*[SM4_BLOCK_SIZE]u8, @ptrCast(output[start..].ptr)),
             );
         }
     }
 
-    // 使用比特切片技术并行处理多个块（加密）
-    fn encryptSliced(ctx: *const SM4, input: []const u8, output: []u8, num_blocks: usize) void {
-        var states: [SLICE_SIZE][4]u32 = undefined;
+    // SIMD 8块并行加密核心实现 - 修复类型错误
+    fn encryptSIMDSlice(ctx: *const SM4, input: []const u8, output: []u8) void {
+        // 加载8个块到SIMD向量
+        var x0: u32x8 = undefined;
+        var x1: u32x8 = undefined;
+        var x2: u32x8 = undefined;
+        var x3: u32x8 = undefined;
 
-        // 初始化状态
-        for (0..num_blocks) |i| {
-            const block = input[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
-            states[i][0] = mem.readInt(u32, block[0..4], .big);
-            states[i][1] = mem.readInt(u32, block[4..8], .big);
-            states[i][2] = mem.readInt(u32, block[8..12], .big);
-            states[i][3] = mem.readInt(u32, block[12..16], .big);
+        // 从输入加载数据 - 修复类型转换
+        for (0..SIMD_WIDTH) |i| {
+            const offset = i * SM4_BLOCK_SIZE;
+            x0[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 0..].ptr)), .big);
+            x1[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 4..].ptr)), .big);
+            x2[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 8..].ptr)), .big);
+            x3[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 12..].ptr)), .big);
         }
 
-        // 并行处理所有轮次
-        for (0..ROUNDS) |round| {
-            for (0..num_blocks) |i| {
-                const temp = states[i][1] ^ states[i][2] ^ states[i][3] ^ ctx.rk[round];
-                const t = sm4_T(temp);
-                const new_x0 = states[i][0] ^ t;
-
-                // 更新状态
-                states[i][0] = states[i][1];
-                states[i][1] = states[i][2];
-                states[i][2] = states[i][3];
-                states[i][3] = new_x0;
-            }
+        // 32轮加密
+        inline for (0..8) |round| {
+            const base = round * 4;
+            x0 ^= sm4_T_SIMD(x1 ^ x2 ^ x3 ^ @as(u32x8, @splat(ctx.rk[base])));
+            x1 ^= sm4_T_SIMD(x0 ^ x2 ^ x3 ^ @as(u32x8, @splat(ctx.rk[base + 1])));
+            x2 ^= sm4_T_SIMD(x0 ^ x1 ^ x3 ^ @as(u32x8, @splat(ctx.rk[base + 2])));
+            x3 ^= sm4_T_SIMD(x0 ^ x1 ^ x2 ^ @as(u32x8, @splat(ctx.rk[base + 3])));
         }
 
-        // 输出结果
-        for (0..num_blocks) |i| {
-            var block = output[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
-            mem.writeInt(u32, block[0..4], states[i][3], .big);
-            mem.writeInt(u32, block[4..8], states[i][2], .big);
-            mem.writeInt(u32, block[8..12], states[i][1], .big);
-            mem.writeInt(u32, block[12..16], states[i][0], .big);
+        // 将结果写回输出
+        for (0..SIMD_WIDTH) |i| {
+            const offset = i * SM4_BLOCK_SIZE;
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 0..].ptr)), x3[i], .big);
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 4..].ptr)), x2[i], .big);
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 8..].ptr)), x1[i], .big);
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 12..].ptr)), x0[i], .big);
         }
     }
 
-    // 使用比特切片技术并行处理多个块（解密）
-    fn decryptSliced(ctx: *const SM4, input: []const u8, output: []u8, num_blocks: usize) void {
-        var states: [SLICE_SIZE][4]u32 = undefined;
+    // SIMD 8块并行解密核心实现 - 修复类型错误
+    fn decryptSIMDSlice(ctx: *const SM4, input: []const u8, output: []u8) void {
+        // 加载8个块到SIMD向量
+        var x0: u32x8 = undefined;
+        var x1: u32x8 = undefined;
+        var x2: u32x8 = undefined;
+        var x3: u32x8 = undefined;
 
-        // 初始化状态
-        for (0..num_blocks) |i| {
-            const block = input[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
-            states[i][0] = mem.readInt(u32, block[0..4], .big);
-            states[i][1] = mem.readInt(u32, block[4..8], .big);
-            states[i][2] = mem.readInt(u32, block[8..12], .big);
-            states[i][3] = mem.readInt(u32, block[12..16], .big);
+        // 从输入加载数据 - 修复类型转换
+        for (0..SIMD_WIDTH) |i| {
+            const offset = i * SM4_BLOCK_SIZE;
+            x0[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 0..].ptr)), .big);
+            x1[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 4..].ptr)), .big);
+            x2[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 8..].ptr)), .big);
+            x3[i] = mem.readInt(u32, @as(*const [4]u8, @ptrCast(input[offset + 12..].ptr)), .big);
         }
 
-        // 并行处理所有轮次（反向）
+        // 32轮解密 (逆序)
         var round: usize = ROUNDS;
         while (round > 0) {
-            round -= 1;
-            for (0..num_blocks) |i| {
-                const temp = states[i][1] ^ states[i][2] ^ states[i][3] ^ ctx.rk[round];
-                const t = sm4_T(temp);
-                const new_x0 = states[i][0] ^ t;
-
-                // 更新状态
-                states[i][0] = states[i][1];
-                states[i][1] = states[i][2];
-                states[i][2] = states[i][3];
-                states[i][3] = new_x0;
-            }
+            round -= 4;
+            x0 ^= sm4_T_SIMD(x1 ^ x2 ^ x3 ^ @as(u32x8, @splat(ctx.rk[round + 3])));
+            x1 ^= sm4_T_SIMD(x0 ^ x2 ^ x3 ^ @as(u32x8, @splat(ctx.rk[round + 2])));
+            x2 ^= sm4_T_SIMD(x0 ^ x1 ^ x3 ^ @as(u32x8, @splat(ctx.rk[round + 1])));
+            x3 ^= sm4_T_SIMD(x0 ^ x1 ^ x2 ^ @as(u32x8, @splat(ctx.rk[round])));
         }
 
-        // 输出结果
-        for (0..num_blocks) |i| {
-            var block = output[i * SM4_BLOCK_SIZE .. (i + 1) * SM4_BLOCK_SIZE];
-            mem.writeInt(u32, block[0..4], states[i][3], .big);
-            mem.writeInt(u32, block[4..8], states[i][2], .big);
-            mem.writeInt(u32, block[8..12], states[i][1], .big);
-            mem.writeInt(u32, block[12..16], states[i][0], .big);
+        // 将结果写回输出
+        for (0..SIMD_WIDTH) |i| {
+            const offset = i * SM4_BLOCK_SIZE;
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 0..].ptr)), x3[i], .big);
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 4..].ptr)), x2[i], .big);
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 8..].ptr)), x1[i], .big);
+            mem.writeInt(u32, @as(*[4]u8, @ptrCast(output[offset + 12..].ptr)), x0[i], .big);
         }
     }
 
+    // SIMD版本的T函数
+    fn sm4_T_SIMD(n: u32x8) u32x8 {
+        var result: u32x8 = undefined;
+        for (0..SIMD_WIDTH) |i| {
+            result[i] = sm4_T(n[i]);
+        }
+        return result;
+    }
     // 使用预计算表的T函数
     fn sm4_T(n: u32) u32 {
         return SBOX_T[(n >> 24) & 0xFF] ^
@@ -473,20 +495,23 @@ test "SM4 Known Answer Test" {
     ctx.decryptBlock(&ciphertext, &decrypted);
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 
-    // 测试多块加密
-    const multi_plain = [2][16]u8{ plaintext, plaintext };
-    var multi_cipher: [2][16]u8 = undefined;
-    ctx.encryptBlocks(&multi_plain[0][0], &multi_cipher[0][0], 32);
+    // 测试SIMD多块加密 - 修复数组初始化
+    var multi_plain: [SIMD_WIDTH][16]u8 = undefined;
+    for (0..SIMD_WIDTH) |i| {
+        multi_plain[i] = plaintext;
+    }
+    var multi_cipher: [SIMD_WIDTH][16]u8 = undefined;
+    ctx.encryptBlocksSIMD(std.mem.sliceAsBytes(&multi_plain), std.mem.sliceAsBytes(&multi_cipher));
 
-    for (0..2) |i| {
+    for (0..SIMD_WIDTH) |i| {
         try std.testing.expectEqualSlices(u8, &expected_ciphertext, &multi_cipher[i]);
     }
 
-    // 测试多块解密
-    var multi_decrypted: [2][16]u8 = undefined;
-    ctx.decryptBlocks(&multi_cipher[0][0], &multi_decrypted[0][0], 32);
+    // 测试SIMD多块解密
+    var multi_decrypted: [SIMD_WIDTH][16]u8 = undefined;
+    ctx.decryptBlocksSIMD(std.mem.sliceAsBytes(&multi_cipher), std.mem.sliceAsBytes(&multi_decrypted));
 
-    for (0..2) |i| {
+    for (0..SIMD_WIDTH) |i| {
         try std.testing.expectEqualSlices(u8, &plaintext, &multi_decrypted[i]);
     }
 }
@@ -630,9 +655,69 @@ pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
     }
 }
 
+// 性能测试函数
+pub fn testPerformanceSIMD_ECB(allocator: std.mem.Allocator) !void {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+    const ctx = SM4.init(&key);
+
+    const test_sizes = [_]usize{
+        16 * 64,      // 1KB
+        1024 * 16,    // 16KB
+        1024 * 1024,  // 1MB
+        10 * 1024 * 1024,   // 10MB
+        100 * 1024 * 1024, // 100MB
+    };
+
+    std.debug.print("\nSM4_ECB_SIMD 性能测试 (推荐使用ReleaseFast构建)\n", .{});
+    std.debug.print("----------------------------------------------------\n", .{});
+
+    for (test_sizes) |size| {
+        const buffer = try allocator.alloc(u8, size);
+        defer allocator.free(buffer);
+
+        // 填充随机数据
+        var prng = std.Random.DefaultPrng.init(0);
+        prng.random().bytes(buffer);
+
+        const out = try allocator.alloc(u8, size);
+        defer allocator.free(out);
+
+        // 预热
+        if (buffer.len >= SM4_BLOCK_SIZE) {
+            ctx.encryptBlock(@as(*const [16]u8, @ptrCast(buffer[0..16])), @as(*[16]u8, @ptrCast(out[0..16])));
+        }
+
+        // SIMD加密性能测试
+        const encrypt_start = std.time.nanoTimestamp();
+        ctx.encryptBlocksSIMD(buffer, out);
+        const encrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - encrypt_start));
+
+        // SIMD解密性能测试
+        const decrypt_start = std.time.nanoTimestamp();
+        ctx.decryptBlocksSIMD(out, buffer);
+        const decrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - decrypt_start));
+
+        // 计算速度 (MB/s)
+        const bytes_per_mb = 1024.0 * 1024.0;
+        const ns_per_s = 1_000_000_000.0;
+        const encrypt_speed = (@as(f64, @floatFromInt(size)) / encrypt_time) * ns_per_s / bytes_per_mb;
+        const decrypt_speed = (@as(f64, @floatFromInt(size)) / decrypt_time) * ns_per_s / bytes_per_mb;
+
+        std.debug.print("数据: {d:>6} KB | SIMD加密: {d:>6.2} MB/s | SIMD解密: {d:>6.2} MB/s\n", .{
+            size / 1024,
+            encrypt_speed,
+            decrypt_speed,
+        });
+    }
+}
+
 // 主测试函数
 test "SM4 Performance" {
     const allocator = std.testing.allocator;
     try testPerformance_ecb(allocator);
     try testPerformance_cbc(allocator);
+    try testPerformanceSIMD_ECB(allocator);
 }
