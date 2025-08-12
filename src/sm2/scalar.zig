@@ -18,7 +18,7 @@ pub const CompressedScalar = [encoded_length]u8;
 
 const Fe = Field(.{
     .fiat = @import("sm2_scalar_64.zig"),
-    .field_order = 115792089210356248756420345214020892766061623724957744567843809356293439045923,
+    .field_order = 0xfffffffeffffffffffffffffffffffff7203df6b21c6052b53bbf40939d54123,
     .field_bits = 256,
     .saturated_bits = 256,
     .encoded_length = encoded_length,
@@ -146,7 +146,7 @@ pub const Scalar = struct {
 
     /// Compute x^n (mod L)
     pub fn pow(a: Scalar, comptime T: type, comptime n: T) Scalar {
-        return Scalar{ .fe = a.fe.pow(n) };
+        return Scalar{ .fe = a.fe.pow(T, n) };
     }
 
     /// Compute -x (mod L)

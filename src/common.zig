@@ -284,6 +284,17 @@ pub fn Field(comptime params: FieldParams) type {
                 const t11111111 = t1111.mul(t1111.sqn(4));
                 const x16 = t11111111.sqn(8).mul(t11111111);
                 return x16.sqn(16).mul(x16).sqn(32).mul(x2).sqn(96).mul(x2).sqn(94);
+            } else if (field_order == 0xfffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff) {
+                // SM2 的素数：p = FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF
+                // p ≡ 3 (mod 4)，所以可以使用 x^((p+1)/4) 计算平方根
+                const t11 = x2.mul(x2.sq());
+                const t1111 = t11.mul(t11.sqn(2));
+                const t11111111 = t1111.mul(t1111.sqn(4));
+                const x16 = t11111111.sqn(8).mul(t11111111);
+                const x32 = x16.sqn(16).mul(x16);
+                const x64 = x32.sqn(32).mul(x32);
+                const x96 = x64.sqn(32).mul(x32);
+                return x96.sqn(32).mul(x2).sqn(94).mul(x2);
             } else if (field_order == 39402006196394479212279040100143613805079739270465446667948293404245721771496870329047266088258938001861606973112319) {
                 const t111 = x2.mul(x2.mul(x2.sq()).sq());
                 const t111111 = t111.mul(t111.sqn(3));
