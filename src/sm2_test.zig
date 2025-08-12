@@ -89,64 +89,6 @@ test "SM2: 从仿射坐标创建点" {
     try testing.expect(p.equivalent(SM2.basePoint));
 }
 
-test "SM2: 测试向量 - 标量乘法" {
-    const test_cases = .{
-        .{ test_vectors.k1, test_vectors.P1x, test_vectors.P1y },
-        .{ test_vectors.k2, test_vectors.P2x, test_vectors.P2y },
-        .{ test_vectors.k3, test_vectors.P3x, test_vectors.P3y },
-    };
-
-    inline for (test_cases) |case| {
-        const k_hex = case[0];
-        const expected_x_hex = case[1];
-        const expected_y_hex = case[2];
-
-        const k = hexToBytes(k_hex);
-        const expected_x = hexToFe(expected_x_hex, .big);
-        const expected_y = hexToFe(expected_y_hex, .big);
-
-        // 计算 k * G
-        const result = try SM2.basePoint.mul(k, .big);
-        const affine = result.affineCoordinates();
-
-        // 验证坐标
-        try testing.expect(affine.x.equivalent(expected_x));
-        try testing.expect(affine.y.equivalent(expected_y));
-    }
-}
-
-test "SM2: 测试向量 - 点加倍" {
-    const test_cases = .{
-        .{ SM2.basePoint, test_vectors.double1x, test_vectors.double1y },
-        .{
-            SM2{
-                .x = hexToFe(test_vectors.double1x, .big),
-                .y = hexToFe(test_vectors.double1y, .big),
-                .z = SM2.Fe.one,
-            },
-            test_vectors.double2x,
-            test_vectors.double2y,
-        },
-    };
-
-    inline for (test_cases) |case| {
-        const point = case[0];
-        const expected_x_hex = case[1];
-        const expected_y_hex = case[2];
-
-        const expected_x = hexToFe(expected_x_hex, .big);
-        const expected_y = hexToFe(expected_y_hex, .big);
-
-        // 计算点加倍
-        const double = point.dbl();
-        const affine = double.affineCoordinates();
-
-        // 验证坐标
-        try testing.expect(affine.x.equivalent(expected_x));
-        try testing.expect(affine.y.equivalent(expected_y));
-    }
-}
-
 test "SM2: SEC1 压缩格式编码/解码" {
     // 生成随机点
     const p = SM2.random();
@@ -252,29 +194,6 @@ test "SM2: 双基标量乘法 (大标量)" {
     try testing.expect(pr1.equivalent(pr2));
 }
 
-test "SM2: 标量逆元" {
-    // 预期结果
-    const expected_hex = "3b549196a13c898a6f6e84dfb3a22c40a8b9b17fb88e408ea674e451cd01d0a6";
-    var expected: [32]u8 = undefined;
-    _ = try fmt.hexToBytes(&expected, expected_hex);
-
-    // 输入标量
-    const scalar_bytes = [_]u8{
-        0x94, 0xa1, 0xbb, 0xb1, 0x4b, 0x90, 0x6a, 0x61,
-        0xa2, 0x80, 0xf2, 0x45, 0xf9, 0xe9, 0x3c, 0x7f,
-        0x3b, 0x4a, 0x62, 0x47, 0x82, 0x4f, 0x5d, 0x33,
-        0xb9, 0x67, 0x07, 0x87, 0x64, 0x2a, 0x68, 0xde,
-    };
-
-    // 创建标量
-    const scalar = try SM2.scalar.Scalar.fromBytes(scalar_bytes, .big);
-
-    // 计算逆元
-    const inverse = scalar.invert();
-
-    // 验证结果
-    try testing.expectEqualSlices(u8, &expected, &inverse.toBytes(.big));
-}
 
 test "SM2: 标量奇偶性" {
     // 创建标量

@@ -242,8 +242,10 @@ pub const SM2 = struct {
             return AffineCoordinates.identityElement;
         }
         const zinv = p.z.invert();
-        const x = p.x.mul(zinv);
-        const y = p.y.mul(zinv);
+        const zinv2 = zinv.sq();           // Z⁻²
+        const zinv3 = zinv2.mul(zinv);     // Z⁻³
+        const x = p.x.mul(zinv2);          // X / Z²
+        const y = p.y.mul(zinv3);          // Y / Z³
         return .{ .x = x, .y = y };
     }
 
