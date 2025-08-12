@@ -117,23 +117,24 @@ pub const SM3 = struct {
 
     // 优化后的压缩函数
     inline fn compress(d: *Self, block: *const [block_length]u8) void {
+        @setRuntimeSafety(false);
         var w: [68]u32 align(16) = undefined; // 对齐内存
         var a: [8]u32 = d.s; // 局部变量优化
 
-        // 加载初始消息字
-        simdLoadMessageWords(block, w[0..16]);
+        // SIMD加载消息字
+        simdLoadMessageWords(block, @as(*[16]u32, @ptrCast(&w[0])));
 
         // 展开的消息扩展循环
         comptime var i = 16;
         inline while (i < 68) : (i += 4) {
-            w[i] = p1(w[i-16] ^ w[i-9] ^ math.rotl(u32, w[i-3], 15)) ^
-                   math.rotl(u32, w[i-13], 7) ^ w[i-6];
-            w[i+1] = p1(w[i-15] ^ w[i-8] ^ math.rotl(u32, w[i-2], 15)) ^
-                     math.rotl(u32, w[i-12], 7) ^ w[i-5];
-            w[i+2] = p1(w[i-14] ^ w[i-7] ^ math.rotl(u32, w[i-1], 15)) ^
-                     math.rotl(u32, w[i-11], 7) ^ w[i-4];
-            w[i+3] = p1(w[i-13] ^ w[i-6] ^ math.rotl(u32, w[i], 15)) ^
-                     math.rotl(u32, w[i-10], 7) ^ w[i-3];
+            w[i] = p1(w[i - 16] ^ w[i - 9] ^ math.rotl(u32, w[i - 3], 15)) ^
+                math.rotl(u32, w[i - 13], 7) ^ w[i - 6];
+            w[i + 1] = p1(w[i - 15] ^ w[i - 8] ^ math.rotl(u32, w[i - 2], 15)) ^
+                math.rotl(u32, w[i - 12], 7) ^ w[i - 5];
+            w[i + 2] = p1(w[i - 14] ^ w[i - 7] ^ math.rotl(u32, w[i - 1], 15)) ^
+                math.rotl(u32, w[i - 11], 7) ^ w[i - 4];
+            w[i + 3] = p1(w[i - 13] ^ w[i - 6] ^ math.rotl(u32, w[i], 15)) ^
+                math.rotl(u32, w[i - 10], 7) ^ w[i - 3];
         }
 
         // 展开的主循环 (4轮一组)
@@ -149,7 +150,7 @@ pub const SM3 = struct {
             var tt1 = if (j < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
             tt1 +%= a[3];
             tt1 +%= ss2;
-            tt1 +%= (w[j] ^ w[j+4]);
+            tt1 +%= (w[j] ^ w[j + 4]);
 
             var tt2 = if (j < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
             tt2 +%= a[7];
@@ -169,19 +170,19 @@ pub const SM3 = struct {
             // 第2轮 (j+1)
             ss1 = math.rotl(u32, a[0], 12);
             ss1 +%= a[4];
-            ss1 +%= T[j+1];
+            ss1 +%= T[j + 1];
             ss1 = math.rotl(u32, ss1, 7);
             const ss2_1 = ss1 ^ math.rotl(u32, a[0], 12);
 
-            tt1 = if (j+1 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
+            tt1 = if (j + 1 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
             tt1 +%= a[3];
             tt1 +%= ss2_1;
-            tt1 +%= (w[j+1] ^ w[j+5]);
+            tt1 +%= (w[j + 1] ^ w[j + 5]);
 
-            tt2 = if (j+1 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
+            tt2 = if (j + 1 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
             tt2 +%= a[7];
             tt2 +%= ss1;
-            tt2 +%= w[j+1];
+            tt2 +%= w[j + 1];
 
             a[3] = a[2];
             a[2] = math.rotl(u32, a[1], 9);
@@ -195,19 +196,19 @@ pub const SM3 = struct {
             // 第3轮 (j+2)
             ss1 = math.rotl(u32, a[0], 12);
             ss1 +%= a[4];
-            ss1 +%= T[j+2];
+            ss1 +%= T[j + 2];
             ss1 = math.rotl(u32, ss1, 7);
             const ss2_2 = ss1 ^ math.rotl(u32, a[0], 12);
 
-            tt1 = if (j+2 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
+            tt1 = if (j + 2 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
             tt1 +%= a[3];
             tt1 +%= ss2_2;
-            tt1 +%= (w[j+2] ^ w[j+6]);
+            tt1 +%= (w[j + 2] ^ w[j + 6]);
 
-            tt2 = if (j+2 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
+            tt2 = if (j + 2 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
             tt2 +%= a[7];
             tt2 +%= ss1;
-            tt2 +%= w[j+2];
+            tt2 +%= w[j + 2];
 
             a[3] = a[2];
             a[2] = math.rotl(u32, a[1], 9);
@@ -221,19 +222,19 @@ pub const SM3 = struct {
             // 第4轮 (j+3)
             ss1 = math.rotl(u32, a[0], 12);
             ss1 +%= a[4];
-            ss1 +%= T[j+3];
+            ss1 +%= T[j + 3];
             ss1 = math.rotl(u32, ss1, 7);
             const ss2_3 = ss1 ^ math.rotl(u32, a[0], 12);
 
-            tt1 = if (j+3 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
+            tt1 = if (j + 3 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
             tt1 +%= a[3];
             tt1 +%= ss2_3;
-            tt1 +%= (w[j+3] ^ w[j+7]);
+            tt1 +%= (w[j + 3] ^ w[j + 7]);
 
-            tt2 = if (j+3 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
+            tt2 = if (j + 3 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
             tt2 +%= a[7];
             tt2 +%= ss1;
-            tt2 +%= w[j+3];
+            tt2 +%= w[j + 3];
 
             a[3] = a[2];
             a[2] = math.rotl(u32, a[1], 9);
@@ -251,11 +252,24 @@ pub const SM3 = struct {
         }
     }
 
-    // 优化内存加载函数
-    inline fn simdLoadMessageWords(block: *const [block_length]u8, words: []u32) void {
-        // 回退到普通加载
-        for (0..16) |i| {
-            words[i] = mem.readInt(u32, block[i * 4 ..][0..4], .big);
+    // SIMD优化的消息加载函数
+    inline fn simdLoadMessageWords(block: *const [block_length]u8, w: *[16]u32) void {
+        @setRuntimeSafety(false);
+
+        // 使用SIMD加载大端序数据
+        comptime var i: usize = 0;
+        inline while (i < 16) : (i += 4) {
+            // 加载16字节到128位向量
+            const vec = @as(*align(1) const @Vector(4, u32), @ptrCast(block[i * 4 ..][0..16])).*;
+
+            // 向量字节交换（大端序转主机序）
+            const swapped = @byteSwap(vec);
+
+            // 存储结果
+            w[i] = swapped[0];
+            w[i + 1] = swapped[1];
+            w[i + 2] = swapped[2];
+            w[i + 3] = swapped[3];
         }
     }
 
@@ -370,8 +384,8 @@ fn hashChunk(chunk: []const u8, out: *[32]u8) void {
 pub fn testPerformance(allocator: std.mem.Allocator) !void {
     const print = std.debug.print;
     const test_sizes = [_]usize{
-        64 * 1024,       // 64KB
-        1024 * 1024,     // 1MB
+        64 * 1024, // 64KB
+        1024 * 1024, // 1MB
         10 * 1024 * 1024, // 10MB
         100 * 1024 * 1024, // 100MB
     };
