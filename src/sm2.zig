@@ -8,6 +8,12 @@ const IdentityElementError = crypto.errors.IdentityElementError;
 const NonCanonicalError = crypto.errors.NonCanonicalError;
 const NotSquareError = crypto.errors.NotSquareError;
 
+// Export SM2 algorithm modules
+pub const signature = @import("sm2/signature.zig");
+pub const key_exchange = @import("sm2/key_exchange.zig");
+pub const encryption = @import("sm2/encryption.zig");
+pub const utils = @import("sm2/utils.zig");
+
 /// Group operations over SM2.
 pub const SM2 = struct {
     /// The underlying prime field.
