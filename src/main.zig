@@ -15,11 +15,6 @@ pub fn main() !void {
     print("=== SM3 Hash Performance ===\n", .{});
     try sm3.testPerformance(allocator);
 
-    print("\n=== SM4 Block Cipher Performance ===\n", .{});
-    try sm4.testPerformance_ecb(allocator);
-    try sm4.testPerformance_cbc(allocator);
-    try sm4.testPerformanceSIMD_ECB(allocator);
-
     print("\n=== SM2 Digital Signature Demo ===\n", .{});
     try demonstrateSignature(allocator);
 
