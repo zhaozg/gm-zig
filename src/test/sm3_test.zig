@@ -1,3 +1,6 @@
+const std = @import("std");
+const testing = std.testing;
+const fmt = std.fmt;
 const sm3 = @import("../sm3.zig");
 const SM3 = sm3.SM3;
 
@@ -76,4 +79,3 @@ test "aligned final" {
 fn hashChunk(chunk: []const u8, out: *[32]u8) void {
     SM3.hash(chunk, out, .{});
 }
-

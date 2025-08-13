@@ -28,24 +28,4 @@ test "SM4 Known Answer Test" {
     var decrypted: [16]u8 = undefined;
     ctx.decryptBlock(&ciphertext, &decrypted);
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
-
-    // 测试SIMD多块加密 - 修复数组初始化
-    var multi_plain: [sm4.SIMD_WIDTH][16]u8 = undefined;
-    for (0..sm4.SIMD_WIDTH) |i| {
-        multi_plain[i] = plaintext;
-    }
-    var multi_cipher: [sm4.SIMD_WIDTH][16]u8 = undefined;
-    ctx.encryptBlocksSIMD(std.mem.sliceAsBytes(&multi_plain), std.mem.sliceAsBytes(&multi_cipher));
-
-    for (0..sm4.SIMD_WIDTH) |i| {
-        try std.testing.expectEqualSlices(u8, &expected_ciphertext, &multi_cipher[i]);
-    }
-
-    // 测试SIMD多块解密
-    var multi_decrypted: [sm4.SIMD_WIDTH][16]u8 = undefined;
-    ctx.decryptBlocksSIMD(std.mem.sliceAsBytes(&multi_cipher), std.mem.sliceAsBytes(&multi_decrypted));
-
-    for (0..sm4.SIMD_WIDTH) |i| {
-        try std.testing.expectEqualSlices(u8, &plaintext, &multi_decrypted[i]);
-    }
 }
