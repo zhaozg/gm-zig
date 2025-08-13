@@ -1,20 +1,20 @@
-// Updated to handle Zig 0.15.0+ Writer API
-
 const std = @import("std");
+const builtin = @import("builtin");
 
-// Define a new type using std.io.AnyWriter
-const MyWriter = std.io.AnyWriter;
-
-// Create a writer function that uses std.io.AnyWriter
-fn createWriter() MyWriter {
-    const allocator = std.heap.page_allocator;
-    const writer = MyWriter.init(allocator);
-    // Additional writer setup can go here if needed
-    return writer;
+pub fn Writer(comptime Context: type, comptime WriteError: type, comptime writeFn: fn (context: Context, bytes: []const u8) WriteError!usize) type {
+    if (comptime @hasDecl(std.io, "GenericWriter")) {
+        // Zig 0.13.0 and earlier
+        return std.io.GenericWriter(Context, WriteError, writeFn);
+    } else {
+        // Zig 0.14.0+
+        return std.io.Writer(Context, WriteError, writeFn);
+    }
 }
 
-// Example usage of MyWriter
-fn main() void {
-    const writer = createWriter();
-    // Use the writer for your operations
+// Version detection helper
+pub const is_new_zig = !@hasDecl(std.io, "GenericWriter");
+
+// Writer creation helper
+pub fn writer(context: anytype, comptime writeFn: anytype) Writer(@TypeOf(context), @TypeOf(@as(@TypeOf(writeFn), undefined)).ReturnType.ErrorSet, writeFn) {
+    return .{ .context = context };
 }
