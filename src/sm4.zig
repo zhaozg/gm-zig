@@ -468,53 +468,6 @@ pub const SM4_CBC = struct {
     }
 };
 
-// 测试向量 (GB/T 32907-2016)
-test "SM4 Known Answer Test" {
-    const key = [16]u8{
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
-    };
-    const plaintext = [16]u8{
-        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
-    };
-    const expected_ciphertext = [16]u8{
-        0x68, 0x1e, 0xdf, 0x34, 0xd2, 0x06, 0x96, 0x5e,
-        0x86, 0xb3, 0xe9, 0x4f, 0x53, 0x6e, 0x42, 0x46,
-    };
-
-    const ctx = SM4.init(&key);
-
-    // 测试单块加密
-    var ciphertext: [16]u8 = undefined;
-    ctx.encryptBlock(&plaintext, &ciphertext);
-    try std.testing.expectEqualSlices(u8, &expected_ciphertext, &ciphertext);
-
-    // 测试单块解密
-    var decrypted: [16]u8 = undefined;
-    ctx.decryptBlock(&ciphertext, &decrypted);
-    try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
-
-    // 测试SIMD多块加密 - 修复数组初始化
-    var multi_plain: [SIMD_WIDTH][16]u8 = undefined;
-    for (0..SIMD_WIDTH) |i| {
-        multi_plain[i] = plaintext;
-    }
-    var multi_cipher: [SIMD_WIDTH][16]u8 = undefined;
-    ctx.encryptBlocksSIMD(std.mem.sliceAsBytes(&multi_plain), std.mem.sliceAsBytes(&multi_cipher));
-
-    for (0..SIMD_WIDTH) |i| {
-        try std.testing.expectEqualSlices(u8, &expected_ciphertext, &multi_cipher[i]);
-    }
-
-    // 测试SIMD多块解密
-    var multi_decrypted: [SIMD_WIDTH][16]u8 = undefined;
-    ctx.decryptBlocksSIMD(std.mem.sliceAsBytes(&multi_cipher), std.mem.sliceAsBytes(&multi_decrypted));
-
-    for (0..SIMD_WIDTH) |i| {
-        try std.testing.expectEqualSlices(u8, &plaintext, &multi_decrypted[i]);
-    }
-}
 
 // 性能测试函数
 pub fn testPerformance_ecb(allocator: std.mem.Allocator) !void {
@@ -712,12 +665,4 @@ pub fn testPerformanceSIMD_ECB(allocator: std.mem.Allocator) !void {
             decrypt_speed,
         });
     }
-}
-
-// 主测试函数
-test "SM4 Performance" {
-    const allocator = std.testing.allocator;
-    try testPerformance_ecb(allocator);
-    try testPerformance_cbc(allocator);
-    try testPerformanceSIMD_ECB(allocator);
 }

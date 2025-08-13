@@ -4,7 +4,7 @@ const testing = std.testing;
 const crypto = std.crypto;
 const mem = std.mem;
 
-const SM2 = @import("sm2.zig").SM2;
+const SM2 = @import("../sm2/group.zig").SM2;
 
 // SM2 GMT 标准测试向量
 const test_vectors = struct {
