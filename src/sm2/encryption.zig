@@ -177,7 +177,13 @@ pub fn decrypt(
     // h = 1 for SM2 curve, so this is just checking if C1 is the identity
 
     // Step 3: Compute d * C1 = (x2, y2)
-    const dc1_point = c1_point.mul(private_key, .big) catch return error.InvalidPrivateKey;
+    const dc1_point = c1_point.mul(private_key, .big) catch |err| {
+        // 区分错误类型
+        if (err == error.IdentityElement) {
+            return error.InvalidPrivateKey;
+        }
+        return err;
+    };
     const dc1_coords = dc1_point.affineCoordinates();
 
     // Step 4: Compute t = KDF(x2 || y2, klen)
@@ -188,10 +194,15 @@ pub fn decrypt(
     const t = try utils.kdf(allocator, &kdf_input, ciphertext.c2.len);
     defer allocator.free(t);
 
-    // Check if t is all zeros
+    // 修复：只检查 KDF 输出是否全为零，而不是是否包含零字节
+    var all_zero = true;
     for (t) |byte| {
-        if (byte == 0) return error.InvalidKDFOutput;
+        if (byte != 0) {
+            all_zero = false;
+            break;
+        }
     }
+    if (all_zero) return error.InvalidKDFOutput;
 
     // Step 5: Compute M = C2 ⊕ t
     var message = try allocator.alloc(u8, ciphertext.c2.len);
@@ -390,7 +401,9 @@ test "SM2 encryption error cases" {
     const ciphertext = try encrypt(allocator, message, public_key, .c1c3c2);
     defer ciphertext.deinit(allocator);
 
-    try testing.expectError(error.IdentityElement, decrypt(allocator, ciphertext, invalid_private));
+    // 测试使用无效私钥（零私钥）
+    // 修正：期望 error.InvalidPrivateKey 而不是 error.IdentityElement
+    try testing.expectError(error.InvalidPrivateKey, decrypt(allocator, ciphertext, invalid_private));
 }
 
 test "SM2 public key creation methods" {

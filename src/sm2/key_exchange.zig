@@ -212,57 +212,49 @@ fn computeSharedSecret(
     other_ephemeral_key: SM2,
     other_user_id: []const u8,
 ) !SM2 {
-    // Step 1: Compute w = ceil(log2(n)) / 2 - 1
-    // For SM2, w = 127 (since n is 256-bit)
-    // const w = 127;
     _ = other_user_id; // Unused in this function, but required for signature
 
-    // Step 2: Compute x1_bar and x2_bar
+    // Step 1: Compute x1_bar and x2_bar
     const self_coords = context.ephemeral_public.affineCoordinates();
     const other_coords = other_ephemeral_key.affineCoordinates();
 
     const x1 = self_coords.x.toBytes(.big);
     const x2 = other_coords.x.toBytes(.big);
 
-    // x1_bar = 2^w + (x1 & (2^w - 1))
-    // x2_bar = 2^w + (x2 & (2^w - 1))
-
-    // Create mask for lower w bits
-    var mask: [32]u8 = [_]u8{0xFF} ** 32;
-    // Clear upper bits to keep only lower 127 bits
-    mask[0] &= 0x7F; // Clear bit 127 (most significant bit of first byte)
+    // x1_bar = 2^w + (x1 & (2^w - 1)) where w = 127
+    // Create mask for lower 127 bits (15 full bytes and 7 bits)
+    var mask: [32]u8 = [_]u8{0} ** 32;
+    for (0..15) |i| {
+        mask[i] = 0xFF; // 15 full bytes = 120 bits
+    }
+    mask[15] = 0x7F; // 7 bits, total 127 bits
 
     var x1_bar: [32]u8 = [_]u8{0} ** 32;
     var x2_bar: [32]u8 = [_]u8{0} ** 32;
 
-    // Apply mask and set bit 127
+    // Apply mask
     for (0..32) |i| {
         x1_bar[i] = x1[i] & mask[i];
         x2_bar[i] = x2[i] & mask[i];
     }
-    x1_bar[0] |= 0x80; // Set bit 127
-    x2_bar[0] |= 0x80; // Set bit 127
+    // Set bit 127 (the highest bit of the 16th byte) to 1
+    x1_bar[15] |= 0x80;
+    x2_bar[15] |= 0x80;
 
-    // Step 3: Compute tA = (dA + x1_bar * rA) mod n
+    // Step 2: Compute t = (d + x1_bar * r) mod n
+    // CORRECTED: Always use x1_bar (own ephemeral key's x coordinate)
     const d_scalar = try SM2.scalar.Scalar.fromBytes(context.private_key, .big);
     const r_scalar = try SM2.scalar.Scalar.fromBytes(context.ephemeral_private, .big);
-    const x_bar_scalar = try SM2.scalar.Scalar.fromBytes(
-        if (context.role == .initiator) x1_bar else x2_bar,
-        .big
-    );
+    const x_bar_scalar = try SM2.scalar.Scalar.fromBytes(x1_bar, .big);
 
     const t_scalar = d_scalar.add(x_bar_scalar.mul(r_scalar));
     const t_bytes = t_scalar.toBytes(.big);
 
-    // Step 4: Compute U = h * tA * (PB + x2_bar * RB)
-    // where h = 1 for SM2 curve
-    const other_x_bar_scalar = try SM2.scalar.Scalar.fromBytes(
-        if (context.role == .initiator) x2_bar else x1_bar,
-        .big
-    );
+    // Step 3: Compute U = t * (other_public_key + x2_bar * other_ephemeral_key)
+    const other_x_bar_scalar = try SM2.scalar.Scalar.fromBytes(x2_bar, .big);
     const other_x_bar_bytes = other_x_bar_scalar.toBytes(.big);
 
-    // Compute (PB + x2_bar * RB)
+    // Compute (other_public_key + x2_bar * other_ephemeral_key)
     const other_ephemeral_scaled = try other_ephemeral_key.mul(other_x_bar_bytes, .big);
     const combined_point = other_public_key.add(other_ephemeral_scaled);
 

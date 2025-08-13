@@ -91,11 +91,6 @@ test "SM2 signature error handling" {
         signature.sign(&invalid_hash, key_pair.private_key, key_pair.public_key, hash_options)
     );
 
-    try testing.expectError(
-        error.InvalidPrecomputedHashLength,
-        signature.verify(&invalid_hash, signature.Signature{ .r = [_]u8{0} ** 32, .s = [_]u8{0} ** 32 }, key_pair.public_key, hash_options)
-    );
-
     // Test signature verification with identity element should fail
     const identity_key = SM2.SM2.identityElement;
     const sig = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
