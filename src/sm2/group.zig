@@ -201,27 +201,26 @@ pub const SM2 = struct {
         if (p.z.isZero()) return q;
         if (q.z.isZero()) return p;
 
-        // Algorithm for point addition in Jacobian coordinates
-        const Z1Z1 = p.z.sq();                      // Z1²
-        const Z2Z2 = q.z.sq();                      // Z2²
-        const U1 = p.x.mul(Z2Z2);                  // U1 = X1*Z2²
-        const U2 = q.x.mul(Z1Z1);                  // U2 = X2*Z1²
-        const S1 = p.y.mul(q.z).mul(Z2Z2);        // S1 = Y1*Z2³
-        const S2 = q.y.mul(p.z).mul(Z1Z1);        // S2 = Y2*Z1³
+        const Z1Z1 = p.z.sq();
+        const Z2Z2 = q.z.sq();
+        const U1 = p.x.mul(Z2Z2);
+        const U2 = q.x.mul(Z1Z1);
+        const S1 = p.y.mul(q.z).mul(Z2Z2);
+        const S2 = q.y.mul(p.z).mul(Z1Z1);
 
         if (U1.equivalent(U2)) {
             return if (S1.equivalent(S2)) p.dbl() else SM2.identityElement;
         }
 
-        const H = U2.sub(U1);                       // H = U2 - U1
-        const I = H.dbl().sq();                     // I = (2*H)²
-        const J = H.mul(I);                         // J = H*I
-        const r = S2.sub(S1).dbl();                // r = 2*(S2 - S1)
-        const V = U1.mul(I);                       // V = U1*I
+        const H = U2.sub(U1);
+        const I = H.sq();
+        const J = H.mul(I);
+        const r = S2.sub(S1).dbl();
+        const V = U1.mul(I);
 
-        const X3 = r.sq().sub(J).sub(V.dbl());     // X3 = r² - J - 2*V
-        const Y3 = r.mul(V.sub(X3)).sub(S1.mul(J).dbl()); // Y3 = r*(V-X3) - 2*S1*J
-        const Z3 = p.z.mul(q.z).mul(H).dbl();      // Z3 = 2*Z1*Z2*H
+        const X3 = r.sq().sub(J).sub(V.dbl());
+        const Y3 = r.mul(V.sub(X3)).sub(S1.mul(J).dbl());
+        const Z3 = p.z.mul(q.z).mul(H).dbl();
 
         return .{ .x = X3, .y = Y3, .z = Z3 };
     }
@@ -267,7 +266,12 @@ pub const SM2 = struct {
     /// Swap the endianness of a 32-byte array.
     fn orderSwap(s: [32]u8) [32]u8 {
         var t = s;
-        mem.reverse(u8, &t);
+        for (0..16) |i| {
+            const j = 31 - i;
+            const tmp = t[i];
+            t[i] = t[j];
+            t[j] = tmp;
+        }
         return t;
     }
 

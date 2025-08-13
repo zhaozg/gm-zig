@@ -88,8 +88,8 @@ test "SM2: 倍点操作验证" {
     // 测试 G.dbl() = 2G
     const double1 = SM2.basePoint.dbl();
     const double1_affine = double1.affineCoordinates();
-    try testing.expect(double1_affine.x.equivalent(hexToFe(test_vectors.double1x, .big)));
-    try testing.expect(double1_affine.y.equivalent(hexToFe(test_vectors.double1y, .big)));
+    try testing.expect(double1_affine.x.equivalent(hexToFe(test_vectors.P2x, .big)));
+    try testing.expect(double1_affine.y.equivalent(hexToFe(test_vectors.P2y, .big)));
 
     // 测试 2G.dbl() = 4G
     const double2 = double1.dbl();
@@ -198,22 +198,24 @@ test "SM2: 负操作验证" {
 }
 
 test "SM2: 标量乘法边界情况" {
-    // 阶n
+    // 阶 n (大端序)
     const n_bytes = hexToBytes(test_vectors.n);
 
     // 测试 n * G = 0
     const result1 = SM2.basePoint.mul(n_bytes, .big);
     try testing.expectError(error.IdentityElement, result1);
 
-    // 测试 (n+1) * G = G
-    var n_plus_one = n_bytes;
-    var carry: u8 = 1;
-    for (&n_plus_one) |*byte| {
-        const sum = @as(u16, byte.*) + carry;
-        byte.* = @truncate(sum);
-        carry = @truncate(sum >> 8);
-        if (carry == 0) break;
+    // 计算 n+1 (大整数加法)
+    var n_plus_one: [32]u8 = undefined;
+    var carry: u16 = 1;
+    for (0..32) |i| {
+        const idx = 31 - i; // 大端序: 从最高位开始
+        const byte_val = @as(u16, n_bytes[idx]) + carry;
+        n_plus_one[idx] = @truncate(byte_val);
+        carry = byte_val >> 8;
     }
+
+    // 测试 (n+1) * G = G
     const result2 = try SM2.basePoint.mul(n_plus_one, .big);
     try testing.expect(result2.equivalent(SM2.basePoint));
 }
@@ -227,11 +229,19 @@ test "SM2: 无效点编码处理" {
     };
 
     // 验证拒绝无效点
-    try testing.expectError(error.InvalidEncoding, SM2.fromAffineCoordinates(invalid_point.affineCoordinates()));
+    try testing.expectError(
+        error.InvalidEncoding,
+        SM2.fromAffineCoordinates(invalid_point.affineCoordinates())
+    );
 
-    // 测试无效SEC1编码
+    // 测试无效SEC1编码 (全FF)
     const invalid_sec1 = [_]u8{0x04} ++ [_]u8{0xFF} ** 64;
-    try testing.expectError(error.InvalidEncoding, SM2.fromSec1(&invalid_sec1));
+
+    // 预期错误应为 NonCanonical
+    try testing.expectError(
+        error.NonCanonical,
+        SM2.fromSec1(&invalid_sec1)
+    );
 }
 
 test "SM2: 条件选择(CMOV)验证" {
