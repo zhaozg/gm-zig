@@ -3,8 +3,26 @@ const fmt = std.fmt;
 const testing = std.testing;
 const crypto = std.crypto;
 const mem = std.mem;
+const math = std.math;
 
 const SM2 = @import("../sm2/group.zig").SM2;
+
+// 辅助函数: 十六进制字符串转字节数组
+fn hexToBytes(comptime hex_str: []const u8) [hex_str.len / 2]u8 {
+    var result: [hex_str.len / 2]u8 = undefined;
+    for (0..result.len) |i| {
+        const hi = fmt.charToDigit(hex_str[2 * i], 16) catch unreachable;
+        const lo = fmt.charToDigit(hex_str[2 * i + 1], 16) catch unreachable;
+        result[i] = (hi << 4) | lo;
+    }
+    return result;
+}
+
+// 辅助函数: 十六进制字符串转Fe
+fn hexToFe(comptime hex_str: []const u8, endian: std.builtin.Endian) SM2.Fe {
+    const bytes = hexToBytes(hex_str);
+    return SM2.Fe.fromBytes(bytes, endian) catch unreachable;
+}
 
 // SM2 GMT 标准测试向量
 const test_vectors = struct {
@@ -43,22 +61,205 @@ const test_vectors = struct {
     const double2y = "02A8A31F7D1E4C1D6E8F0A0F1C4D8CEE9B19B9A6A0F8B1D9E6A0F8B1D9E6A0F8";
 };
 
-// 辅助函数: 十六进制字符串转字节数组
-fn hexToBytes(comptime hex_str: []const u8) [hex_str.len / 2]u8 {
-    var result: [hex_str.len / 2]u8 = undefined;
-    for (0..result.len) |i| {
-        const hi = fmt.charToDigit(hex_str[2 * i], 16) catch unreachable;
-        const lo = fmt.charToDigit(hex_str[2 * i + 1], 16) catch unreachable;
-        result[i] = (hi << 4) | lo;
-    }
-    return result;
+test "SM2: 使用国标测试向量验证标量乘法" {
+    // 测试 k1 * G = P1
+    const k1 = hexToBytes(test_vectors.k1);
+    const p1 = try SM2.basePoint.mul(k1, .big);
+    const p1_affine = p1.affineCoordinates();
+    try testing.expect(p1_affine.x.equivalent(hexToFe(test_vectors.P1x, .big)));
+    try testing.expect(p1_affine.y.equivalent(hexToFe(test_vectors.P1y, .big)));
+
+    // 测试 k2 * G = P2
+    const k2 = hexToBytes(test_vectors.k2);
+    const p2 = try SM2.basePoint.mul(k2, .big);
+    const p2_affine = p2.affineCoordinates();
+    try testing.expect(p2_affine.x.equivalent(hexToFe(test_vectors.P2x, .big)));
+    try testing.expect(p2_affine.y.equivalent(hexToFe(test_vectors.P2y, .big)));
+
+    // 测试 k3 * G = P3 (n-1)
+    const k3 = hexToBytes(test_vectors.k3);
+    const p3 = try SM2.basePoint.mul(k3, .big);
+    const p3_affine = p3.affineCoordinates();
+    try testing.expect(p3_affine.x.equivalent(hexToFe(test_vectors.P3x, .big)));
+    try testing.expect(p3_affine.y.equivalent(hexToFe(test_vectors.P3y, .big)));
 }
 
-// 辅助函数: 十六进制字符串转Fe
-fn hexToFe(comptime hex_str: []const u8, endian: std.builtin.Endian) SM2.Fe {
-    const bytes = hexToBytes(hex_str);
-    return SM2.Fe.fromBytes(bytes, endian) catch unreachable;
+test "SM2: 倍点操作验证" {
+    // 测试 G.dbl() = 2G
+    const double1 = SM2.basePoint.dbl();
+    const double1_affine = double1.affineCoordinates();
+    try testing.expect(double1_affine.x.equivalent(hexToFe(test_vectors.double1x, .big)));
+    try testing.expect(double1_affine.y.equivalent(hexToFe(test_vectors.double1y, .big)));
+
+    // 测试 2G.dbl() = 4G
+    const double2 = double1.dbl();
+    const double2_affine = double2.affineCoordinates();
+    try testing.expect(double2_affine.x.equivalent(hexToFe(test_vectors.double2x, .big)));
+    try testing.expect(double2_affine.y.equivalent(hexToFe(test_vectors.double2y, .big)));
 }
+
+test "SM2: 点加操作验证" {
+    const base = SM2.basePoint;
+
+    // 计算 G + G
+    const sum1 = base.add(base);
+
+    // 计算 2G (通过倍点)
+    const double = base.dbl();
+
+    // 验证 G + G = 2G
+    try testing.expect(sum1.equivalent(double));
+
+    // 计算 G + 2G
+    const sum2 = base.add(double);
+
+    // 计算 3G (通过标量乘法)
+    const k3 = [_]u8{0x03} ** 32;
+    const p3 = try SM2.basePoint.mul(k3, .big);
+
+    // 验证 G + 2G = 3G
+    try testing.expect(sum2.equivalent(p3));
+}
+
+test "SM2: 点减操作验证" {
+    const base = SM2.basePoint;
+    const double = base.dbl();
+
+    // 计算 2G - G = G
+    const sub1 = double.sub(base);
+    try testing.expect(sub1.equivalent(base));
+
+    // 计算 G - G = 中性元素
+    const sub2 = base.sub(base);
+    try testing.expectError(error.IdentityElement, sub2.rejectIdentity());
+}
+
+test "SM2: 混合点加操作验证" {
+    const base = SM2.basePoint;
+    const base_affine = base.affineCoordinates();
+
+    // 计算 G + G (使用混合加法)
+    const sum1 = base.addMixed(base_affine);
+
+    // 计算 2G (通过倍点)
+    const double = base.dbl();
+
+    // 验证结果相同
+    try testing.expect(sum1.equivalent(double));
+}
+
+test "SM2: 混合点减操作验证" {
+    const base = SM2.basePoint;
+    const base_affine = base.affineCoordinates();
+    const double = base.dbl();
+
+    // 计算 2G - G = G
+    const sub = double.subMixed(base_affine);
+    try testing.expect(sub.equivalent(base));
+}
+
+test "SM2: 中性元素性质验证" {
+    const identity = SM2.identityElement;
+    const base = SM2.basePoint;
+
+    // 验证 P + 0 = P
+    const sum1 = base.add(identity);
+    try testing.expect(sum1.equivalent(base));
+
+    // 验证 0 + P = P
+    const sum2 = identity.add(base);
+    try testing.expect(sum2.equivalent(base));
+
+    // 验证 P - P = 0
+    const sub = base.sub(base);
+    try testing.expect(sub.equivalent(identity));
+
+    // 验证 0 的仿射坐标是 (0,0)
+    const affine = identity.affineCoordinates();
+    try testing.expect(affine.x.isZero());
+    try testing.expect(affine.y.isZero());
+}
+
+test "SM2: 负操作验证" {
+    const base = SM2.basePoint;
+
+    // 计算 -P
+    const neg = base.neg();
+
+    // 验证 P + (-P) = 0
+    const sum = base.add(neg);
+    try testing.expectError(error.IdentityElement, sum.rejectIdentity());
+
+    // 验证仿射坐标y值取反
+    const base_affine = base.affineCoordinates();
+    const neg_affine = neg.affineCoordinates();
+    try testing.expect(neg_affine.x.equivalent(base_affine.x));
+    try testing.expect(neg_affine.y.equivalent(base_affine.y.neg()));
+}
+
+test "SM2: 标量乘法边界情况" {
+    // 阶n
+    const n_bytes = hexToBytes(test_vectors.n);
+
+    // 测试 n * G = 0
+    const result1 = SM2.basePoint.mul(n_bytes, .big);
+    try testing.expectError(error.IdentityElement, result1);
+
+    // 测试 (n+1) * G = G
+    var n_plus_one = n_bytes;
+    var carry: u8 = 1;
+    for (&n_plus_one) |*byte| {
+        const sum = @as(u16, byte.*) + carry;
+        byte.* = @truncate(sum);
+        carry = @truncate(sum >> 8);
+        if (carry == 0) break;
+    }
+    const result2 = try SM2.basePoint.mul(n_plus_one, .big);
+    try testing.expect(result2.equivalent(SM2.basePoint));
+}
+
+test "SM2: 无效点编码处理" {
+    // 创建无效点 (不在曲线上)
+    const invalid_point = SM2{
+        .x = SM2.Fe.one,
+        .y = SM2.Fe.one,
+        .z = SM2.Fe.one,
+    };
+
+    // 验证拒绝无效点
+    try testing.expectError(error.InvalidEncoding, SM2.fromAffineCoordinates(invalid_point.affineCoordinates()));
+
+    // 测试无效SEC1编码
+    const invalid_sec1 = [_]u8{0x04} ++ [_]u8{0xFF} ** 64;
+    try testing.expectError(error.InvalidEncoding, SM2.fromSec1(&invalid_sec1));
+}
+
+test "SM2: 条件选择(CMOV)验证" {
+    var p1 = SM2.basePoint;
+    const p2 = SM2.basePoint.dbl();
+
+    // 条件为真时选择p2
+    p1.cMov(p2, 1);
+    try testing.expect(p1.equivalent(p2));
+
+    // 条件为假时保持原值
+    p1.cMov(SM2.basePoint, 0);
+    try testing.expect(p1.equivalent(p2));
+}
+
+test "SM2: 公钥标量乘法验证" {
+    const k = [_]u8{0x03} ** 32;
+
+    // 常规乘法
+    const p1 = try SM2.basePoint.mul(k, .big);
+
+    // 公钥乘法(可变时间)
+    const p2 = try SM2.basePoint.mulPublic(k, .big);
+
+    // 验证结果相同
+    try testing.expect(p1.equivalent(p2));
+}
+
 
 test "SM2: ECDH 密钥交换" {
     // 生成随机私钥

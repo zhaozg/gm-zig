@@ -258,7 +258,7 @@ pub const SM2 = struct {
         }
     }
 
-    fn cMov(p: *SM2, a: SM2, c: u1) void {
+    pub fn cMov(p: *SM2, a: SM2, c: u1) void {
         p.x.cMov(a.x, c);
         p.y.cMov(a.y, c);
         p.z.cMov(a.z, c);

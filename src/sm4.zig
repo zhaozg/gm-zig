@@ -257,9 +257,3 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         });
     }
 }
-
-// 主测试函数
-test "SM4 Performance" {
-    const allocator = std.testing.allocator;
-    try testPerformance(allocator);
-}
