@@ -42,8 +42,9 @@
         "build.zig.zon",
         "src",
         "test",
+        "README.md",
+        "SM2_IMPLEMENTATION.md",
         // For example...
         //"LICENSE",
-        //"README.md",
     },
 }
