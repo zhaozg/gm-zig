@@ -96,7 +96,7 @@ pub const SM2 = struct {
                 const x = try Fe.fromBytes(encoded[0..32].*, .big);
                 const y_is_odd = (encoding_type == 3);
                 const y = try recoverY(x, y_is_odd);
-                return SM2{ .x = x, .y = y };
+                return SM2{ .x = x, .y = y, .z = Fe.one };
             },
             4 => {
                 if (encoded.len != 64) return error.InvalidEncoding;
@@ -150,50 +150,54 @@ pub const SM2 = struct {
             return SM2.identityElement;
         }
 
-        // Algorithm for point doubling in Jacobian coordinates
-        // Input: P = (X1, Y1, Z1)
-        // Output: 2P = (X3, Y3, Z3)
+        const THREE = Fe.fromInt(3) catch unreachable;
 
-        const Y1Y1 = p.y.sq();                      // Y1²
-        const S = p.x.mul(Y1Y1).dbl().dbl();       // S = 4*X1*Y1²
-        const M = p.x.sq().mul(Fe.fromInt(3) catch unreachable).add(A.mul(p.z.sq().sq())); // M = 3*X1² + a*Z1⁴
-        const X3 = M.sq().sub(S.dbl());            // X3 = M² - 2*S
-        const Y3 = M.mul(S.sub(X3)).sub(Y1Y1.sq().dbl().dbl().dbl()); // Y3 = M*(S-X3) - 8*Y1⁴
-        const Z3 = p.y.mul(p.z).dbl();             // Z3 = 2*Y1*Z1
+        const xx = p.x.sq(); // X1²
+        const yy = p.y.sq(); // Y1²
+        const yyyy = yy.sq(); // Y1⁴
+        const zz = p.z.sq(); // Z1²
+        const s = p.x.add(yy).sq().sub(xx).sub(yyyy).dbl(); // 2*(X1+Y1²)²-2*X1²-2*Y1⁴
+        const m = xx.mul(THREE).add(A.mul(zz.sq())); // 3*X1² + a*Z1⁴
+        const x3 = m.sq().sub(s.dbl()); // M² - 2*S
+        const y3 = m.mul(s.sub(x3)).sub(yyyy.dbl().dbl().dbl()); // M*(S-X3) - 8*Y1⁴
+        const z3 = p.y.mul(p.z).dbl(); // 2*Y1*Z1
 
-        return .{ .x = X3, .y = Y3, .z = Z3 };
+        return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Add SM2 points, the second being specified using affine coordinates.
+    /// 由于有限域运算的特性，缺少这个因子会导致后续计算不匹配。
     pub fn addMixed(p: SM2, q: AffineCoordinates) SM2 {
-        if (p.z.isZero()) {
-            return .{ .x = q.x, .y = q.y, .z = Fe.one };
-        }
-        if (q.x.isZero() and q.y.isZero()) {
-            return p;
-        }
+    if (p.z.isZero()) {
+        return .{ .x = q.x, .y = q.y, .z = Fe.one };
+    }
+    if (q.x.isZero() and q.y.isZero()) {
+        return p;
+    }
 
-        // Algorithm for mixed addition in Jacobian coordinates
-        const Z1Z1 = p.z.sq();                      // Z1²
-        const U2 = q.x.mul(Z1Z1);                  // U2 = X2*Z1²
-        const S2 = q.y.mul(p.z).mul(Z1Z1);        // S2 = Y2*Z1³
+    const z1z1 = p.z.sq();
+    const n2 = q.x.mul(z1z1);
+    const s2 = q.y.mul(p.z).mul(z1z1);
 
-        if (p.x.equivalent(U2)) {
-            return if (p.y.equivalent(S2)) p.dbl() else SM2.identityElement;
-        }
+    if (p.x.equivalent(n2)) {
+        return if (p.y.equivalent(s2)) p.dbl() else SM2.identityElement;
+    }
 
-        const H = U2.sub(p.x);                      // H = U2 - X1
-        const HH = H.sq();                          // HH = H²
-        const I = HH.dbl().dbl();                   // I = 4*HH
-        const J = H.mul(I);                         // J = H*I
-        const r = S2.sub(p.y).dbl();               // r = 2*(S2 - Y1)
-        const V = p.x.mul(I);                      // V = X1*I
+    const h = n2.sub(p.x);
+    const hh = h.sq();
+    const h3 = h.mul(hh);
+    // 修复1: 移除r的dbl()
+    const r = s2.sub(p.y);
+    const v = p.x.mul(hh);
 
-        const X3 = r.sq().sub(J).sub(V.dbl());     // X3 = r² - J - 2*V
-        const Y3 = r.mul(V.sub(X3)).sub(p.y.mul(J).dbl()); // Y3 = r*(V-X3) - 2*Y1*J
-        const Z3 = p.z.mul(H).dbl();               // Z3 = 2*Z1*H
+    // 修复2: 移除h3的dbl()
+    const x3 = r.sq().sub(h3).sub(v.dbl());
+    // 修复3: 移除p.y.mul(h3)的dbl()
+    const y3 = r.mul(v.sub(x3)).sub(p.y.mul(h3));
+    // 修复4: 移除z3的dbl()
+    const z3 = p.z.mul(h);
 
-        return .{ .x = X3, .y = Y3, .z = Z3 };
+    return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Add SM2 points.
@@ -201,28 +205,28 @@ pub const SM2 = struct {
         if (p.z.isZero()) return q;
         if (q.z.isZero()) return p;
 
-        const Z1Z1 = p.z.sq();
-        const Z2Z2 = q.z.sq();
-        const U1 = p.x.mul(Z2Z2);
-        const U2 = q.x.mul(Z1Z1);
-        const S1 = p.y.mul(q.z).mul(Z2Z2);
-        const S2 = q.y.mul(p.z).mul(Z1Z1);
+        const z1z1 = p.z.sq();
+        const z2z2 = q.z.sq();
+        const n1 = p.x.mul(z2z2);
+        const n2 = q.x.mul(z1z1);
+        const s1 = p.y.mul(q.z).mul(z2z2);
+        const s2 = q.y.mul(p.z).mul(z1z1);
 
-        if (U1.equivalent(U2)) {
-            return if (S1.equivalent(S2)) p.dbl() else SM2.identityElement;
+        if (n1.equivalent(n2)) {
+            return if (s1.equivalent(s2)) p.dbl() else SM2.identityElement;
         }
 
-        const H = U2.sub(U1);
-        const I = H.sq();
-        const J = H.mul(I);
-        const r = S2.sub(S1).dbl();
-        const V = U1.mul(I);
+        const h = n2.sub(n1);
+        const hh = h.sq(); // H²
+        const h3 = h.mul(hh); // H³
+        const r = s2.sub(s1);
+        const v = n1.mul(hh); // U1 * H²
 
-        const X3 = r.sq().sub(J).sub(V.dbl());
-        const Y3 = r.mul(V.sub(X3)).sub(S1.mul(J).dbl());
-        const Z3 = p.z.mul(q.z).mul(H).dbl();
+        const x3 = r.sq().sub(h3).sub(v.dbl());
+        const y3 = r.mul(v.sub(x3)).sub(s1.mul(h3)); // 修正：移除多余的.dbl()
+        const z3 = p.z.mul(q.z).mul(h); // 修正：Z3 = H * Z1 * Z2
 
-        return .{ .x = X3, .y = Y3, .z = Z3 };
+        return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Subtract SM2 points.
@@ -241,20 +245,29 @@ pub const SM2 = struct {
             return AffineCoordinates.identityElement;
         }
         const zinv = p.z.invert();
-        const zinv2 = zinv.sq();           // Z⁻²
-        const zinv3 = zinv2.mul(zinv);     // Z⁻³
-        const x = p.x.mul(zinv2);          // X / Z²
-        const y = p.y.mul(zinv3);          // Y / Z³
+        const zinv2 = zinv.sq(); // Z⁻²
+        const zinv3 = zinv2.mul(zinv); // Z⁻³
+        const x = p.x.mul(zinv2); // X / Z²
+        const y = p.y.mul(zinv3); // Y / Z³
         return .{ .x = x, .y = y };
     }
 
     /// Return true if both coordinate sets represent the same point.
     pub fn equivalent(a: SM2, b: SM2) bool {
-        if (a.sub(b).rejectIdentity()) {
-            return false;
-        } else |_| {
-            return true;
-        }
+        // 都是无穷远点
+        if (a.z.isZero() and b.z.isZero()) return true;
+        // 一个无穷远点，一个不是
+        if (a.z.isZero() or b.z.isZero()) return false;
+
+        // 转换到仿射坐标进行比较
+        const z1z1 = a.z.sq();
+        const z2z2 = b.z.sq();
+        const n1 = a.x.mul(z2z2); // X1 * Z2²
+        const n2 = b.x.mul(z1z1); // X2 * Z1²
+        const s1 = a.y.mul(b.z).mul(z2z2); // Y1 * Z2³
+        const s2 = b.y.mul(a.z).mul(z1z1); // Y2 * Z1³
+
+        return n1.equivalent(n2) and s1.equivalent(s2);
     }
 
     pub fn cMov(p: *SM2, a: SM2, c: u1) void {
@@ -280,24 +293,20 @@ pub const SM2 = struct {
     pub fn mul(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
         const s = if (endian == .little) s_ else orderSwap(s_);
 
-        // 使用简单的二进制方法（从最高位开始）
         var result = SM2.identityElement;
+        var addend = p;
 
-        // 从最高字节开始处理
-        var byte_idx: usize = 31;
-        while (true) {
-            const byte = s[byte_idx];
-            var bit_mask: u8 = 0x80; // 从最高位开始
+        // 从最低字节开始处理（小端序）
+        for (0..32) |i| {
+            const byte = s[i];
+            var bit_mask: u8 = 1;
 
-            while (bit_mask != 0) : (bit_mask >>= 1) {
-                result = result.dbl();
-                if (byte & bit_mask != 0) {
-                    result = result.add(p);
+            while (bit_mask != 0) : (bit_mask <<= 1) {
+                if ((byte & bit_mask) != 0) {
+                    result = result.add(addend);
                 }
+                addend = addend.dbl();
             }
-
-            if (byte_idx == 0) break;
-            byte_idx -= 1;
         }
 
         try result.rejectIdentity();
