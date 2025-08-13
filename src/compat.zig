@@ -19,8 +19,8 @@ pub fn Writer(comptime Context: type, comptime WriteError: type, comptime writeF
 // Helper function to create a writer instance with version compatibility
 pub fn writer(comptime Context: type, comptime WriteError: type, comptime writeFn: fn (context: Context, bytes: []const u8) WriteError!usize, context: Context) Writer(Context, WriteError, writeFn) {
     if (is_zig_015_or_later) {
-        // For Zig 0.15.0+, convert to AnyWriter
-        const typed_writer = std.io.Writer(Context, WriteError, writeFn){ .context = context };
+        // For Zig 0.15.0+, create a GenericWriter and convert to AnyWriter
+        const typed_writer = std.io.GenericWriter(Context, WriteError, writeFn){ .context = context };
         return typed_writer.any();
     } else {
         // For Zig 0.14.1 and earlier, return the typed Writer directly
