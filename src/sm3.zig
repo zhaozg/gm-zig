@@ -3,10 +3,8 @@ const testing = std.testing;
 const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
-const builtin = @import("builtin");
-const simd = std.simd;
 
-/// 优化的SM3哈希算法实现
+/// SM3哈希算法实现 - 严格按照GM/T 0004-2012标准
 pub const SM3 = struct {
     const Self = @This();
 
@@ -14,21 +12,8 @@ pub const SM3 = struct {
     pub const digest_length = 32;
     pub const Options = struct {};
 
-    // 使用编译期计算的常量表
-    const T = initT();
-    fn initT() [64]u32 {
-        var table: [64]u32 = undefined;
-        inline for (0..16) |i| {
-            table[i] = 0x79CC4519;
-        }
-        inline for (16..64) |i| {
-            table[i] = 0x7A879D8A;
-        }
-        return table;
-    }
-
     s: [8]u32,
-    buf: [block_length]u8 align(16), // 16字节对齐内存访问
+    buf: [block_length]u8,
     buf_len: u8,
     total_len: u64,
 
@@ -54,58 +39,52 @@ pub const SM3 = struct {
     pub fn update(d: *Self, b: []const u8) void {
         d.total_len +%= b.len;
         var off: usize = 0;
-        const buf = &d.buf;
-        var buf_len = d.buf_len;
 
-        // 处理缓冲区中已有的部分数据
-        if (buf_len != 0 and buf_len + b.len >= block_length) {
-            off = block_length - buf_len;
-            @memcpy(buf[buf_len..][0..off], b[0..off]);
-            d.compress(buf);
-            buf_len = 0;
+        // 如果缓冲区有数据且加上新数据能组成完整块
+        if (d.buf_len != 0 and d.buf_len + b.len >= block_length) {
+            off = block_length - d.buf_len;
+            @memcpy(d.buf[d.buf_len..][0..off], b[0..off]);
+            d.compress(&d.buf);
+            d.buf_len = 0;
         }
 
-        // 处理完整块
-        const main_blocks = (b.len - off) / block_length;
-        const main_end = off + main_blocks * block_length;
-        while (off < main_end) : (off += block_length) {
+        // 处理完整的64字节块
+        while (off + block_length <= b.len) {
             d.compress(b[off..][0..block_length]);
+            off += block_length;
         }
 
-        // 保存剩余数据
-        const remain = b[off..];
-        if (remain.len > 0) {
-            @memcpy(buf[buf_len..][0..remain.len], remain);
-            buf_len += @as(u8, @intCast(remain.len));
+        // 保存剩余数据到缓冲区
+        const remainder = b[off..];
+        if (remainder.len > 0) {
+            @memcpy(d.buf[d.buf_len..][0..remainder.len], remainder);
+            d.buf_len += @as(u8, @intCast(remainder.len));
         }
-
-        d.buf_len = buf_len;
     }
 
     pub fn final(d: *Self, out: *[digest_length]u8) void {
-        var buf = d.buf;
-        var buf_len = d.buf_len;
         const total_bits = d.total_len * 8;
 
-        // 添加填充
-        @memset(buf[buf_len..], 0);
-        buf[buf_len] = 0x80;
-        buf_len += 1;
+        // 添加填充位 10000000
+        d.buf[d.buf_len] = 0x80;
+        d.buf_len += 1;
 
-        // 处理需要额外块的情况
-        if (block_length - buf_len < 8) {
-            d.compress(&buf);
-            @memset(buf[0..], 0);
-            buf_len = 0;
+        // 如果剩余空间不足8字节存放长度，需要新的块
+        if (d.buf_len > 56) {
+            @memset(d.buf[d.buf_len..], 0);
+            d.compress(&d.buf);
+            @memset(d.buf[0..56], 0);
+        } else {
+            @memset(d.buf[d.buf_len..56], 0);
         }
 
-        // 写入长度信息
-        mem.writeInt(u64, buf[block_length - 8 ..][0..8], total_bits, .big);
-        d.compress(&buf);
+        // 在最后8字节写入消息长度(大端序)
+        mem.writeInt(u64, d.buf[56..64], total_bits, .big);
+        d.compress(&d.buf);
 
-        // 输出结果
-        for (d.s, 0..) |s, i| {
-            mem.writeInt(u32, out[4 * i ..][0..4], s, .big);
+        // 输出哈希值(大端序)
+        for (d.s, 0..) |state, i| {
+            mem.writeInt(u32, out[4 * i ..][0..4], state, .big);
         }
     }
 
@@ -115,170 +94,77 @@ pub const SM3 = struct {
         return result;
     }
 
-    // 优化后的压缩函数
-    inline fn compress(d: *Self, block: *const [block_length]u8) void {
-        @setRuntimeSafety(false);
-        var w: [68]u32 align(16) = undefined; // 对齐内存
-        var a: [8]u32 = d.s; // 局部变量优化
+    fn compress(d: *Self, block: *const [block_length]u8) void {
+        var w: [68]u32 = undefined;
+        var w1: [64]u32 = undefined;
 
-        // SIMD加载消息字
-        simdLoadMessageWords(block, @as(*[16]u32, @ptrCast(&w[0])));
-
-        // 展开的消息扩展循环
-        comptime var i = 16;
-        inline while (i < 68) : (i += 4) {
-            w[i] = p1(w[i - 16] ^ w[i - 9] ^ math.rotl(u32, w[i - 3], 15)) ^
-                math.rotl(u32, w[i - 13], 7) ^ w[i - 6];
-            w[i + 1] = p1(w[i - 15] ^ w[i - 8] ^ math.rotl(u32, w[i - 2], 15)) ^
-                math.rotl(u32, w[i - 12], 7) ^ w[i - 5];
-            w[i + 2] = p1(w[i - 14] ^ w[i - 7] ^ math.rotl(u32, w[i - 1], 15)) ^
-                math.rotl(u32, w[i - 11], 7) ^ w[i - 4];
-            w[i + 3] = p1(w[i - 13] ^ w[i - 6] ^ math.rotl(u32, w[i], 15)) ^
-                math.rotl(u32, w[i - 10], 7) ^ w[i - 3];
+        // 消息字加载 - 大端序
+        for (0..16) |j| {
+            w[j] = mem.readInt(u32, block[j * 4..][0..4], .big);
         }
 
-        // 展开的主循环 (4轮一组)
-        comptime var j = 0;
-        inline while (j < 64) : (j += 4) {
-            // 第1轮
-            var ss1 = math.rotl(u32, a[0], 12);
-            ss1 +%= a[4];
-            ss1 +%= T[j];
-            ss1 = math.rotl(u32, ss1, 7);
-            const ss2 = ss1 ^ math.rotl(u32, a[0], 12);
-
-            var tt1 = if (j < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
-            tt1 +%= a[3];
-            tt1 +%= ss2;
-            tt1 +%= (w[j] ^ w[j + 4]);
-
-            var tt2 = if (j < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
-            tt2 +%= a[7];
-            tt2 +%= ss1;
-            tt2 +%= w[j];
-
-            // 更新状态
-            a[3] = a[2];
-            a[2] = math.rotl(u32, a[1], 9);
-            a[1] = a[0];
-            a[0] = tt1;
-            a[7] = a[6];
-            a[6] = math.rotl(u32, a[5], 19);
-            a[5] = a[4];
-            a[4] = p0(tt2);
-
-            // 第2轮 (j+1)
-            ss1 = math.rotl(u32, a[0], 12);
-            ss1 +%= a[4];
-            ss1 +%= T[j + 1];
-            ss1 = math.rotl(u32, ss1, 7);
-            const ss2_1 = ss1 ^ math.rotl(u32, a[0], 12);
-
-            tt1 = if (j + 1 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
-            tt1 +%= a[3];
-            tt1 +%= ss2_1;
-            tt1 +%= (w[j + 1] ^ w[j + 5]);
-
-            tt2 = if (j + 1 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
-            tt2 +%= a[7];
-            tt2 +%= ss1;
-            tt2 +%= w[j + 1];
-
-            a[3] = a[2];
-            a[2] = math.rotl(u32, a[1], 9);
-            a[1] = a[0];
-            a[0] = tt1;
-            a[7] = a[6];
-            a[6] = math.rotl(u32, a[5], 19);
-            a[5] = a[4];
-            a[4] = p0(tt2);
-
-            // 第3轮 (j+2)
-            ss1 = math.rotl(u32, a[0], 12);
-            ss1 +%= a[4];
-            ss1 +%= T[j + 2];
-            ss1 = math.rotl(u32, ss1, 7);
-            const ss2_2 = ss1 ^ math.rotl(u32, a[0], 12);
-
-            tt1 = if (j + 2 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
-            tt1 +%= a[3];
-            tt1 +%= ss2_2;
-            tt1 +%= (w[j + 2] ^ w[j + 6]);
-
-            tt2 = if (j + 2 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
-            tt2 +%= a[7];
-            tt2 +%= ss1;
-            tt2 +%= w[j + 2];
-
-            a[3] = a[2];
-            a[2] = math.rotl(u32, a[1], 9);
-            a[1] = a[0];
-            a[0] = tt1;
-            a[7] = a[6];
-            a[6] = math.rotl(u32, a[5], 19);
-            a[5] = a[4];
-            a[4] = p0(tt2);
-
-            // 第4轮 (j+3)
-            ss1 = math.rotl(u32, a[0], 12);
-            ss1 +%= a[4];
-            ss1 +%= T[j + 3];
-            ss1 = math.rotl(u32, ss1, 7);
-            const ss2_3 = ss1 ^ math.rotl(u32, a[0], 12);
-
-            tt1 = if (j + 3 < 16) a[0] ^ a[1] ^ a[2] else (a[0] & a[1]) | (a[0] & a[2]) | (a[1] & a[2]);
-            tt1 +%= a[3];
-            tt1 +%= ss2_3;
-            tt1 +%= (w[j + 3] ^ w[j + 7]);
-
-            tt2 = if (j + 3 < 16) a[4] ^ a[5] ^ a[6] else (a[4] & a[5]) | (~a[4] & a[6]);
-            tt2 +%= a[7];
-            tt2 +%= ss1;
-            tt2 +%= w[j + 3];
-
-            a[3] = a[2];
-            a[2] = math.rotl(u32, a[1], 9);
-            a[1] = a[0];
-            a[0] = tt1;
-            a[7] = a[6];
-            a[6] = math.rotl(u32, a[5], 19);
-            a[5] = a[4];
-            a[4] = p0(tt2);
+        // 消息扩展
+        for (16..68) |j| {
+            w[j] = p1(w[j - 16] ^ w[j - 9] ^ math.rotl(u32, w[j - 3], 15)) ^
+                math.rotl(u32, w[j - 13], 7) ^ w[j - 6];
         }
 
-        // 更新状态
-        for (0..8) |k| {
-            d.s[k] ^= a[k];
+        // 计算W'
+        for (0..64) |j| {
+            w1[j] = w[j] ^ w[j + 4];
         }
+
+        // 初始化工作变量 (A,B,C,D,E,F,G,H)
+        var a = d.s[0];
+        var b = d.s[1];
+        var c = d.s[2];
+        var dd = d.s[3]; // 重命名为dd避免与d冲突
+        var e = d.s[4];
+        var f = d.s[5];
+        var g = d.s[6];
+        var h = d.s[7];
+
+        // 64轮迭代 - 修复工作变量更新逻辑
+        for (0..64) |j| {
+            const t_j = if (j < 16) @as(u32, 0x79CC4519) else @as(u32, 0x7A879D8A);
+            const shift = @as(u5, @intCast(j % 32));
+            const ss1 = math.rotl(u32, math.rotl(u32, a, 12) +% e +% math.rotl(u32, t_j, shift), 7);
+            const ss2 = ss1 ^ math.rotl(u32, a, 12);
+
+            const ff_j = if (j < 16) a ^ b ^ c else (a & b) | (a & c) | (b & c);
+            const gg_j = if (j < 16) e ^ f ^ g else (e & f) | (~e & g);
+
+            const tt1 = ff_j +% dd +% ss2 +% w1[j];
+            const tt2 = gg_j +% h +% ss1 +% w[j];
+
+            // 正确的工作变量更新顺序
+            dd = c;                  // D = C
+            c = math.rotl(u32, b, 9); // C = B <<< 9
+            b = a;                   // B = A
+            a = tt1;                 // A = TT1
+            h = g;                   // H = G
+            g = math.rotl(u32, f, 19); // G = F <<< 19
+            f = e;                   // F = E
+            e = p0(tt2);             // E = P0(TT2)
+        }
+
+        // 更新哈希值
+        d.s[0] ^= a;
+        d.s[1] ^= b;
+        d.s[2] ^= c;
+        d.s[3] ^= dd;
+        d.s[4] ^= e;
+        d.s[5] ^= f;
+        d.s[6] ^= g;
+        d.s[7] ^= h;
     }
 
-    // SIMD优化的消息加载函数
-    inline fn simdLoadMessageWords(block: *const [block_length]u8, w: *[16]u32) void {
-        @setRuntimeSafety(false);
-
-        // 使用SIMD加载大端序数据
-        comptime var i: usize = 0;
-        inline while (i < 16) : (i += 4) {
-            // 加载16字节到128位向量
-            const vec = @as(*align(1) const @Vector(4, u32), @ptrCast(block[i * 4 ..][0..16])).*;
-
-            // 向量字节交换（大端序转主机序）
-            const swapped = @byteSwap(vec);
-
-            // 存储结果
-            w[i] = swapped[0];
-            w[i + 1] = swapped[1];
-            w[i + 2] = swapped[2];
-            w[i + 3] = swapped[3];
-        }
-    }
-
-    // 优化P0函数
+    // 置换函数P0
     inline fn p0(x: u32) u32 {
         return x ^ math.rotl(u32, x, 9) ^ math.rotl(u32, x, 17);
     }
 
-    // 优化P1函数
+    // 置换函数P1
     inline fn p1(x: u32) u32 {
         return x ^ math.rotl(u32, x, 15) ^ math.rotl(u32, x, 23);
     }
@@ -298,9 +184,7 @@ pub const SM3 = struct {
 
 pub fn hash(b: []const u8) [32]u8 {
     var out: [32]u8 = undefined;
-    var d = SM3.init(.{});
-    d.update(b);
-    d.final(&out);
+    SM3.hash(b, &out, .{});
     return out;
 }
 
