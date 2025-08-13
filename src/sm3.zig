@@ -4,6 +4,7 @@ const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
 const builtin = @import("builtin");
+const compat = @import("compat.zig");
 
 // Version compatibility check
 const zig_version = builtin.zig_version;
@@ -221,16 +222,16 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         defer allocator.free(buffer);
 
         // 填充随机数据
-        var prng = std.Random.DefaultPrng.init(0);
+        var prng = compat.DefaultPrng().init(0);
         prng.random().bytes(buffer);
 
         // 准备输出缓冲区
         var out: [32]u8 = undefined;
 
         // 加密性能测试
-        const hash_start = std.time.nanoTimestamp();
+        const hash_start = compat.nanoTimestamp();
         SM3.hash(buffer, &out, .{});
-        const hash_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - hash_start));
+        const hash_time = @as(f64, @floatFromInt(compat.nanoTimestamp() - hash_start));
 
         // 计算速度 (MB/s)
         const bytes_per_mb = 1024.0 * 1024.0;

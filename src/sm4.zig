@@ -1,6 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const print = std.debug.print;
+const compat = @import("compat.zig");
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
@@ -209,7 +210,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         defer allocator.free(buffer);
 
         // 填充随机数据
-        var prng = std.Random.DefaultPrng.init(0);
+        var prng = compat.DefaultPrng().init(0);
         prng.random().bytes(buffer);
 
         // 准备输出缓冲区
