@@ -3,6 +3,11 @@ const testing = std.testing;
 const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
+const builtin = @import("builtin");
+
+// Version compatibility check
+const zig_version = builtin.zig_version;
+const is_zig_015_or_later = zig_version.order(std.SemanticVersion.parse("0.15.0") catch unreachable) != .lt;
 
 /// SM3哈希算法实现 - 严格按照GM/T 0004-2012标准
 pub const SM3 = struct {
@@ -170,7 +175,15 @@ pub const SM3 = struct {
     }
 
     pub const Error = error{};
-    pub const Writer = std.io.Writer(*Self, Error, write);
+    
+    // Fix std.io.Writer compatibility between Zig 0.14.1 and 0.15.0-dev
+    // In 0.15.0, std.io.Writer became a type, no longer a function
+    pub const Writer = if (comptime is_zig_015_or_later) 
+        // For 0.15.0+: Use std.io.GenericWriter (common replacement pattern)
+        std.io.GenericWriter(*Self, Error, write)
+    else
+        // For 0.14.1: Use std.io.Writer as function
+        std.io.Writer(*Self, Error, write);
 
     fn write(self: *Self, bytes: []const u8) Error!usize {
         self.update(bytes);
