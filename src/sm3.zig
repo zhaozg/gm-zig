@@ -3,6 +3,7 @@ const testing = std.testing;
 const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
+const compat = @import("compat.zig");
 
 /// SM3哈希算法实现 - 严格按照GM/T 0004-2012标准
 pub const SM3 = struct {
@@ -170,7 +171,7 @@ pub const SM3 = struct {
     }
 
     pub const Error = error{};
-    pub const Writer = std.io.Writer(*Self, Error, write);
+    pub const Writer = compat.Writer(*Self, Error, write);
 
     fn write(self: *Self, bytes: []const u8) Error!usize {
         self.update(bytes);
@@ -178,7 +179,7 @@ pub const SM3 = struct {
     }
 
     pub fn writer(self: *Self) Writer {
-        return .{ .context = self };
+        return compat.writer(*Self, Error, write, self);
     }
 };
 
