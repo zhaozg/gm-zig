@@ -41,6 +41,44 @@ async function loadWasm() {
     return finalHash;
   }
 
+  window.sm2GenKeyPair = function() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+
+    const priPtr= exports.alloc(32);
+    const pubPtr = exports.alloc(65);
+    if (!priPtr) throw new Error("Allocation failed");
+    if (!pubPtr) throw new Error("Allocation failed");
+
+    const priMem = new Uint8Array(
+      exports.memory.buffer,
+      priPtr,
+      32
+    );
+    priMem.set(array);
+
+    exports.sm2genKeyPair(priPtr, pubPtr);
+
+    const pubKey = new Uint8Array(new Uint8Array(
+      exports.memory.buffer,
+      pubPtr,
+      65
+    ));
+    const priKey = new Uint8Array(new Uint8Array(
+      exports.memory.buffer,
+      priPtr,
+      32
+    ));
+
+    exports.free(pubPtr, 65);
+    exports.free(priPtr, 32);
+
+    return {
+      "publicKey": pubKey,
+      "privateKey": priKey
+    };
+  }
+
   window.sm3hmac = function(key, inputData) {
     const keyPtr= exports.alloc(key.length);
     const inputPtr = exports.alloc(inputData.length);

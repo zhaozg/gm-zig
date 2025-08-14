@@ -193,7 +193,12 @@
         }
 
         .btn-verify {
-            background: linear-gradient(to right, #1abc9c, #16a085);
+            background: linear-gradient(to right, #e67e22, #d6a085);
+            color: white;
+        }
+
+        .bnt-gen {
+            background: linear-gradient(to right, #f39c12, #e67e22);
             color: white;
         }
 
@@ -312,11 +317,11 @@
             </div>
 
             <div class="input-group">
-                <label for="key">密钥：</label>
-                <input type="text" id="key" class="key-input" placeholder="请输入密钥..." value="mySecretKey123456">
+                <label for="key">密钥/私钥：</label>
+                <input type="text" id="key" class="key-input" placeholder="请输入密钥..." value="mySecretKey123456" style="flex:1;">
             </div>
             <div class="input-group">
-                <label for="iv">iv：</label>
+                <label for="iv">iv/公钥：</label>
                 <input type="text" id="iv" class="key-input" placeholder="请输入IV..." value="mySecretKey123456">
             </div>
 
@@ -338,6 +343,9 @@
                     </button>
                     <button class="btn btn-hmac" id="hmacBtn">
                         <i>🔑</i> HMAC-SM3
+                    </button>
+                    <button class="btn btn-gen" id="genKeyBtn">
+                        <i>🔑</i> 生成密钥
                     </button>
                     <button class="btn btn-sign" id="signBtn">
                         <i>🖋️</i> 签名
@@ -389,6 +397,16 @@
         const copyBtn = document.getElementById('copyBtn');
         const notification = document.getElementById('notification');
 
+        const genKeyBtn = document.getElementById('genKeyBtn');
+
+        genKeyBtn.addEventListener('click', () => {
+            const keyPair = window.sm2GenKeyPair();
+
+            keyInput.value = bytesToHex(keyPair.privateKey);
+            ivInput.value = bytesToHex(keyPair.publicKey);
+            showNotification('密钥已生成！');
+        });
+
         // 显示通知
         function showNotification(message) {
             notification.textContent = message;
@@ -421,7 +439,7 @@
 
         // 字节数组转Hex字符串
         function bytesToHex(bytes) {
-            return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+            return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
         }
 
         // Hex字符串转字节数组
