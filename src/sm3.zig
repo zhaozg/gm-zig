@@ -188,6 +188,40 @@ pub fn hash(b: []const u8) [32]u8 {
     return out;
 }
 
+pub fn hmac(key: []const u8, message: []const u8) [SM3.digest_length]u8 {
+    var k: [SM3.block_length]u8 = undefined;
+    if (key.len > SM3.block_length) {
+        SM3.hash(key, k[0..SM3.digest_length], .{});
+        @memset(k[SM3.digest_length..], 0);
+    } else {
+        @memcpy(k[0..key.len], key);
+        @memset(k[key.len..], 0);
+    }
+
+    var o_key_pad: [SM3.block_length]u8 = undefined;
+    var i_key_pad: [SM3.block_length]u8 = undefined;
+    for (k, 0..) |b, i| {
+        o_key_pad[i] = b ^ 0x5c;
+        i_key_pad[i] = b ^ 0x36;
+    }
+
+    // inner = SM3(i_key_pad || message)
+    var inner = SM3.init(.{});
+    inner.update(i_key_pad[0..]);
+    inner.update(message);
+    var inner_hash: [SM3.digest_length]u8 = undefined;
+    inner.final(&inner_hash);
+
+    // outer = SM3(o_key_pad || inner_hash)
+    var outer = SM3.init(.{});
+    outer.update(o_key_pad[0..]);
+    outer.update(inner_hash[0..]);
+    var out: [SM3.digest_length]u8 = undefined;
+    outer.final(&out);
+
+    return out;
+}
+
 // 优化的性能测试函数
 pub fn testPerformance(allocator: std.mem.Allocator) !void {
     const print = std.debug.print;

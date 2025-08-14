@@ -302,13 +302,22 @@
 
         <div class="panel">
             <div class="input-group">
-                <label for="inputText">输入文本：</label>
+
+                <div class="hex-toggle">
+                    <label for="inputText">输入文本：</label>
+                    <input type="checkbox" id="hexInput">
+                    <label for="hexMode">Hex 输入</label>
+                </div>
                 <textarea id="inputText" placeholder="请输入要处理的文本...">国密算法在线工具示例文本</textarea>
             </div>
 
             <div class="input-group">
                 <label for="key">密钥：</label>
                 <input type="text" id="key" class="key-input" placeholder="请输入密钥..." value="mySecretKey123456">
+            </div>
+            <div class="input-group">
+                <label for="iv">iv：</label>
+                <input type="text" id="iv" class="key-input" placeholder="请输入IV..." value="mySecretKey123456">
             </div>
 
             <div class="control-group">
@@ -369,6 +378,7 @@
         const inputText = document.getElementById('inputText');
         const outputText = document.getElementById('outputText');
         const keyInput = document.getElementById('key');
+        const ivInput = document.getElementById('iv');
         const hexMode = document.getElementById('hexMode');
         const encryptBtn = document.getElementById('encryptBtn');
         const decryptBtn = document.getElementById('decryptBtn');
@@ -416,8 +426,19 @@
 
         // Hex字符串转字节数组
         function hexToBytes(hex) {
-            const bytes = Uint8Array.fromHex(hex);
-            return bytes;
+          // Remove optional '0x' prefix
+          hex = hex.startsWith('0x') ? hex.slice(2) : hex;
+
+          // Ensure even number of characters
+          if (hex.length % 2 !== 0) {
+            throw new Error('Invalid hex string');
+          }
+
+          const bytes = new Uint8Array(hex.length / 2);
+          for (let i = 0; i < hex.length; i += 2) {
+            bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+          }
+          return bytes;
         }
 
         function toBase64(uint8Array) {
@@ -427,7 +448,7 @@
               binary += String.fromCharCode(uint8Array[i]);
           }
           return btoa(binary);
-      }
+        }
 
         // 处理输入数据（根据Hex模式）
         function processInput(data) {
@@ -456,33 +477,25 @@
             }
         }
 
-        // 获取密钥字节数组
-        function getKeyBytes() {
-            const key = keyInput.value;
-            if (hexMode.checked) {
-                return hexToBytes(key);
-            }
-            return stringToBytes(key);
-        }
-
         // SM4-CBC加密
         function encryptSM4() {
             try {
+                const key = hexToBytes(keyInput.value);
+                const iv = hexToBytes(ivInput.value);
                 const inputBytes = processInput(inputText.value);
-                const keyBytes = getKeyBytes();
 
-                if (keyBytes.length !== 16) {
+                if (key.length !== 16) {
                     throw new Error('SM4密钥必须为16字节(128位)');
                 }
-
-                // 创建16字节的IV（初始化向量）
-                const iv = new Array(16).fill(0);
+                if (iv.length !== 16) {
+                    throw new Error('SM4 IV必须为16字节(128位)');
+                }
+                if (inputBytes.length % 16 !== 0) {
+                    throw new Error('输入数据长度必须是16的倍数');
+                }
 
                 // 加密
-                const encryptedBytes = sm4.encrypt(inputBytes, keyBytes, {
-                    mode: 'cbc',
-                    iv: iv
-                });
+                const encryptedBytes = window.sm4cbc(key, iv, true, inputBytes);
 
                 outputText.value = processOutput(encryptedBytes);
                 showNotification('SM4-CBC加密成功！');
@@ -494,21 +507,22 @@
         // SM4-CBC解密
         function decryptSM4() {
             try {
+                const key = hexToBytes(keyInput.value);
+                const iv = hexToBytes(ivInput.value);
                 const inputBytes = processInput(inputText.value);
-                const keyBytes = getKeyBytes();
 
-                if (keyBytes.length !== 16) {
+                if (key.length !== 16) {
                     throw new Error('SM4密钥必须为16字节(128位)');
                 }
-
-                // 创建16字节的IV（初始化向量）
-                const iv = new Array(16).fill(0);
+                if (iv.length !== 16) {
+                    throw new Error('SM4 IV必须为16字节(128位)');
+                }
+                if (inputBytes.length % 16 !== 0) {
+                    throw new Error('输入数据长度必须是16的倍数');
+                }
 
                 // 解密
-                const decryptedBytes = sm4.decrypt(inputBytes, keyBytes, {
-                    mode: 'cbc',
-                    iv: iv
-                });
+                const decryptedBytes = window.sm4cbc(key, iv, false, inputBytes);
 
                 outputText.value = processOutput(decryptedBytes);
                 showNotification('SM4-CBC解密成功！');
@@ -521,14 +535,8 @@
         async function hashSM3() {
             try {
                 const inputBytes = processInput(inputText.value);
-
-                const result = await window.sm3hash(inputBytes);
-
-                if (hexMode.checked) {
-                    outputText.value = result.toHex();
-                } else {
-                    outputText.value = toBase64(result);
-                }
+                const result = window.sm3hash(inputBytes);
+                outputText.value = processOutput(result);
 
                 showNotification('SM3摘要计算成功！');
             } catch (error) {
@@ -539,14 +547,10 @@
         // HMAC-SM3
         function hmacSM3() {
             try {
+                const key = hexToBytes(keyInput.value);
                 const inputBytes = processInput(inputText.value);
-                var result = new Uint8Array(32);
-                exports.sm3hash(inputBytes, result);
-                if (hexMode.checked) {
-                    outputText.value = result.toHex();
-                } else {
-                    outputText.value = toBase64(result);
-                }
+                const result = window.sm3hash(key, inputBytes);
+                outputText.value = processOutput(result);
 
                 showNotification('HMAC-SM3计算成功！');
             } catch (error) {
@@ -611,7 +615,8 @@
 
         // 初始化示例
         inputText.value = "国密算法在线工具示例文本";
-        keyInput.value = "mySecretKey123456";
+        keyInput.value = "0123456789abcdef0123456789abcdef";
+        ivInput.value = "0123456789abcdef0123456789abcdef";
     </script>
 </body>
 </html>

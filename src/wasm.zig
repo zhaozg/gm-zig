@@ -40,10 +40,32 @@ export fn sm3hash(input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) v
     // 处理输入切片
     const input = input_ptr[0..input_len];
     // 处理输出缓冲区
-    var output: [32]u8 = undefined;
-
-    sm3.SM3.hash(input, &output, .{});
+    const output: [32]u8 = sm3.hash(input);
     std.mem.copyForwards(u8, output_ptr[0..32], &output);
+}
+
+export fn sm3hmac(key_ptr: [*]const u8, key_len: usize,
+                 input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
+    // 处理输入切片
+    const input = input_ptr[0..input_len];
+    // 处理输出缓冲区
+    const output: [32]u8 = sm3.hmac(key_ptr[0..key_len], input);
+    std.mem.copyForwards(u8, output_ptr[0..32], &output);
+}
+
+export fn sm4cbc(key_ptr: [*]const u8, iv_ptr: [*]const u8, encrypt: bool,
+                 input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
+    // 处理输入切片
+    const input = input_ptr[0..input_len];
+    // 处理输出缓冲区
+    const output: []u8 = output_ptr[0..input_len];
+
+    var ctx = sm4.SM4_CBC.init(key_ptr[0..16], iv_ptr[0..16]);
+    if (encrypt) {
+        ctx.encrypt(input, output);
+    } else {
+        ctx.decrypt(input, output);
+    }
 }
 
 pub fn main() !void { }
