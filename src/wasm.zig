@@ -4,35 +4,46 @@ const sm3 = root.sm3;
 const sm4 = root.sm4;
 const sm2 = root.sm2;
 
+pub const panic = customPanic;
+fn customPanic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
+    _ = msg;
+    _ = error_return_trace;
+    _ = ret_addr;
+    while (true) {}
+}
+
+// 自定义内存分配器
+const allocator: std.mem.Allocator = .{
+    .ptr = undefined,
+    .vtable = &std.heap.WasmAllocator.vtable,
+};
+
 const builtin = @import("builtin");
 pub const io_mode = .disabled;
 
 ///导出一个addPoi函数供wasm调用
-export fn addPoi(a: i32, b: i32) i32 {
-    return a + b;
+export fn version() i32 {
+    return 0;
 }
 
-// 使用固定缓冲区简化示例（实际生产环境应使用分配器）
-var input_buffer: [1024 * 1024]u8 = undefined; // 1MB 输入缓冲区
-var output_buffer: [32]u8 = undefined;         // 固定32字节输出
-
-// 获取输入缓冲区的指针和长度
-export fn getInputBufferPtr() [*]u8 {
-    return &input_buffer;
+export fn alloc(size: usize) [*]u8 {
+    const ptr = allocator.alloc(u8, size) catch @panic("allocation failed");
+    return ptr.ptr;
+}
+export fn free(ptr: [*]u8, size: usize) void {
+    const slice = ptr[0..size];
+    allocator.free(slice);
 }
 
-// 执行哈希计算
-export fn sm3Hash(input_len: usize) void {
-    const data = input_buffer[0..input_len];
-    sm3.SM3.hash(data, &output_buffer, .{});
+// 导出给 WASM 调用的函数
+export fn sm3hash(input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
+    // 处理输入切片
+    const input = input_ptr[0..input_len];
+    // 处理输出缓冲区
+    var output: [32]u8 = undefined;
+
+    sm3.SM3.hash(input, &output, .{});
+    std.mem.copyForwards(u8, output_ptr[0..32], &output);
 }
 
-// 获取结果缓冲区的指针
-export fn getOutputBufferPtr() [*]const u8 {
-    return &output_buffer;
-}
-///导出一个全局变量
-export var lllaaa: i64 = 114514;
-
-pub fn main() !void {
-}
+pub fn main() !void { }
