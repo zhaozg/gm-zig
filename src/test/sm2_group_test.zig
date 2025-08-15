@@ -233,8 +233,8 @@ test "SM2: 公钥标量乘法验证" {
 
 
 test "SM2: ECDH 密钥交换" {
-    const dha = SM2.scalar.random(.little);
-    const dhb = SM2.scalar.random(.little);
+    const dha = SM2.scalar.random(null, .little);
+    const dhb = SM2.scalar.random(null, .little);
 
     const dhA = try SM2.basePoint.mul(dha, .little);
     const dhB = try SM2.basePoint.mul(dhb, .little);
@@ -258,7 +258,7 @@ test "SM2: 从仿射坐标创建点" {
 }
 
 test "SM2: SEC1 压缩格式编码/解码" {
-    const p = SM2.random();
+    const p = SM2.random(null);
     const s = p.toCompressedSec1();
     const q = try SM2.fromSec1(&s);
     try testing.expect(p.equivalent(q));
@@ -266,7 +266,7 @@ test "SM2: SEC1 压缩格式编码/解码" {
 
 test "SM2: SEC1 非压缩格式编码/解码" {
     // 生成随机点
-    const p = SM2.random();
+    const p = SM2.random(null);
 
     // 编码为非压缩格式
     const s = p.toUncompressedSec1();
@@ -370,7 +370,7 @@ test "SM2: 标量奇偶性" {
 
 test "SM2: 随机点曲线验证" {
     // 生成随机点
-    const point = SM2.random();
+    const point = SM2.random(null);
     try point.rejectIdentity();
 
     // 获取仿射坐标

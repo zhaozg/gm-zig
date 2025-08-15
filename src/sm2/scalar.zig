@@ -5,6 +5,9 @@ const debug = std.debug;
 const math = std.math;
 const mem = std.mem;
 
+const builtin = @import("builtin");
+const wasmRng = @import("../wasmRng.zig");
+
 const Field = common.Field;
 
 const NonCanonicalError = std.crypto.errors.NonCanonicalError;
@@ -68,8 +71,8 @@ pub fn sub(a: CompressedScalar, b: CompressedScalar, endian: std.builtin.Endian)
 }
 
 /// Return a random scalar
-pub fn random(endian: std.builtin.Endian) CompressedScalar {
-    return Scalar.random().toBytes(endian);
+pub fn random(rnd: ?*const std.Random, endian: std.builtin.Endian) CompressedScalar {
+    return Scalar.random(rnd).toBytes(endian);
 }
 
 /// A scalar in unpacked representation.
@@ -170,8 +173,14 @@ pub const Scalar = struct {
     }
 
     /// Return a random scalar < L.
-    pub fn random() Scalar {
+    pub fn random(rnd: ?* const std.Random) Scalar {
         var s: [48]u8 = undefined;
+        if (builtin.os.tag == .freestanding) {
+            // In WASI, we use the global random generator.
+            rnd.?.bytes(&s);
+            return Scalar.fromBytes48(s, .little);
+        }
+
         while (true) {
             crypto.random.bytes(&s);
             const n = Scalar.fromBytes48(s, .little);

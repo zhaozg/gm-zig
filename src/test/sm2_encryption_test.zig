@@ -1,20 +1,23 @@
 const std = @import("std");
 const testing = std.testing;
-const SM2 = @import("../sm2.zig");
-const encryption = SM2.encryption;
+const encryption = @import("../sm2/encryption.zig");
+const sm2 = @import("../sm2/group.zig");
+const SM2 = sm2.SM2;
 
-test "SM2 encryption comprehensive tests" {
+const kp = @import("../sm2/keypair.zig");
+const KeyPair = kp.KeyPair;
+
+test "SM2 encryption and decryption basic" {
     const allocator = testing.allocator;
 
-    // Test 1: Basic encryption/decryption setup
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    // Generate key pair
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
-    // Test 2: Basic encryption and decryption
-    const message = "Hello, SM2 encryption world!";
+    const message = "Hello, SM2 encryption!";
 
     // Test C1C3C2 format
-    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext_c1c3c2.deinit(allocator);
 
     const decrypted_c1c3c2 = try encryption.decrypt(allocator, ciphertext_c1c3c2, private_key);
@@ -23,7 +26,180 @@ test "SM2 encryption comprehensive tests" {
     try testing.expectEqualStrings(message, decrypted_c1c3c2);
 
     // Test C1C2C3 format
-    const ciphertext_c1c2c3 = try encryption.encrypt(allocator, message, public_key, .c1c2c3);
+    const ciphertext_c1c2c3 = try encryption.encrypt(allocator, message, public_key, .c1c2c3, null);
+    defer ciphertext_c1c2c3.deinit(allocator);
+
+    const decrypted_c1c2c3 = try encryption.decrypt(allocator, ciphertext_c1c2c3, private_key);
+    defer allocator.free(decrypted_c1c2c3);
+
+    try testing.expectEqualStrings(message, decrypted_c1c2c3);
+}
+
+test "SM2 encryption with different message sizes" {
+    const allocator = testing.allocator;
+
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
+
+    // Test various message sizes
+    const test_sizes = [_]usize{ 1, 16, 32, 64, 128, 256, 1024 };
+
+    for (test_sizes) |size| {
+        const message = try allocator.alloc(u8, size);
+        defer allocator.free(message);
+
+        // Fill with test pattern
+        for (message, 0..) |*byte, i| {
+            byte.* = @intCast(i & 0xFF);
+        }
+
+        const ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
+        defer ciphertext.deinit(allocator);
+
+        const decrypted = try encryption.decrypt(allocator, ciphertext, private_key);
+        defer allocator.free(decrypted);
+
+        try testing.expectEqualSlices(u8, message, decrypted);
+    }
+}
+
+test "SM2 ciphertext serialization" {
+    const allocator = testing.allocator;
+
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
+
+    const message = "Test serialization";
+
+    // Test C1C3C2 format
+    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
+    defer ciphertext_c1c3c2.deinit(allocator);
+
+    const serialized_c1c3c2 = try ciphertext_c1c3c2.toBytes(allocator);
+    defer allocator.free(serialized_c1c3c2);
+
+    const deserialized_c1c3c2 = try encryption.Ciphertext.fromBytes(allocator, serialized_c1c3c2, .c1c3c2);
+    defer deserialized_c1c3c2.deinit(allocator);
+
+    const decrypted_c1c3c2 = try encryption.decrypt(allocator, deserialized_c1c3c2, private_key);
+    defer allocator.free(decrypted_c1c3c2);
+
+    try testing.expectEqualStrings(message, decrypted_c1c3c2);
+
+    // Test C1C2C3 format
+    const ciphertext_c1c2c3 = try encryption.encrypt(allocator, message, public_key, .c1c2c3, null);
+    defer ciphertext_c1c2c3.deinit(allocator);
+
+    const serialized_c1c2c3 = try ciphertext_c1c2c3.toBytes(allocator);
+    defer allocator.free(serialized_c1c2c3);
+
+    const deserialized_c1c2c3 = try encryption.Ciphertext.fromBytes(allocator, serialized_c1c2c3, .c1c2c3);
+    defer deserialized_c1c2c3.deinit(allocator);
+
+    const decrypted_c1c2c3 = try encryption.decrypt(allocator, deserialized_c1c2c3, private_key);
+    defer allocator.free(decrypted_c1c2c3);
+
+    try testing.expectEqualStrings(message, decrypted_c1c2c3);
+}
+
+test "SM2 encryption convenience functions" {
+    const allocator = testing.allocator;
+
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
+
+    const message = "Convenience function test";
+
+    // Test encryptWithFormat and decryptWithFormat
+    const encrypted_bytes = try encryption.encryptWithFormat(allocator, message, public_key, .c1c3c2, null);
+    defer allocator.free(encrypted_bytes);
+
+    const decrypted_message = try encryption.decryptWithFormat(allocator, encrypted_bytes, private_key, .c1c3c2);
+    defer allocator.free(decrypted_message);
+
+    try testing.expectEqualStrings(message, decrypted_message);
+
+    // Test encryptWithFormat
+    const encrypted_c1c3c2 = try encryption.encryptWithFormat(allocator, message, public_key, .c1c3c2, null);
+    defer allocator.free(encrypted_c1c3c2);
+
+    const encrypted_c1c2c3 = try encryption.encryptWithFormat(allocator, message, public_key, .c1c2c3, null);
+    defer allocator.free(encrypted_c1c2c3);
+
+    // Test decryptWithFormat
+    const decrypted_c1c3c2 = try encryption.decryptWithFormat(allocator, encrypted_c1c3c2, private_key, .c1c3c2);
+    defer allocator.free(decrypted_c1c3c2);
+
+    const decrypted_c1c2c3 = try encryption.decryptWithFormat(allocator, encrypted_c1c2c3, private_key, .c1c2c3);
+    defer allocator.free(decrypted_c1c2c3);
+
+    try testing.expectEqualStrings(message, decrypted_c1c3c2);
+    try testing.expectEqualStrings(message, decrypted_c1c2c3);
+}
+
+test "SM2 encryption error cases" {
+    const allocator = testing.allocator;
+
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
+
+    // Test empty message
+    try testing.expectError(error.EmptyMessage, encryption.encrypt(allocator, "", public_key, .c1c3c2, null));
+
+    // Test invalid private key (all zeros)
+    const invalid_private = [_]u8{0} ** 32;
+    const message = "test";
+    const ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
+    defer ciphertext.deinit(allocator);
+
+    // 测试使用无效私钥（零私钥）
+    // 修正：期望 error.InvalidPrivateKey 而不是 error.IdentityElement
+    try testing.expectError(error.InvalidPrivateKey, encryption.decrypt(allocator, ciphertext, invalid_private));
+}
+
+test "SM2 public key creation methods" {
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key1 = try kp.publicKeyFromPrivateKey(private_key);
+
+    // Test creation from coordinates
+    const coords = public_key1.affineCoordinates();
+    const x_bytes = coords.x.toBytes(.big);
+    const y_bytes = coords.y.toBytes(.big);
+
+    const public_key2 = try kp.publicKeyFromCoordinates(x_bytes, y_bytes);
+    try testing.expect(public_key1.equivalent(public_key2));
+
+    // Test creation from SEC1
+    const sec1_uncompressed = public_key1.toUncompressedSec1();
+    const public_key3 = try kp.publicKeyFromSec1(&sec1_uncompressed);
+    try testing.expect(public_key1.equivalent(public_key3));
+
+    const sec1_compressed = public_key1.toCompressedSec1();
+    const public_key4 = try kp.publicKeyFromSec1(&sec1_compressed);
+    try testing.expect(public_key1.equivalent(public_key4));
+}
+
+test "SM2 encryption comprehensive tests" {
+    const allocator = testing.allocator;
+
+    // Test 1: Basic encryption/decryption setup
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
+
+    // Test 2: Basic encryption and decryption
+    const message = "Hello, SM2 encryption world!";
+
+    // Test C1C3C2 format
+    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
+    defer ciphertext_c1c3c2.deinit(allocator);
+
+    const decrypted_c1c3c2 = try encryption.decrypt(allocator, ciphertext_c1c3c2, private_key);
+    defer allocator.free(decrypted_c1c3c2);
+
+    try testing.expectEqualStrings(message, decrypted_c1c3c2);
+
+    // Test C1C2C3 format
+    const ciphertext_c1c2c3 = try encryption.encrypt(allocator, message, public_key, .c1c2c3, null);
     defer ciphertext_c1c2c3.deinit(allocator);
 
     const decrypted_c1c2c3 = try encryption.decrypt(allocator, ciphertext_c1c2c3, private_key);
@@ -35,8 +211,8 @@ test "SM2 encryption comprehensive tests" {
 test "SM2 encryption various message sizes" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     // Test different message sizes
     const test_sizes = [_]usize{ 1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048 };
@@ -54,7 +230,7 @@ test "SM2 encryption various message sizes" {
         const formats = [_]encryption.CiphertextFormat{ .c1c3c2, .c1c2c3 };
 
         for (formats) |format| {
-            const ciphertext = try encryption.encrypt(allocator, message, public_key, format);
+            const ciphertext = try encryption.encrypt(allocator, message, public_key, format, null);
             defer ciphertext.deinit(allocator);
 
             // Verify ciphertext structure
@@ -75,13 +251,13 @@ test "SM2 encryption various message sizes" {
 test "SM2 encryption ciphertext serialization" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     const message = "Serialization test message";
 
     // Test C1C3C2 format serialization
-    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext_c1c3c2.deinit(allocator);
 
     const serialized_c1c3c2 = try ciphertext_c1c3c2.toBytes(allocator);
@@ -100,7 +276,7 @@ test "SM2 encryption ciphertext serialization" {
     try testing.expectEqualStrings(message, decrypted_c1c3c2);
 
     // Test C1C2C3 format serialization
-    const ciphertext_c1c2c3 = try encryption.encrypt(allocator, message, public_key, .c1c2c3);
+    const ciphertext_c1c2c3 = try encryption.encrypt(allocator, message, public_key, .c1c2c3, null);
     defer ciphertext_c1c2c3.deinit(allocator);
 
     const serialized_c1c2c3 = try ciphertext_c1c2c3.toBytes(allocator);
@@ -118,53 +294,27 @@ test "SM2 encryption ciphertext serialization" {
     try testing.expectEqualStrings(message, decrypted_c1c2c3);
 }
 
-test "SM2 encryption convenience functions" {
-    const allocator = testing.allocator;
-
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
-
-    const message = "Convenience function test";
-
-    // Test encryptWithFormat
-    const encrypted_c1c3c2 = try encryption.encryptWithFormat(allocator, message, public_key, .c1c3c2);
-    defer allocator.free(encrypted_c1c3c2);
-
-    const encrypted_c1c2c3 = try encryption.encryptWithFormat(allocator, message, public_key, .c1c2c3);
-    defer allocator.free(encrypted_c1c2c3);
-
-    // Test decryptWithFormat
-    const decrypted_c1c3c2 = try encryption.decryptWithFormat(allocator, encrypted_c1c3c2, private_key, .c1c3c2);
-    defer allocator.free(decrypted_c1c3c2);
-
-    const decrypted_c1c2c3 = try encryption.decryptWithFormat(allocator, encrypted_c1c2c3, private_key, .c1c2c3);
-    defer allocator.free(decrypted_c1c2c3);
-
-    try testing.expectEqualStrings(message, decrypted_c1c3c2);
-    try testing.expectEqualStrings(message, decrypted_c1c2c3);
-}
-
 test "SM2 encryption error handling" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     // Test empty message
-    try testing.expectError(error.EmptyMessage, encryption.encrypt(allocator, "", public_key, .c1c3c2));
+    try testing.expectError(error.EmptyMessage, encryption.encrypt(allocator, "", public_key, .c1c3c2, null));
 
     // Test invalid public key (identity element)
-    const identity_key = SM2.SM2.identityElement;
+    const identity_key = SM2.identityElement;
     const message = "test message";
 
     try testing.expectError(
         error.IdentityElement,
-        encryption.encrypt(allocator, message, identity_key, .c1c3c2)
+        encryption.encrypt(allocator, message, identity_key, .c1c3c2, null)
     );
 
     // Test decryption with wrong private key
-    const wrong_private_key = SM2.SM2.scalar.random(.big);
-    const ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    const wrong_private_key = SM2.scalar.random(null, .big);
+    const ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext.deinit(allocator);
 
     // This should either fail or produce wrong result
@@ -181,12 +331,12 @@ test "SM2 encryption error handling" {
 test "SM2 encryption MAC verification" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     const message = "MAC verification test";
 
-    var ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    var ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext.deinit(allocator);
 
     // Tamper with C3 (MAC)
@@ -206,40 +356,40 @@ test "SM2 encryption MAC verification" {
 }
 
 test "SM2 encryption public key creation methods" {
-    const private_key = SM2.SM2.scalar.random(.big);
+    const private_key = SM2.scalar.random(null, .big);
 
     // Test publicKeyFromPrivateKey
-    const public_key1 = try encryption.publicKeyFromPrivateKey(private_key);
+    const public_key1 = try kp.publicKeyFromPrivateKey(private_key);
 
     // Test publicKeyFromCoordinates
     const coords = public_key1.affineCoordinates();
     const x_bytes = coords.x.toBytes(.big);
     const y_bytes = coords.y.toBytes(.big);
 
-    const public_key2 = try encryption.publicKeyFromCoordinates(x_bytes, y_bytes);
+    const public_key2 = try kp.publicKeyFromCoordinates(x_bytes, y_bytes);
     try testing.expect(public_key1.equivalent(public_key2));
 
     // Test publicKeyFromSec1 (uncompressed)
     const sec1_uncompressed = public_key1.toUncompressedSec1();
-    const public_key3 = try encryption.publicKeyFromSec1(&sec1_uncompressed);
+    const public_key3 = try kp.publicKeyFromSec1(&sec1_uncompressed);
     try testing.expect(public_key1.equivalent(public_key3));
 
     // Test publicKeyFromSec1 (compressed)
     const sec1_compressed = public_key1.toCompressedSec1();
-    const public_key4 = try encryption.publicKeyFromSec1(&sec1_compressed);
+    const public_key4 = try kp.publicKeyFromSec1(&sec1_compressed);
     try testing.expect(public_key1.equivalent(public_key4));
 }
 
 test "SM2 encryption cross-format compatibility" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     const message = "Cross-format test";
 
     // Encrypt with C1C3C2 format
-    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    const ciphertext_c1c3c2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext_c1c3c2.deinit(allocator);
 
     // Serialize and deserialize as C1C2C3 format should fail or give wrong result
@@ -271,16 +421,16 @@ test "SM2 encryption ciphertext length validation" {
 test "SM2 encryption deterministic properties" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     const message = "Deterministic test";
 
     // Encrypt the same message twice
-    const ciphertext1 = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    const ciphertext1 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext1.deinit(allocator);
 
-    const ciphertext2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
+    const ciphertext2 = try encryption.encrypt(allocator, message, public_key, .c1c3c2, null);
     defer ciphertext2.deinit(allocator);
 
     // C1 should be different (due to random k)
@@ -309,8 +459,8 @@ test "SM2 encryption deterministic properties" {
 test "SM2 encryption large message handling" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.SM2.scalar.random(.big);
-    const public_key = try encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = SM2.scalar.random(null, .big);
+    const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     // Test with 64KB message
     const large_size = 64 * 1024;
@@ -322,7 +472,7 @@ test "SM2 encryption large message handling" {
         byte.* = @intCast((i * 251 + 17) & 0xFF); // Use prime numbers for better distribution
     }
 
-    const ciphertext = try encryption.encrypt(allocator, large_message, public_key, .c1c3c2);
+    const ciphertext = try encryption.encrypt(allocator, large_message, public_key, .c1c3c2, null);
     defer ciphertext.deinit(allocator);
 
     const decrypted = try encryption.decrypt(allocator, ciphertext, private_key);

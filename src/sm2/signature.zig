@@ -4,52 +4,8 @@ const mem = std.mem;
 const SM2 = @import("group.zig").SM2;
 const SM3 = @import("../sm3.zig").SM3;
 const utils = @import("utils.zig");
-
-/// SM2 Key Pair
-pub const KeyPair = struct {
-    private_key: [32]u8,
-    public_key: SM2,
-
-    /// Generate a new SM2 key pair
-    pub fn generate() KeyPair {
-        const private_key = SM2.scalar.random(.big);
-        const public_key = SM2.basePoint.mul(private_key, .big) catch unreachable;
-
-        return KeyPair{
-            .private_key = private_key,
-            .public_key = public_key,
-        };
-    }
-
-    /// Create key pair from existing private key
-    pub fn fromPrivateKey(private_key: [32]u8) !KeyPair {
-        const public_key = try SM2.basePoint.mul(private_key, .big);
-
-        return KeyPair{
-            .private_key = private_key,
-            .public_key = public_key,
-        };
-    }
-
-    /// Get public key as uncompressed SEC1 format (65 bytes)
-    pub fn getPublicKeyUncompressed(self: KeyPair) [65]u8 {
-        return self.public_key.toUncompressedSec1();
-    }
-
-    /// Get public key as compressed SEC1 format (33 bytes)
-    pub fn getPublicKeyCompressed(self: KeyPair) [33]u8 {
-        return self.public_key.toCompressedSec1();
-    }
-
-    /// Get public key coordinates
-    pub fn getPublicKeyCoordinates(self: KeyPair) struct { x: [32]u8, y: [32]u8 } {
-        const affine = self.public_key.affineCoordinates();
-        return .{
-            .x = affine.x.toBytes(.big),
-            .y = affine.y.toBytes(.big),
-        };
-    }
-};
+const kp = @import("keypair.zig");
+const KeyPair = kp.KeyPair;
 
 /// SM2 Digital Signature
 pub const Signature = struct {
@@ -91,12 +47,8 @@ pub const Signature = struct {
 pub const SignatureOptions = struct {
     user_id: ?[]const u8 = null, // If null, uses default "1234567812345678"
     hash_type: enum { sm3, precomputed } = .sm3,
+    random: ?* const std.Random = null, // Optional custom RNG for signing
 };
-
-/// Generate SM2 key pair
-pub fn generateKeyPair() KeyPair {
-    return KeyPair.generate();
-}
 
 /// Sign a message using SM2 digital signature algorithm
 /// Implements the signing process as specified in GM/T 0003.2-2012
@@ -139,7 +91,7 @@ pub fn sign(
 
     while (true) {
         // Step 1: Generate random k
-        const k_bytes = SM2.scalar.random(.big);
+        const k_bytes = SM2.scalar.random(options.random, .big);
         const k = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
 
         // Ensure k is not zero
@@ -257,118 +209,3 @@ pub fn verify(
     return utils.constantTimeEqual(&R_bytes, &signature.r);
 }
 
-/// Create public key from coordinates
-pub fn publicKeyFromCoordinates(x: [32]u8, y: [32]u8) !SM2 {
-    const fe_x = try SM2.Fe.fromBytes(x, .big);
-    const fe_y = try SM2.Fe.fromBytes(y, .big);
-    return try SM2.fromAffineCoordinates(.{ .x = fe_x, .y = fe_y });
-}
-
-/// Create public key from SEC1 encoding
-pub fn publicKeyFromSec1(sec1_bytes: []const u8) !SM2 {
-    return try SM2.fromSec1(sec1_bytes);
-}
-
-test "SM2 key pair generation" {
-    const testing = std.testing;
-
-    const key_pair = generateKeyPair();
-
-    // Verify public key is valid (not identity element)
-    try key_pair.public_key.rejectIdentity();
-
-    // Test serialization
-    const uncompressed = key_pair.getPublicKeyUncompressed();
-    try testing.expect(uncompressed[0] == 0x04); // Uncompressed marker
-
-    const compressed = key_pair.getPublicKeyCompressed();
-    try testing.expect(compressed[0] == 0x02 or compressed[0] == 0x03); // Compressed marker
-}
-
-test "SM2 signature creation and verification" {
-    const testing = std.testing;
-
-    const key_pair = generateKeyPair();
-    const message = "hello world";
-    const options = SignatureOptions{ .hash_type = .sm3 };
-
-    // Create signature
-    const signature = try sign(message, key_pair.private_key, key_pair.public_key, options);
-
-    // Verify signature
-    const is_valid = try verify(message, signature, key_pair.public_key, options);
-    try testing.expect(is_valid);
-
-    // Test with wrong message
-    const wrong_message = "hello world!";
-    const is_invalid = try verify(wrong_message, signature, key_pair.public_key, options);
-    try testing.expect(!is_invalid);
-}
-
-test "SM2 signature with precomputed hash" {
-    const testing = std.testing;
-
-    const key_pair = generateKeyPair();
-    const message_hash = [_]u8{0x01} ** 32;
-    const options = SignatureOptions{ .hash_type = .precomputed };
-
-    // Create signature
-    const signature = try sign(&message_hash, key_pair.private_key, key_pair.public_key, options);
-
-    // Verify signature
-    const is_valid = try verify(&message_hash, signature, key_pair.public_key, options);
-    try testing.expect(is_valid);
-}
-
-test "SM2 signature serialization" {
-    const testing = std.testing;
-    const allocator = testing.allocator;
-
-    const key_pair = generateKeyPair();
-    const message = "test message";
-    const options = SignatureOptions{};
-
-    const signature = try sign(message, key_pair.private_key, key_pair.public_key, options);
-
-    // Test raw bytes serialization
-    const bytes = signature.toBytes();
-    const signature2 = Signature.fromBytes(bytes);
-
-    try testing.expectEqualSlices(u8, &signature.r, &signature2.r);
-    try testing.expectEqualSlices(u8, &signature.s, &signature2.s);
-
-    // Test DER serialization
-    const der_bytes = try signature.toDER(allocator);
-    defer allocator.free(der_bytes);
-
-    const signature3 = try Signature.fromDER(der_bytes);
-    try testing.expectEqualSlices(u8, &signature.r, &signature3.r);
-    try testing.expectEqualSlices(u8, &signature.s, &signature3.s);
-}
-
-test "SM2 public key from coordinates" {
-    const testing = std.testing;
-
-    const key_pair = generateKeyPair();
-    const coords = key_pair.getPublicKeyCoordinates();
-
-    const reconstructed_key = try publicKeyFromCoordinates(coords.x, coords.y);
-
-    try testing.expect(key_pair.public_key.equivalent(reconstructed_key));
-}
-
-test "SM2 public key from SEC1" {
-    const testing = std.testing;
-
-    const key_pair = generateKeyPair();
-
-    // Test uncompressed format
-    const uncompressed = key_pair.getPublicKeyUncompressed();
-    const key_from_uncompressed = try publicKeyFromSec1(&uncompressed);
-    try testing.expect(key_pair.public_key.equivalent(key_from_uncompressed));
-
-    // Test compressed format
-    const compressed = key_pair.getPublicKeyCompressed();
-    const key_from_compressed = try publicKeyFromSec1(&compressed);
-    try testing.expect(key_pair.public_key.equivalent(key_from_compressed));
-}

@@ -29,9 +29,10 @@ pub const KeyExchangeContext = struct {
         private_key: [32]u8,
         public_key: SM2,
         user_id: []const u8,
+        rng: ?*std.Random
     ) KeyExchangeContext {
         // Generate ephemeral key pair
-        const ephemeral_private = SM2.scalar.random(.big);
+        const ephemeral_private = SM2.scalar.random(rng, .big);
         const ephemeral_public = SM2.basePoint.mul(ephemeral_private, .big) catch unreachable;
 
         return KeyExchangeContext{
@@ -347,116 +348,3 @@ pub fn ephemeralKeyFromSec1(sec1_bytes: []const u8) !SM2 {
     return try SM2.fromSec1(sec1_bytes);
 }
 
-test "SM2 key exchange protocol" {
-    const testing = std.testing;
-    const allocator = testing.allocator;
-
-    // Generate key pairs for Alice and Bob
-    const alice_private = SM2.scalar.random(.big);
-    const alice_public = try SM2.basePoint.mul(alice_private, .big);
-    const alice_id = "alice@example.com";
-
-    const bob_private = SM2.scalar.random(.big);
-    const bob_public = try SM2.basePoint.mul(bob_private, .big);
-    const bob_id = "bob@example.com";
-
-    // Initialize contexts
-    var alice_ctx = KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
-    var bob_ctx = KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
-
-    // Perform key exchange
-    const key_length = 32;
-
-    // Alice generates shared key
-    const alice_result = try keyExchangeInitiator(
-        allocator,
-        &alice_ctx,
-        bob_public,
-        bob_ctx.ephemeral_public,
-        bob_id,
-        key_length,
-        false,
-    );
-    defer alice_result.deinit(allocator);
-
-    // Bob generates shared key
-    const bob_result = try keyExchangeResponder(
-        allocator,
-        &bob_ctx,
-        alice_public,
-        alice_ctx.ephemeral_public,
-        alice_id,
-        key_length,
-        false,
-    );
-    defer bob_result.deinit(allocator);
-
-    // Verify shared keys are equal
-    try testing.expectEqualSlices(u8, alice_result.shared_key, bob_result.shared_key);
-}
-
-test "SM2 key exchange with confirmation" {
-    const testing = std.testing;
-    const allocator = testing.allocator;
-
-    // Generate key pairs
-    const alice_private = SM2.scalar.random(.big);
-    const alice_public = try SM2.basePoint.mul(alice_private, .big);
-    const alice_id = "alice@test.com";
-
-    const bob_private = SM2.scalar.random(.big);
-    const bob_public = try SM2.basePoint.mul(bob_private, .big);
-    const bob_id = "bob@test.com";
-
-    // Initialize contexts
-    var alice_ctx = KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
-    var bob_ctx = KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
-
-    // Perform key exchange with confirmation
-    const key_length = 32;
-
-    const alice_result = try keyExchangeInitiator(
-        allocator,
-        &alice_ctx,
-        bob_public,
-        bob_ctx.ephemeral_public,
-        bob_id,
-        key_length,
-        true,
-    );
-    defer alice_result.deinit(allocator);
-
-    const bob_result = try keyExchangeResponder(
-        allocator,
-        &bob_ctx,
-        alice_public,
-        alice_ctx.ephemeral_public,
-        alice_id,
-        key_length,
-        true,
-    );
-    defer bob_result.deinit(allocator);
-
-    // Verify shared keys are equal
-    try testing.expectEqualSlices(u8, alice_result.shared_key, bob_result.shared_key);
-
-    // Verify confirmation values exist
-    try testing.expect(alice_result.key_confirmation != null);
-    try testing.expect(bob_result.key_confirmation != null);
-}
-
-test "SM2 ephemeral key creation" {
-    const testing = std.testing;
-
-    // Test creation from coordinates
-    const coords = [_]u8{0x01} ++ [_]u8{0x00} ** 31;
-    const ephemeral = ephemeralKeyFromCoordinates(coords, coords);
-
-    // Should fail for invalid coordinates
-    try testing.expectError(error.InvalidEncoding, ephemeral);
-
-    // Test creation from SEC1
-    const base_sec1 = SM2.basePoint.toUncompressedSec1();
-    const ephemeral2 = try ephemeralKeyFromSec1(&base_sec1);
-    try testing.expect(ephemeral2.equivalent(SM2.basePoint));
-}

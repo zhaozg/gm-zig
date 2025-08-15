@@ -1,5 +1,6 @@
 const std = @import("std");
 const root = @import("./root.zig");
+const builtin = @import("builtin");
 const print = std.debug.print;
 const sm3 = root.sm3;
 const sm4 = root.sm4;
@@ -26,13 +27,18 @@ pub fn main() !void {
 
     print("\n=== SM2 Utilities Demo ===\n", .{});
     try demonstrateUtils(allocator);
+
+    print("\n=== SM2 WasmRng Demo ===\n", .{});
+    if (builtin.target.cpu.arch == .wasm32) {
+        WasmRng();
+    }
 }
 
 fn demonstrateSignature(allocator: std.mem.Allocator) !void {
 
     // Generate key pair
     print("1. Generating SM2 key pair...\n", .{});
-    const key_pair = sm2.signature.generateKeyPair();
+    const key_pair = sm2.kp.generateKeyPair(null);
 
     // Display public key in different formats
     const compressed = key_pair.getPublicKeyCompressed();
@@ -85,7 +91,7 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     print("1. Setting up key exchange participants...\n", .{});
 
     // Alice's setup
-    const alice_private = sm2.SM2.scalar.random(.big);
+    const alice_private = sm2.SM2.scalar.random(null, .big);
     const alice_public = try sm2.SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@company.com";
 
@@ -93,7 +99,7 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     printHex(&alice_private);
 
     // Bob's setup
-    const bob_private = sm2.SM2.scalar.random(.big);
+    const bob_private = sm2.SM2.scalar.random(null, .big);
     const bob_public = try sm2.SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@company.com";
 
@@ -101,8 +107,8 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     printHex(&bob_private);
 
     // Initialize key exchange contexts
-    var alice_ctx = sm2.key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
-    var bob_ctx = sm2.key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
+    var alice_ctx = sm2.key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
+    var bob_ctx = sm2.key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
 
     print("2. Exchanging ephemeral keys...\n", .{});
 
@@ -167,8 +173,8 @@ fn demonstrateEncryption(allocator: std.mem.Allocator) !void {
     print("1. Setting up encryption...\n", .{});
 
     // Generate key pair
-    const private_key = sm2.SM2.scalar.random(.big);
-    const public_key = try sm2.encryption.publicKeyFromPrivateKey(private_key);
+    const private_key = sm2.SM2.scalar.random(null, .big);
+    const public_key = try sm2.kp.publicKeyFromPrivateKey(private_key);
 
     print("   Private key: ", .{});
     printHex(&private_key);
@@ -193,7 +199,7 @@ fn demonstrateEncryption(allocator: std.mem.Allocator) !void {
         print("3. Testing {any} format...\n", .{name});
 
         // Encrypt
-        const ciphertext = try sm2.encryption.encrypt(allocator, message, public_key, format);
+        const ciphertext = try sm2.encryption.encrypt(allocator, message, public_key, format, null);
         defer ciphertext.deinit(allocator);
 
         print("   C1 (point): ", .{});
@@ -281,3 +287,16 @@ fn printHex(data: []const u8) void {
     print("\n", .{});
 }
 
+fn WasmRng() void {
+    const ByteArrayRandom = @import("WasmRng.zig").ByteArrayRandom;
+
+    // 初始化生成器
+    const seed = "SECURE_SEED_DATA";
+    var rng = ByteArrayRandom.init(seed);
+    const rand = rng.random();
+
+    // 直接使用标准接口
+    var buffer: [16]u8 = undefined;
+
+    rand.fillFn(rand.ptr, &buffer);
+}

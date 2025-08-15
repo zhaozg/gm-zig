@@ -197,7 +197,7 @@
             color: white;
         }
 
-        .bnt-gen {
+        .btn-gen {
             background: linear-gradient(to right, #f39c12, #e67e22);
             color: white;
         }
@@ -400,6 +400,8 @@
         const genKeyBtn = document.getElementById('genKeyBtn');
 
         genKeyBtn.addEventListener('click', () => {
+
+            console.log("RAND:", bytesToHex(window.random(16)));
             const keyPair = window.sm2GenKeyPair();
 
             keyInput.value = bytesToHex(keyPair.privateKey);
@@ -579,15 +581,13 @@
         // 签名
         function sign() {
             try {
-                const inputBytes = processInput(inputText.value);
-                const key = keyInput.value; // 私钥
+                const msg = processInput(inputText.value);
+                const priKey = hexToBytes(keyInput.value);
+                const pubKey = hexToBytes(ivInput.value);
 
-                if (!key) {
-                    throw new Error('请提供签名私钥');
-                }
 
-                const sigValue = sm2.doSignature(bytesToHex(inputBytes), key);
-                outputText.value = JSON.stringify(sigValue);
+                const sigValue = window.sm2Sign(priKey, msg);
+                outputText.value = bytesToHex(sigValue);
                 showNotification('签名成功！');
             } catch (error) {
                 outputText.value = `错误: ${error.message}`;
@@ -597,27 +597,20 @@
         // 验签
         function verify() {
             try {
-                const inputBytes = processInput(inputText.value);
-                const key = keyInput.value; // 公钥
-                const signature = inputText.value;
+                const msg = processInput(inputText.value);
+                const sig = hexToBytes(outputText.value);
+                const pubKey = hexToBytes(ivInput.value);
 
-                if (!key) {
-                    throw new Error('请提供验签公钥');
+                if (pubKey.length !== 65) {
+                    throw new Error('请提供正确的验签公钥');
+                }
+                if (sig.length !== 64) {
+                    throw new Error('请提供正确的签名');
                 }
 
-                let sigObj;
-                try {
-                    sigObj = JSON.parse(signature);
-                } catch {
-                    throw new Error('无效的签名格式');
-                }
-
-                const publicKey = key;
-                const msg = bytesToHex(inputBytes);
-                const verifyResult = sm2.doVerifySignature(msg, sigObj, publicKey);
-
-                outputText.value = verifyResult ? '✅ 签名验证成功' : '❌ 签名验证失败';
-                showNotification(verifyResult ? '签名验证成功！' : '签名验证失败！');
+                const pass = window.sm2Verify(pubKey, msg, sig);
+                outputText.value = pass ? '✅ 签名验证成功' : '❌ 签名验证失败';
+                showNotification(pass? '签名验证成功！' : '签名验证失败！');
             } catch (error) {
                 outputText.value = `错误: ${error.message}`;
             }

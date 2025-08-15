@@ -9,6 +9,41 @@ async function loadWasm() {
 
   const exports = instance.exports;
 
+  window.initRandom = function(len = 4096) {
+    const array = new Uint8Array(len);
+    crypto.getRandomValues(array);
+
+    const rndSeedPtr= exports.alloc(len);
+    if (!rndSeedPtr) throw new Error("Allocation failed");
+
+    const rndSeedMem = new Uint8Array(
+      exports.memory.buffer,
+      rndSeedPtr,
+      len
+    );
+    rndSeedMem.set(array);
+
+    exports.setRandomSeed(rndSeedPtr, len);
+    exports.free(rndSeedPtr, len);
+  }
+
+  window.random = function(len) {
+    const outputPtr = exports.alloc(len);
+    if (!outputPtr) throw new Error("Allocation failed");
+    exports.getRandomBytes(outputPtr, len);
+
+    const Result = new Uint8Array(
+      exports.memory.buffer,
+      outputPtr,
+      len
+    );
+
+    const rndResult = new Uint8Array(Result);
+    exports.free(outputPtr, len);
+
+    return rndResult;
+  }
+
   window.sm3hash = function(inputData) {
     const inputPtr = exports.alloc(inputData.length);
     if (!inputPtr) throw new Error("Allocation failed");
@@ -43,19 +78,11 @@ async function loadWasm() {
 
   window.sm2GenKeyPair = function() {
     const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
 
     const priPtr= exports.alloc(32);
     const pubPtr = exports.alloc(65);
     if (!priPtr) throw new Error("Allocation failed");
     if (!pubPtr) throw new Error("Allocation failed");
-
-    const priMem = new Uint8Array(
-      exports.memory.buffer,
-      priPtr,
-      32
-    );
-    priMem.set(array);
 
     exports.sm2genKeyPair(priPtr, pubPtr);
 
@@ -77,6 +104,82 @@ async function loadWasm() {
       "publicKey": pubKey,
       "privateKey": priKey
     };
+  }
+
+  window.sm2Sign = function(priKey, msg) {
+
+    const priPtr= exports.alloc(32);
+    const msgPtr = exports.alloc(msg.length);
+    const sigPtr = exports.alloc(64);
+    if (!priPtr) throw new Error("Allocation failed");
+    if (!msgPtr) throw new Error("Allocation failed");
+    if (!sigPtr) throw new Error("Allocation failed");
+
+    const priMem = new Uint8Array(
+      exports.memory.buffer,
+      priPtr,
+      priKey.length
+    );
+    priMem.set(priKey);
+
+    const msgMem = new Uint8Array(
+      exports.memory.buffer,
+      msgPtr,
+      msg.length
+    );
+    msgMem.set(msg);
+
+    exports.sm2sign(priPtr, msgPtr, msg.length, sigPtr);
+
+    const Result = new Uint8Array(
+      exports.memory.buffer,
+      sigPtr,
+      64
+    );
+
+    const sigVal = new Uint8Array(Result);
+
+    exports.free(priPtr, 32);
+    exports.free(msgPtr, msg.length);
+    exports.free(sigPtr, 64);
+    return sigVal;
+  }
+
+  window.sm2Verify = function(pubKey, msg, sig) {
+    const pubPtr = exports.alloc(65);
+    const msgPtr = exports.alloc(msg.length);
+    const sigPtr = exports.alloc(64);
+    if (!pubPtr) throw new Error("Allocation failed");
+    if (!msgPtr) throw new Error("Allocation failed");
+    if (!sigPtr) throw new Error("Allocation failed");
+
+    const pubMem = new Uint8Array(
+      exports.memory.buffer,
+      pubPtr,
+      pubKey.length
+    );
+    pubMem.set(pubKey);
+
+    const msgMem = new Uint8Array(
+      exports.memory.buffer,
+      msgPtr,
+      msg.length
+    );
+    msgMem.set(msg);
+
+    const sigMem = new Uint8Array(
+      exports.memory.buffer,
+      sigPtr,
+      sig.length
+    );
+    sigMem.set(sig);
+
+    const pass = exports.sm2verify(pubPtr, msgPtr, msg.length, sigPtr);
+
+    exports.free(pubPtr, 65);
+    exports.free(msgPtr, msg.length);
+    exports.free(sigPtr, msg.length);
+    return pass;
   }
 
   window.sm3hmac = function(key, inputData) {
@@ -165,6 +268,8 @@ async function loadWasm() {
 
     return output;
   }
+
+  window.initRandom(4096);
 }
 
 loadWasm();
