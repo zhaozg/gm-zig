@@ -11,10 +11,5 @@ pub fn Writer(comptime Context: type, comptime WriteError: type, comptime writeF
     }
 }
 
-// Version detection helper
+// Version detection helper for debugging/conditional compilation if needed
 pub const is_new_zig = !@hasDecl(std.io, "GenericWriter");
-
-// Writer creation helper
-pub fn writer(context: anytype, comptime writeFn: anytype) Writer(@TypeOf(context), @TypeOf(@as(@TypeOf(writeFn), undefined)).ReturnType.ErrorSet, writeFn) {
-    return .{ .context = context };
-}
