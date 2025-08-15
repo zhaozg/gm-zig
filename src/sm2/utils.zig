@@ -3,6 +3,7 @@ const crypto = std.crypto;
 const mem = std.mem;
 const sm3 = @import("../sm3.zig");
 const SM3 = sm3.SM3;
+const compat = @import("../compat.zig");
 
 /// Key Derivation Function (KDF) based on SM3
 /// Implements the KDF function as specified in GM/T 0003.4-2012
@@ -108,7 +109,7 @@ pub const SignatureEncoding = enum {
 /// Output: DER-encoded signature
 pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![]u8 {
     // Simple DER encoding: SEQUENCE { r INTEGER, s INTEGER }
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = compat.arrayListInit(u8, allocator);
     errdefer buffer.deinit();
 
     // Helper function to encode integer
@@ -142,12 +143,12 @@ pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![
     }.call;
 
     // Encode r
-    var r_buffer = std.ArrayList(u8).init(allocator);
+    var r_buffer = compat.arrayListInit(u8, allocator);
     defer r_buffer.deinit();
     try encodeInteger(&r_buffer, r);
 
     // Encode s
-    var s_buffer = std.ArrayList(u8).init(allocator);
+    var s_buffer = compat.arrayListInit(u8, allocator);
     defer s_buffer.deinit();
     try encodeInteger(&s_buffer, s);
 

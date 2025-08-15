@@ -25,7 +25,7 @@ test "compat Writer creation" {
         }
     };
     
-    var buffer = std.ArrayList(u8).init(testing.allocator);
+    var buffer = compat.arrayListInit(u8, testing.allocator);
     defer buffer.deinit();
     
     var context = TestContext{ .buffer = buffer };
@@ -36,4 +36,5 @@ test "compat Writer creation" {
     
     try writer.writeAll("Hello, World!");
     try testing.expectEqualStrings("Hello, World!", context.buffer.items);
+}
 }
