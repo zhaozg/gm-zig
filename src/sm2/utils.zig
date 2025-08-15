@@ -159,7 +159,7 @@ pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![
     try compat.arrayListAppendSlice(u8, &buffer, allocator, r_buffer.items);
     try compat.arrayListAppendSlice(u8, &buffer, allocator, s_buffer.items);
 
-    return try buffer.toOwnedSlice();
+    return try compat.arrayListToOwnedSlice(u8, &buffer, allocator);
 }
 
 /// Decode DER-encoded SM2 signature

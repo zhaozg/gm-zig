@@ -66,6 +66,18 @@ pub fn arrayListDeinit(comptime T: type, list: *std.ArrayList(T), allocator: std
     }
 }
 
+/// Cross-version compatible ArrayList.toOwnedSlice
+pub fn arrayListToOwnedSlice(comptime T: type, list: *std.ArrayList(T), allocator: std.mem.Allocator) ![]T {
+    // Try the new API first (Zig 0.15.0-dev+), then fall back to old API
+    if (comptime is_zig_015_dev) {
+        // Zig 0.15.0-dev+ - requires allocator parameter
+        return try list.toOwnedSlice(allocator);
+    } else {
+        // Zig 0.14.1 and earlier - no allocator parameter
+        return try list.toOwnedSlice();
+    }
+}
+
 /// Version detection helper - true for Zig 0.14.0+
 pub const is_new_zig = !@hasDecl(std.io, "GenericWriter");
 

@@ -38,3 +38,20 @@ test "compat Writer creation" {
     try writer.writeAll("Hello, World!");
     try testing.expectEqualStrings("Hello, World!", context.buffer.items);
 }
+
+test "compat ArrayList toOwnedSlice" {
+    var list = compat.arrayListInit(u8, testing.allocator);
+    defer compat.arrayListDeinit(u8, &list, testing.allocator);
+    
+    try compat.arrayListAppend(u8, &list, testing.allocator, 0x01);
+    try compat.arrayListAppend(u8, &list, testing.allocator, 0x02);
+    try compat.arrayListAppend(u8, &list, testing.allocator, 0x03);
+    
+    const owned = try compat.arrayListToOwnedSlice(u8, &list, testing.allocator);
+    defer testing.allocator.free(owned);
+    
+    try testing.expectEqual(@as(usize, 3), owned.len);
+    try testing.expectEqual(@as(u8, 0x01), owned[0]);
+    try testing.expectEqual(@as(u8, 0x02), owned[1]);
+    try testing.expectEqual(@as(u8, 0x03), owned[2]);
+}
