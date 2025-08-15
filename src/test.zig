@@ -1,4 +1,5 @@
 test {
+     _ = @import("test/compat_test.zig");
      _ = @import("test/sm3_test.zig");
      _ = @import("test/sm4_test.zig");
      _ = @import("test/sm2_group_test.zig");

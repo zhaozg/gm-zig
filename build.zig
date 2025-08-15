@@ -43,6 +43,7 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
+    // Create test modules for comprehensive testing
     const lib_unit_tests = b.addTest(.{
         .root_module = lib_mod,
     });
@@ -55,6 +56,7 @@ pub fn build(b: *std.Build) void {
     });
     exe_unit_tests.root_module.addImport("gmlib", lib_mod);
 
+    // Additional comprehensive test suite
     const tests = b.addTest(.{
          .root_source_file = b.path("src/test.zig"),
          .target = target,
@@ -64,6 +66,7 @@ pub fn build(b: *std.Build) void {
      const run_tests = b.addRunArtifact(tests);
      const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
+     // Test step with all test configurations
      const test_step = b.step("test", "Run tests");
      test_step.dependOn(&run_tests.step);
      test_step.dependOn(&run_lib_unit_tests.step);

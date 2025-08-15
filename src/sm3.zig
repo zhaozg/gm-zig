@@ -170,14 +170,17 @@ pub const SM3 = struct {
         return x ^ math.rotl(u32, x, 15) ^ math.rotl(u32, x, 23);
     }
 
+    // Writer API for streaming interface
     pub const Error = error{};
     pub const Writer = compat.Writer(*Self, Error, write);
 
+    /// Write bytes to the hasher (for Writer interface)
     fn write(self: *Self, bytes: []const u8) Error!usize {
         self.update(bytes);
         return bytes.len;
     }
 
+    /// Get a Writer interface for this hasher instance
     pub fn writer(self: *Self) Writer {
         return .{ .context = self };
     }
