@@ -7,7 +7,7 @@ const sm2 = root.sm2;
 
 pub const io_mode = .disabled;
 
-const wasmRng = @import("WasmRng.zig");
+const wasmRng = @import("wasmRng.zig");
 
 pub const panic = customPanic;
 fn customPanic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {

@@ -288,7 +288,7 @@ fn printHex(data: []const u8) void {
 }
 
 fn WasmRng() void {
-    const ByteArrayRandom = @import("WasmRng.zig").ByteArrayRandom;
+    const ByteArrayRandom = @import("wasmRng.zig").ByteArrayRandom;
 
     // 初始化生成器
     const seed = "SECURE_SEED_DATA";
