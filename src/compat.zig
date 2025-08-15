@@ -22,12 +22,62 @@ pub fn arrayListInit(comptime T: type, allocator: std.mem.Allocator) std.ArrayLi
     if (comptime @hasDecl(ArrayListType, "init")) {
         return ArrayListType.init(allocator);
     } else {
-        // Zig 0.15.0-dev+ - use new initialization pattern
+        // Zig 0.15.0-dev+ - use new initialization pattern without allocator field
         return ArrayListType{
             .items = &[_]T{},
             .capacity = 0,
-            .allocator = allocator,
         };
+    }
+}
+
+/// Cross-version compatible ArrayList.append
+pub fn arrayListAppend(comptime T: type, list: *std.ArrayList(T), allocator: std.mem.Allocator, item: T) !void {
+    const ArrayListType = std.ArrayList(T);
+    
+    // Check if append method takes allocator parameter (Zig 0.15.0-dev+)
+    const append_info = @typeInfo(@TypeOf(ArrayListType.append));
+    const params = append_info.Fn.params;
+    
+    if (params.len == 3) {
+        // Zig 0.15.0-dev+ - requires allocator parameter
+        try list.append(allocator, item);
+    } else {
+        // Zig 0.14.1 and earlier - no allocator parameter
+        try list.append(item);
+    }
+}
+
+/// Cross-version compatible ArrayList.appendSlice
+pub fn arrayListAppendSlice(comptime T: type, list: *std.ArrayList(T), allocator: std.mem.Allocator, items: []const T) !void {
+    const ArrayListType = std.ArrayList(T);
+    
+    // Check if appendSlice method takes allocator parameter (Zig 0.15.0-dev+)
+    const append_slice_info = @typeInfo(@TypeOf(ArrayListType.appendSlice));
+    const params = append_slice_info.Fn.params;
+    
+    if (params.len == 3) {
+        // Zig 0.15.0-dev+ - requires allocator parameter
+        try list.appendSlice(allocator, items);
+    } else {
+        // Zig 0.14.1 and earlier - no allocator parameter
+        try list.appendSlice(items);
+    }
+}
+
+/// Cross-version compatible ArrayList.deinit
+pub fn arrayListDeinit(comptime T: type, list: *std.ArrayList(T), allocator: std.mem.Allocator) void {
+    const ArrayListType = std.ArrayList(T);
+    
+    // Check if deinit method takes allocator parameter (Zig 0.15.0-dev+)
+    const deinit_info = @typeInfo(@TypeOf(ArrayListType.deinit));
+    const params = deinit_info.Fn.params;
+    
+    if (params.len == 2) {
+        // Zig 0.15.0-dev+ - requires allocator parameter
+        list.deinit(allocator);
+    } else {
+        // Zig 0.14.1 and earlier - no allocator parameter
+        list.deinit();
     }
 }
 

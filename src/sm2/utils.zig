@@ -110,12 +110,12 @@ pub const SignatureEncoding = enum {
 pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![]u8 {
     // Simple DER encoding: SEQUENCE { r INTEGER, s INTEGER }
     var buffer = compat.arrayListInit(u8, allocator);
-    errdefer buffer.deinit();
+    errdefer compat.arrayListDeinit(u8, &buffer, allocator);
 
     // Helper function to encode integer
     const encodeInteger = struct {
-        fn call(buf: *std.ArrayList(u8), value: [32]u8) !void {
-            try buf.append(0x02); // INTEGER tag
+        fn call(buf: *std.ArrayList(u8), alloc: std.mem.Allocator, value: [32]u8) !void {
+            try compat.arrayListAppend(u8, buf, alloc, 0x02); // INTEGER tag
 
             // Find first non-zero byte
             var start: usize = 0;
@@ -123,8 +123,8 @@ pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![
 
             // If the number is zero
             if (start == 32) {
-                try buf.append(0x01); // length
-                try buf.append(0x00); // value
+                try compat.arrayListAppend(u8, buf, alloc, 0x01); // length
+                try compat.arrayListAppend(u8, buf, alloc, 0x00); // value
                 return;
             }
 
@@ -132,32 +132,32 @@ pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![
             const need_padding = (value[start] & 0x80) != 0;
             const content_len = 32 - start + @as(usize, if (need_padding) 1 else 0);
 
-            try buf.append(@intCast(content_len)); // length
+            try compat.arrayListAppend(u8, buf, alloc, @intCast(content_len)); // length
 
             if (need_padding) {
-                try buf.append(0x00); // padding byte
+                try compat.arrayListAppend(u8, buf, alloc, 0x00); // padding byte
             }
 
-            try buf.appendSlice(value[start..]);
+            try compat.arrayListAppendSlice(u8, buf, alloc, value[start..]);
         }
     }.call;
 
     // Encode r
     var r_buffer = compat.arrayListInit(u8, allocator);
-    defer r_buffer.deinit();
-    try encodeInteger(&r_buffer, r);
+    defer compat.arrayListDeinit(u8, &r_buffer, allocator);
+    try encodeInteger(&r_buffer, allocator, r);
 
     // Encode s
     var s_buffer = compat.arrayListInit(u8, allocator);
-    defer s_buffer.deinit();
-    try encodeInteger(&s_buffer, s);
+    defer compat.arrayListDeinit(u8, &s_buffer, allocator);
+    try encodeInteger(&s_buffer, allocator, s);
 
     // Build SEQUENCE
-    try buffer.append(0x30); // SEQUENCE tag
+    try compat.arrayListAppend(u8, &buffer, allocator, 0x30); // SEQUENCE tag
     const content_length = r_buffer.items.len + s_buffer.items.len;
-    try buffer.append(@intCast(content_length)); // length
-    try buffer.appendSlice(r_buffer.items);
-    try buffer.appendSlice(s_buffer.items);
+    try compat.arrayListAppend(u8, &buffer, allocator, @intCast(content_length)); // length
+    try compat.arrayListAppendSlice(u8, &buffer, allocator, r_buffer.items);
+    try compat.arrayListAppendSlice(u8, &buffer, allocator, s_buffer.items);
 
     return try buffer.toOwnedSlice();
 }

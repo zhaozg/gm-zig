@@ -15,20 +15,21 @@ test "compat version detection" {
 test "compat Writer creation" {
     const TestContext = struct {
         buffer: std.ArrayList(u8),
+        allocator: std.mem.Allocator,
         
         const Self = @This();
         const WriteError = std.mem.Allocator.Error;
         
         fn write(self: *Self, bytes: []const u8) WriteError!usize {
-            try self.buffer.appendSlice(bytes);
+            try compat.arrayListAppendSlice(u8, &self.buffer, self.allocator, bytes);
             return bytes.len;
         }
     };
     
     var buffer = compat.arrayListInit(u8, testing.allocator);
-    defer buffer.deinit();
+    defer compat.arrayListDeinit(u8, &buffer, testing.allocator);
     
-    var context = TestContext{ .buffer = buffer };
+    var context = TestContext{ .buffer = buffer, .allocator = testing.allocator };
     
     // Test that Writer can be created and used
     const WriterType = compat.Writer(*TestContext, TestContext.WriteError, TestContext.write);
