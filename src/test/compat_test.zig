@@ -37,4 +37,3 @@ test "compat Writer creation" {
     try writer.writeAll("Hello, World!");
     try testing.expectEqualStrings("Hello, World!", context.buffer.items);
 }
-}

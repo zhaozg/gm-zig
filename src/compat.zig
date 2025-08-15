@@ -35,7 +35,7 @@ pub fn arrayListInit(comptime T: type, allocator: std.mem.Allocator) std.ArrayLi
 pub const is_new_zig = !@hasDecl(std.io, "GenericWriter");
 
 /// Version detection helper - true for Zig 0.15.0-dev+
-pub const is_zig_015_dev = comptime blk: {
+pub const is_zig_015_dev = blk: {
     // Try to detect 0.15.0-dev by checking if ArrayList.init exists
     const TestList = std.ArrayList(u8);
     break :blk !@hasDecl(TestList, "init");
