@@ -85,14 +85,23 @@ pub fn alignedAlloc(allocator: std.mem.Allocator, comptime T: type, alignment: c
     
     if (comptime has_alignment_enum) {
         // Zig 0.15.0-dev+ - has std.mem.Alignment enum
-        // Check if the alignment value is valid for the enum
-        if (comptime std.math.isPowerOfTwo(alignment) and alignment <= 1 << 29) {
-            const alignment_enum = @as(std.mem.Alignment, @enumFromInt(alignment));
-            return try allocator.alignedAlloc(T, alignment_enum, n);
-        } else {
-            // Fallback for invalid alignment values
-            return try allocator.alloc(T, n);
-        }
+        // Map common alignment values explicitly to avoid enum conversion issues
+        const alignment_enum = switch (alignment) {
+            1 => @as(std.mem.Alignment, @enumFromInt(1)),
+            2 => @as(std.mem.Alignment, @enumFromInt(2)),
+            4 => @as(std.mem.Alignment, @enumFromInt(4)),
+            8 => @as(std.mem.Alignment, @enumFromInt(8)),
+            16 => @as(std.mem.Alignment, @enumFromInt(16)),
+            32 => @as(std.mem.Alignment, @enumFromInt(32)),
+            64 => @as(std.mem.Alignment, @enumFromInt(64)),
+            128 => @as(std.mem.Alignment, @enumFromInt(128)),
+            256 => @as(std.mem.Alignment, @enumFromInt(256)),
+            else => {
+                // For unsupported alignment values, fall back to regular allocation
+                return try allocator.alloc(T, n);
+            },
+        };
+        return try allocator.alignedAlloc(T, alignment_enum, n);
     } else {
         // Zig 0.14.1 and earlier - alignment parameter is comptime_int
         return try allocator.alignedAlloc(T, alignment, n);
