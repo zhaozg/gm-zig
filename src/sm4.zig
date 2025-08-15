@@ -154,6 +154,71 @@ pub const SM4 = struct {
     }
 };
 
+// CBC模式加密
+pub const SM4_CBC = struct {
+    sm4: SM4,
+    iv: [SM4_BLOCK_SIZE]u8,
+
+    pub fn init(key: *const [SM4_KEY_SIZE]u8, iv: *const [SM4_BLOCK_SIZE]u8) SM4_CBC {
+        return .{
+            .sm4 = SM4.init(key),
+            .iv = iv.*,
+        };
+    }
+
+    pub fn encrypt(self: *SM4_CBC, input: []const u8, output: []u8) void {
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+        assert(output.len >= input.len);
+
+        var iv = self.iv;
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const block = input[i..i + SM4_BLOCK_SIZE];
+            var xored: [SM4_BLOCK_SIZE]u8 = undefined;
+
+            // XOR with IV or previous ciphertext
+            for (0..SM4_BLOCK_SIZE) |j| {
+                xored[j] = block[j] ^ iv[j];
+            }
+
+            self.sm4.encryptBlock(&xored, @as(*[16]u8, @ptrCast(output[i..].ptr)));
+            iv = @as(*[16]u8, @ptrCast(output[i..].ptr)).*;
+        }
+
+        // 更新IV为最后一个密文块
+        @memcpy(&self.iv, output[output.len - SM4_BLOCK_SIZE ..][0..SM4_BLOCK_SIZE]);
+    }
+
+    pub fn decrypt(self: *SM4_CBC, input: []const u8, output: []u8) void {
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+        assert(output.len >= input.len);
+
+        var next_iv: [SM4_BLOCK_SIZE]u8 = undefined;
+        var iv = self.iv;
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const ciphertext  = input[i..i + SM4_BLOCK_SIZE];
+            var decrypted: [SM4_BLOCK_SIZE]u8 = undefined;
+
+            // 保存下一个IV
+            @memcpy(&next_iv, ciphertext[0..SM4_BLOCK_SIZE]);
+
+            self.sm4.decryptBlock(@as(*const [16]u8, @ptrCast(ciphertext.ptr)), &decrypted);
+
+            // XOR with IV or previous ciphertext
+            for (0..SM4_BLOCK_SIZE) |j| {
+                output[i + j] = decrypted[j] ^ iv[j];
+            }
+
+            // 更新IV
+            iv = next_iv;
+        }
+
+        // 更新IV为最后一个密文块
+        @memcpy(&self.iv, &next_iv);
+    }
+};
+
 // Test vector from GM/T 0002-2012
 test "SM4 Known Answer Test" {
     // Test key and plaintext
@@ -251,6 +316,75 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         const decrypt_speed = (@as(f64, @floatFromInt(size)) / decrypt_time) * ns_per_s / bytes_per_mb;
 
         print("Data: {d:>6.2} KB | Encrypt: {d:>6.2} MB/s | Decrypt: {d:>6.2} MB/s\n", .{
+            size / 1024,
+            encrypt_speed,
+            decrypt_speed,
+        });
+    }
+}
+
+pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+    var ctx = SM4_CBC.init(&key, &key);
+
+    const test_sizes = [_]usize{
+        16 * 64,      // 1KB
+        1024 * 16,    // 16KB
+        1024 * 1024,  // 1MB
+        10 * 1024 * 1024,  // 10MB
+        100 * 1024 * 1024, // 100MB
+    };
+
+    std.debug.print("\nSM4_CBC 性能测试 (推荐使用ReleaseSafe构建)\n", .{});
+    std.debug.print("------------------------------------------------\n", .{});
+
+    for (test_sizes) |size| {
+        const buffer = try allocator.alloc(u8, size);
+        defer allocator.free(buffer);
+
+        // 填充随机数据
+        var prng = std.Random.DefaultPrng.init(0);
+        prng.random().bytes(buffer);
+
+        const out = try allocator.alloc(u8, size);
+        defer allocator.free(out);
+
+        // 预热
+        ctx.encrypt(buffer[0..16], out[0..16]);
+
+        // 加密性能测试
+        const encrypt_start = std.time.nanoTimestamp();
+        const blocks = size / SM4_BLOCK_SIZE;
+        for (0..blocks) |i| {
+            const start = i * SM4_BLOCK_SIZE;
+            ctx.encrypt(
+                buffer[start..][0..SM4_BLOCK_SIZE],
+                out[start..][0..SM4_BLOCK_SIZE],
+            );
+        }
+        const encrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - encrypt_start));
+
+        // 解密性能测试
+        const decrypt_start = std.time.nanoTimestamp();
+        for (0..blocks) |i| {
+            const start = i * SM4_BLOCK_SIZE;
+            ctx.decrypt(
+                out[start..][0..SM4_BLOCK_SIZE],
+                buffer[start..][0..SM4_BLOCK_SIZE],
+            );
+        }
+        const decrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - decrypt_start));
+
+        // 计算速度 (MB/s)
+        const bytes_per_mb = 1024.0 * 1024.0;
+        const ns_per_s = 1_000_000_000.0;
+        const encrypt_speed = (@as(f64, @floatFromInt(size)) / encrypt_time) * ns_per_s / bytes_per_mb;
+        const decrypt_speed = (@as(f64, @floatFromInt(size)) / decrypt_time) * ns_per_s / bytes_per_mb;
+
+        std.debug.print("数据: {d:>6} KB | 加密: {d:>6.2} MB/s | 解密: {d:>6.2} MB/s\n", .{
             size / 1024,
             encrypt_speed,
             decrypt_speed,

@@ -4,35 +4,38 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-   // 创建模块
     const lib_mod = b.addModule("gmlib", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
+    const main_src =
+        if (target.result.cpu.arch == .wasm32 and target.result.os.tag == .freestanding)
+            b.path("src/wasm.zig") else b.path("src/main.zig");
+
+
     const exe_mod = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
+        .root_source_file = main_src,
         .target = target,
         .optimize = optimize,
     });
-
     exe_mod.addImport("gmlib", lib_mod);
 
-    const lib = b.addLibrary(.{
-        .linkage = .static,
-        .name = "gmlib",
-        .root_module = lib_mod,
-    });
-
-    b.installArtifact(lib);
-
     const exe = b.addExecutable(.{
-        .name = "gmlib",
+        .name = "gm",
         .root_module = exe_mod,
     });
-
     b.installArtifact(exe);
+
+    if (target.result.cpu.arch == .wasm32) {
+        // 此项默认为false，如果你需要在js环境中调用导出的方法，需要设置为true
+        exe.rdynamic = true;
+
+        // 关键配置：禁用标准库的 POSIX 功能
+        exe.is_linking_libc = false;
+        exe.root_module.single_threaded = true;
+    }
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
@@ -61,10 +64,12 @@ pub fn build(b: *std.Build) void {
          .root_source_file = b.path("src/test.zig"),
          .target = target,
          .optimize = optimize,
-     });
+    });
+    tests.addIncludePath(.{ .cwd_relative = "src" }); // 添加包含路径
      
-     const run_tests = b.addRunArtifact(tests);
-     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+    const run_tests = b.addRunArtifact(tests);
+    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+
 
      // Test step with all test configurations
      const test_step = b.step("test", "Run tests");

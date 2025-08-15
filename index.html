@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script src="wasm-loader.js" type="module"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>国密算法在线工具</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.92);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            z-index: 0;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
+        }
+
+        .description {
+            text-align: center;
+            color: #555;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            position: relative;
+            z-index: 1;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            position: relative;
+            z-index: 1;
+            border: 1px solid #eaeaea;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+
+        textarea:focus {
+            border-color: #3498db;
+            outline: none;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        .key-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+            background: #fafafa;
+        }
+
+        .key-input:focus {
+            border-color: #3498db;
+            outline: none;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        .control-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .hex-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .hex-toggle label {
+            margin-bottom: 0;
+            font-weight: normal;
+            color: #555;
+        }
+
+        .buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 14px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn i {
+            font-size: 1.2rem;
+        }
+
+        .btn-encrypt {
+            background: linear-gradient(to right, #3498db, #2980b9);
+            color: white;
+        }
+
+        .btn-decrypt {
+            background: linear-gradient(to right, #2ecc71, #27ae60);
+            color: white;
+        }
+
+        .btn-hash {
+            background: linear-gradient(to right, #9b59b6, #8e44ad);
+            color: white;
+        }
+
+        .btn-hmac {
+            background: linear-gradient(to right, #e67e22, #d35400);
+            color: white;
+        }
+
+        .btn-sign {
+            background: linear-gradient(to right, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .btn-verify {
+            background: linear-gradient(to right, #e67e22, #d6a085);
+            color: white;
+        }
+
+        .bnt-gen {
+            background: linear-gradient(to right, #f39c12, #e67e22);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .result-container {
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .copy-btn:hover {
+            background: #2980b9;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background: #2ecc71;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            transform: translateX(110%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .algo-info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .algo-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #3498db;
+        }
+
+        .algo-card h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+
+        .algo-card p {
+            color: #555;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .control-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>国密算法在线工具</h1>
+        <p class="description">支持SM4-CBC加密/解密、SM3摘要、HMAC-SM3、SM2签名和验签功能</p>
+
+        <div class="panel">
+            <div class="input-group">
+
+                <div class="hex-toggle">
+                    <label for="inputText">输入文本：</label>
+                    <input type="checkbox" id="hexInput">
+                    <label for="hexMode">Hex 输入</label>
+                </div>
+                <textarea id="inputText" placeholder="请输入要处理的文本...">国密算法在线工具示例文本</textarea>
+            </div>
+
+            <div class="input-group">
+                <label for="key">密钥/私钥：</label>
+                <input type="text" id="key" class="key-input" placeholder="请输入密钥..." value="mySecretKey123456" style="flex:1;">
+            </div>
+            <div class="input-group">
+                <label for="iv">iv/公钥：</label>
+                <input type="text" id="iv" class="key-input" placeholder="请输入IV..." value="mySecretKey123456">
+            </div>
+
+            <div class="control-group">
+                <div class="hex-toggle">
+                    <input type="checkbox" id="hexMode">
+                    <label for="hexMode">Hex编码输入/输出</label>
+                </div>
+
+                <div class="buttons">
+                    <button class="btn btn-encrypt" id="encryptBtn">
+                        <i>🔒</i> SM4-CBC加密
+                    </button>
+                    <button class="btn btn-decrypt" id="decryptBtn">
+                        <i>🔓</i> SM4-CBC解密
+                    </button>
+                    <button class="btn btn-hash" id="hashBtn">
+                        <i>#️⃣</i> SM3摘要
+                    </button>
+                    <button class="btn btn-hmac" id="hmacBtn">
+                        <i>🔑</i> HMAC-SM3
+                    </button>
+                    <button class="btn btn-gen" id="genKeyBtn">
+                        <i>🔑</i> 生成密钥
+                    </button>
+                    <button class="btn btn-sign" id="signBtn">
+                        <i>🖋️</i> 签名
+                    </button>
+                    <button class="btn btn-verify" id="verifyBtn">
+                        <i>✅</i> 验签
+                    </button>
+                </div>
+            </div>
+
+            <div class="input-group result-container">
+                <label for="outputText">处理结果：</label>
+                <textarea id="outputText" placeholder="处理结果将显示在这里..." readonly></textarea>
+                <button class="copy-btn" id="copyBtn">复制结果</button>
+            </div>
+        </div>
+
+        <div class="algo-info">
+            <div class="algo-card">
+                <h3>SM4-CBC 加密</h3>
+                <p>分组密码算法，密钥长度128位，CBC模式需要初始化向量(IV)，提供数据机密性保护。</p>
+            </div>
+            <div class="algo-card">
+                <h3>SM3 摘要算法</h3>
+                <p>密码杂凑算法，输出长度256位，用于数字签名和验证、消息认证码的生成等。</p>
+            </div>
+            <div class="algo-card">
+                <h3>HMAC-SM3</h3>
+                <p>基于密钥的哈希运算消息认证码，使用SM3作为基础哈希函数，用于消息完整性验证。</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="notification" id="notification">结果已复制到剪贴板！</div>
+
+    <script>
+        // 获取DOM元素
+        const inputText = document.getElementById('inputText');
+        const outputText = document.getElementById('outputText');
+        const keyInput = document.getElementById('key');
+        const ivInput = document.getElementById('iv');
+        const hexMode = document.getElementById('hexMode');
+        const encryptBtn = document.getElementById('encryptBtn');
+        const decryptBtn = document.getElementById('decryptBtn');
+        const hashBtn = document.getElementById('hashBtn');
+        const hmacBtn = document.getElementById('hmacBtn');
+        const signBtn = document.getElementById('signBtn');
+        const verifyBtn = document.getElementById('verifyBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const notification = document.getElementById('notification');
+
+        const genKeyBtn = document.getElementById('genKeyBtn');
+
+        genKeyBtn.addEventListener('click', () => {
+            const keyPair = window.sm2GenKeyPair();
+
+            keyInput.value = bytesToHex(keyPair.privateKey);
+            ivInput.value = bytesToHex(keyPair.publicKey);
+            showNotification('密钥已生成！');
+        });
+
+        // 显示通知
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 2000);
+        }
+
+        // 复制结果到剪贴板
+        copyBtn.addEventListener('click', () => {
+            outputText.select();
+            document.execCommand('copy');
+            showNotification('结果已复制到剪贴板！');
+        });
+
+        // 字符串转字节数组
+        function stringToBytes(str) {
+            const bytes = new Uint8Array(str.length);
+            for (let i = 0; i < str.length; i++) {
+                bytes[i] = str.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        // 字节数组转字符串
+        function bytesToString(bytes) {
+            return String.fromCharCode.apply(null, bytes);
+        }
+
+        // 字节数组转Hex字符串
+        function bytesToHex(bytes) {
+            return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Hex字符串转字节数组
+        function hexToBytes(hex) {
+          // Remove optional '0x' prefix
+          hex = hex.startsWith('0x') ? hex.slice(2) : hex;
+
+          // Ensure even number of characters
+          if (hex.length % 2 !== 0) {
+            throw new Error('Invalid hex string');
+          }
+
+          const bytes = new Uint8Array(hex.length / 2);
+          for (let i = 0; i < hex.length; i += 2) {
+            bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+          }
+          return bytes;
+        }
+
+        function toBase64(uint8Array) {
+          let binary = '';
+          const len = uint8Array.byteLength;
+          for (let i = 0; i < len; i++) {
+              binary += String.fromCharCode(uint8Array[i]);
+          }
+          return btoa(binary);
+        }
+
+        // 处理输入数据（根据Hex模式）
+        function processInput(data) {
+            if (hexMode.checked) {
+                return hexToBytes(data);
+            }
+            return stringToBytes(data);
+        }
+
+        // 处理输出数据（根据Hex模式）
+        function processOutput(bytes) {
+            if (hexMode.checked) {
+                return bytesToHex(bytes);
+            }
+
+            // 尝试将字节数组转为字符串，如果不能转为有效字符串则转为Base64
+            try {
+                const str = bytesToString(bytes);
+                // 检查是否包含控制字符（非可打印字符）
+                if (/[\x00-\x1F\x7F-\x9F]/.test(str)) {
+                    throw new Error('Binary data detected');
+                }
+                return str;
+            } catch (e) {
+                return btoa(bytesToString(bytes));
+            }
+        }
+
+        // SM4-CBC加密
+        function encryptSM4() {
+            try {
+                const key = hexToBytes(keyInput.value);
+                const iv = hexToBytes(ivInput.value);
+                const inputBytes = processInput(inputText.value);
+
+                if (key.length !== 16) {
+                    throw new Error('SM4密钥必须为16字节(128位)');
+                }
+                if (iv.length !== 16) {
+                    throw new Error('SM4 IV必须为16字节(128位)');
+                }
+                if (inputBytes.length % 16 !== 0) {
+                    throw new Error('输入数据长度必须是16的倍数');
+                }
+
+                // 加密
+                const encryptedBytes = window.sm4cbc(key, iv, true, inputBytes);
+
+                outputText.value = processOutput(encryptedBytes);
+                showNotification('SM4-CBC加密成功！');
+            } catch (error) {
+                outputText.value = `错误: ${error.message}`;
+            }
+        }
+
+        // SM4-CBC解密
+        function decryptSM4() {
+            try {
+                const key = hexToBytes(keyInput.value);
+                const iv = hexToBytes(ivInput.value);
+                const inputBytes = processInput(inputText.value);
+
+                if (key.length !== 16) {
+                    throw new Error('SM4密钥必须为16字节(128位)');
+                }
+                if (iv.length !== 16) {
+                    throw new Error('SM4 IV必须为16字节(128位)');
+                }
+                if (inputBytes.length % 16 !== 0) {
+                    throw new Error('输入数据长度必须是16的倍数');
+                }
+
+                // 解密
+                const decryptedBytes = window.sm4cbc(key, iv, false, inputBytes);
+
+                outputText.value = processOutput(decryptedBytes);
+                showNotification('SM4-CBC解密成功！');
+            } catch (error) {
+                outputText.value = `错误: ${error.message}`;
+            }
+        }
+
+        // SM3摘要
+        async function hashSM3() {
+            try {
+                const inputBytes = processInput(inputText.value);
+                const result = window.sm3hash(inputBytes);
+                outputText.value = processOutput(result);
+
+                showNotification('SM3摘要计算成功！');
+            } catch (error) {
+                outputText.value = `错误: ${error.message}`;
+            }
+        }
+
+        // HMAC-SM3
+        function hmacSM3() {
+            try {
+                const key = hexToBytes(keyInput.value);
+                const inputBytes = processInput(inputText.value);
+                const result = window.sm3hash(key, inputBytes);
+                outputText.value = processOutput(result);
+
+                showNotification('HMAC-SM3计算成功！');
+            } catch (error) {
+                outputText.value = `错误: ${error.message}`;
+            }
+        }
+
+        // 签名
+        function sign() {
+            try {
+                const inputBytes = processInput(inputText.value);
+                const key = keyInput.value; // 私钥
+
+                if (!key) {
+                    throw new Error('请提供签名私钥');
+                }
+
+                const sigValue = sm2.doSignature(bytesToHex(inputBytes), key);
+                outputText.value = JSON.stringify(sigValue);
+                showNotification('签名成功！');
+            } catch (error) {
+                outputText.value = `错误: ${error.message}`;
+            }
+        }
+
+        // 验签
+        function verify() {
+            try {
+                const inputBytes = processInput(inputText.value);
+                const key = keyInput.value; // 公钥
+                const signature = inputText.value;
+
+                if (!key) {
+                    throw new Error('请提供验签公钥');
+                }
+
+                let sigObj;
+                try {
+                    sigObj = JSON.parse(signature);
+                } catch {
+                    throw new Error('无效的签名格式');
+                }
+
+                const publicKey = key;
+                const msg = bytesToHex(inputBytes);
+                const verifyResult = sm2.doVerifySignature(msg, sigObj, publicKey);
+
+                outputText.value = verifyResult ? '✅ 签名验证成功' : '❌ 签名验证失败';
+                showNotification(verifyResult ? '签名验证成功！' : '签名验证失败！');
+            } catch (error) {
+                outputText.value = `错误: ${error.message}`;
+            }
+        }
+
+        // 绑定事件
+        encryptBtn.addEventListener('click', encryptSM4);
+        decryptBtn.addEventListener('click', decryptSM4);
+        hashBtn.addEventListener('click', hashSM3);
+        hmacBtn.addEventListener('click', hmacSM3);
+        signBtn.addEventListener('click', sign);
+        verifyBtn.addEventListener('click', verify);
+
+        // 初始化示例
+        inputText.value = "国密算法在线工具示例文本";
+        keyInput.value = "0123456789abcdef0123456789abcdef";
+        ivInput.value = "0123456789abcdef0123456789abcdef";
+    </script>
+</body>
+</html>

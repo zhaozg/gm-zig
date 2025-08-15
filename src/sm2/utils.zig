@@ -1,7 +1,8 @@
 const std = @import("std");
 const crypto = std.crypto;
 const mem = std.mem;
-const SM3 = @import("../sm3.zig").SM3;
+const sm3 = @import("../sm3.zig");
+const SM3 = sm3.SM3;
 
 /// Key Derivation Function (KDF) based on SM3
 /// Implements the KDF function as specified in GM/T 0003.4-2012
