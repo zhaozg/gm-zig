@@ -77,7 +77,7 @@ test "compat alignedAlloc" {
     
     defer {
         std.debug.print("About to free buffer...\n", .{});
-        testing.allocator.free(buffer);
+        compat.alignedFree(testing.allocator, buffer);
         std.debug.print("Buffer freed successfully.\n", .{});
     }
     
