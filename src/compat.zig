@@ -80,15 +80,29 @@ pub fn arrayListToOwnedSlice(comptime T: type, list: *std.ArrayList(T), allocato
 
 /// Cross-version compatible Allocator.alignedAlloc
 pub fn alignedAlloc(allocator: std.mem.Allocator, comptime T: type, alignment: comptime_int, n: usize) ![]T {
-    // Check if the API expects ?mem.Alignment by looking at the enum existence and usage
-    if (comptime @hasDecl(std.mem, "Alignment")) {
+    // Try to detect the correct API more carefully
+    const has_alignment_enum = @hasDecl(std.mem, "Alignment");
+    
+    if (comptime has_alignment_enum) {
         // Zig 0.15.0-dev+ - has std.mem.Alignment enum
-        const alignment_enum = @as(std.mem.Alignment, @enumFromInt(alignment));
-        return try allocator.alignedAlloc(T, alignment_enum, n);
+        // Check if the alignment value is valid for the enum
+        if (comptime std.math.isPowerOfTwo(alignment) and alignment <= 1 << 29) {
+            const alignment_enum = @as(std.mem.Alignment, @enumFromInt(alignment));
+            return try allocator.alignedAlloc(T, alignment_enum, n);
+        } else {
+            // Fallback for invalid alignment values
+            return try allocator.alloc(T, n);
+        }
     } else {
         // Zig 0.14.1 and earlier - alignment parameter is comptime_int
         return try allocator.alignedAlloc(T, alignment, n);
     }
+}
+
+/// Cross-version compatible free for aligned allocations
+/// Note: For aligned allocations, the same allocator should be used for both alloc and free
+pub fn alignedFree(allocator: std.mem.Allocator, buffer: anytype) void {
+    allocator.free(buffer);
 }
 
 /// Version detection helper - true for Zig 0.14.0+
