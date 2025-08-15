@@ -242,7 +242,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
     for (test_sizes) |size| {
         // 分配对齐的内存
         const alignment = 16;
-        const buffer = try allocator.alignedAlloc(u8, alignment, size);
+        const buffer = try compat.alignedAlloc(allocator, u8, alignment, size);
         defer allocator.free(buffer);
 
         // 填充随机数据

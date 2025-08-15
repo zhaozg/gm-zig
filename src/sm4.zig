@@ -1,6 +1,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const print = std.debug.print;
+const compat = @import("compat.zig");
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
@@ -270,7 +271,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
     for (test_sizes) |size| {
         // 分配对齐的内存以提高性能
         const alignment = 16;
-        const buffer = try allocator.alignedAlloc(u8, alignment, size);
+        const buffer = try compat.alignedAlloc(allocator, u8, alignment, size);
         defer allocator.free(buffer);
 
         // 填充随机数据
@@ -278,7 +279,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         prng.random().bytes(buffer);
 
         // 准备输出缓冲区
-        const out = try allocator.alignedAlloc(u8, alignment, size);
+        const out = try compat.alignedAlloc(allocator, u8, alignment, size);
         defer allocator.free(out);
 
         // 预热缓存

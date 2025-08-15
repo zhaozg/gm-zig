@@ -78,6 +78,18 @@ pub fn arrayListToOwnedSlice(comptime T: type, list: *std.ArrayList(T), allocato
     }
 }
 
+/// Cross-version compatible Allocator.alignedAlloc
+pub fn alignedAlloc(allocator: std.mem.Allocator, comptime T: type, alignment: comptime_int, n: usize) ![]T {
+    if (comptime is_zig_015_dev) {
+        // Zig 0.15.0-dev+ - alignment parameter is ?mem.Alignment enum
+        const alignment_enum = @as(std.mem.Alignment, @enumFromInt(alignment));
+        return try allocator.alignedAlloc(T, alignment_enum, n);
+    } else {
+        // Zig 0.14.1 and earlier - alignment parameter is comptime_int
+        return try allocator.alignedAlloc(T, alignment, n);
+    }
+}
+
 /// Version detection helper - true for Zig 0.14.0+
 pub const is_new_zig = !@hasDecl(std.io, "GenericWriter");
 

@@ -56,3 +56,24 @@ test "compat ArrayList toOwnedSlice" {
     try testing.expectEqual(@as(u8, 0x02), owned[1]);
     try testing.expectEqual(@as(u8, 0x03), owned[2]);
 }
+
+test "compat alignedAlloc" {
+    const buffer = try compat.alignedAlloc(testing.allocator, u8, 16, 64);
+    defer testing.allocator.free(buffer);
+    
+    try testing.expectEqual(@as(usize, 64), buffer.len);
+    
+    // Check that the pointer is properly aligned
+    const ptr_addr = @intFromPtr(buffer.ptr);
+    try testing.expectEqual(@as(usize, 0), ptr_addr % 16);
+    
+    // Test that we can write to the buffer
+    for (buffer, 0..) |*byte, i| {
+        byte.* = @intCast(i % 256);
+    }
+    
+    // Verify the data
+    for (buffer, 0..) |byte, i| {
+        try testing.expectEqual(@as(u8, @intCast(i % 256)), byte);
+    }
+}
