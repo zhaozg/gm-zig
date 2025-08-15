@@ -26,10 +26,11 @@ test "compat Writer creation" {
         }
     };
     
-    var buffer = compat.arrayListInit(u8, testing.allocator);
-    defer compat.arrayListDeinit(u8, &buffer, testing.allocator);
-    
-    var context = TestContext{ .buffer = buffer, .allocator = testing.allocator };
+    var context = TestContext{
+        .buffer = compat.arrayListInit(u8, testing.allocator),
+        .allocator = testing.allocator,
+    };
+    defer compat.arrayListDeinit(u8, &context.buffer, testing.allocator);
     
     // Test that Writer can be created and used
     const WriterType = compat.Writer(*TestContext, TestContext.WriteError, TestContext.write);
