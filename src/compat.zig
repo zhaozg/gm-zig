@@ -80,8 +80,9 @@ pub fn arrayListToOwnedSlice(comptime T: type, list: *std.ArrayList(T), allocato
 
 /// Cross-version compatible Allocator.alignedAlloc
 pub fn alignedAlloc(allocator: std.mem.Allocator, comptime T: type, alignment: comptime_int, n: usize) ![]T {
-    if (comptime is_zig_015_dev) {
-        // Zig 0.15.0-dev+ - alignment parameter is ?mem.Alignment enum
+    // Check if the API expects ?mem.Alignment by looking at the enum existence and usage
+    if (comptime @hasDecl(std.mem, "Alignment")) {
+        // Zig 0.15.0-dev+ - has std.mem.Alignment enum
         const alignment_enum = @as(std.mem.Alignment, @enumFromInt(alignment));
         return try allocator.alignedAlloc(T, alignment_enum, n);
     } else {
@@ -107,6 +108,7 @@ pub fn getZigVersionInfo() struct {
     has_generic_writer: bool,
     has_writer: bool,
     arraylist_has_init: bool,
+    has_mem_alignment: bool,
 } {
     const TestList = std.ArrayList(u8);
     return .{
@@ -115,5 +117,6 @@ pub fn getZigVersionInfo() struct {
         .has_generic_writer = @hasDecl(std.io, "GenericWriter"),
         .has_writer = @hasDecl(std.io, "Writer"),
         .arraylist_has_init = @hasDecl(TestList, "init"),
+        .has_mem_alignment = @hasDecl(std.mem, "Alignment"),
     };
 }
