@@ -60,10 +60,13 @@ pub fn build(b: *std.Build) void {
     exe_unit_tests.root_module.addImport("gmlib", lib_mod);
 
     // Additional comprehensive test suite
+    const test_mod = b.createModule(.{
+        .root_source_file = b.path("src/test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
     const tests = b.addTest(.{
-         .root_source_file = b.path("src/test.zig"),
-         .target = target,
-         .optimize = optimize,
+         .root_module = test_mod,
     });
     tests.addIncludePath(.{ .cwd_relative = "src" }); // 添加包含路径
      
