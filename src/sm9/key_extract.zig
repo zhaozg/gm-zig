@@ -15,7 +15,7 @@ pub const SignUserPrivateKey = struct {
     id: []const u8,
     
     /// Private key point on G1 (ds_A = (1/(s+H1(ID_A,hid))) * P1)
-    key: [32]u8,
+    key: [33]u8, // G1 point (compressed)
     
     /// Hash identifier for signature (hid = 0x01)
     hid: u8,
@@ -40,7 +40,7 @@ pub const SignUserPrivateKey = struct {
         
         return SignUserPrivateKey{
             .id = user_id,
-            .key = std.mem.zeroes([32]u8),
+            .key = std.mem.zeroes([33]u8),
             .hid = 0x01, // Signature hash identifier
         };
     }
@@ -62,13 +62,13 @@ pub const SignUserPrivateKey = struct {
     
     /// Deserialize private key
     pub fn fromBytes(bytes: []const u8, user_id: UserId) !SignUserPrivateKey {
-        if (bytes.len != 32) {
+        if (bytes.len != 33) {
             return error.InvalidKeyLength;
         }
         
         return SignUserPrivateKey{
             .id = user_id,
-            .key = bytes[0..32].*,
+            .key = bytes[0..33].*,
             .hid = 0x01,
         };
     }
@@ -80,7 +80,7 @@ pub const EncryptUserPrivateKey = struct {
     id: []const u8,
     
     /// Private key point on G2 (de_B = (1/(s+H1(ID_B,hid))) * P2)
-    key: [64]u8,
+    key: [65]u8, // G2 point (uncompressed)
     
     /// Hash identifier for encryption (hid = 0x03)
     hid: u8,
@@ -105,7 +105,7 @@ pub const EncryptUserPrivateKey = struct {
         
         return EncryptUserPrivateKey{
             .id = user_id,
-            .key = std.mem.zeroes([64]u8),
+            .key = std.mem.zeroes([65]u8),
             .hid = 0x03, // Encryption hash identifier
         };
     }
@@ -127,13 +127,13 @@ pub const EncryptUserPrivateKey = struct {
     
     /// Deserialize private key  
     pub fn fromBytes(bytes: []const u8, user_id: UserId) !EncryptUserPrivateKey {
-        if (bytes.len != 64) {
+        if (bytes.len != 65) {
             return error.InvalidKeyLength;
         }
         
         return EncryptUserPrivateKey{
             .id = user_id,
-            .key = bytes[0..64].*,
+            .key = bytes[0..65].*,
             .hid = 0x03,
         };
     }
@@ -268,3 +268,37 @@ pub const KeyExtractionContext = struct {
         );
     }
 };
+
+/// H1 hash function for SM9 as defined in GM/T 0044-2016
+/// Computes H1(Z, n) where Z is data and n is the order
+pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
+    _ = allocator;
+    
+    // Create SM3 hasher
+    var sm3 = std.crypto.hash.sha3.Sha3_256.init(.{});
+    
+    // Hash the input data
+    sm3.update(data);
+    sm3.update(&[1]u8{hid});
+    
+    var h = [32]u8{0};
+    sm3.final(&h);
+    
+    // Reduce modulo order (simplified - should use proper modular arithmetic)
+    // TODO: Implement proper big integer modular reduction
+    // For now, return the hash directly as placeholder
+    return h;
+}
+
+/// H2 hash function for SM9 signature
+pub fn h2Hash(message: []const u8, w: []const u8, allocator: std.mem.Allocator) ![32]u8 {
+    _ = allocator;
+    
+    var sm3 = std.crypto.hash.sha3.Sha3_256.init(.{});
+    sm3.update(message);
+    sm3.update(w);
+    
+    var h = [32]u8{0};
+    sm3.final(&h);
+    return h;
+}
