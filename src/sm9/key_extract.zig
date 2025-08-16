@@ -122,7 +122,7 @@ pub const EncryptUserPrivateKey = struct {
     /// Private key point on G2 (de_B = (1/(s+H1(ID_B,hid))) * P2)
     key: [65]u8, // G2 point (uncompressed)
     
-    /// Hash identifier for encryption (hid = 0x02)
+    /// Hash identifier for encryption (hid = 0x03)
     hid: u8,
     
     /// Create user private key for encryption
@@ -132,8 +132,8 @@ pub const EncryptUserPrivateKey = struct {
         user_id: UserId,
         allocator: std.mem.Allocator,
     ) !EncryptUserPrivateKey {
-        // Step 1: Compute H1(ID||hid, N) where hid = 0x02 for encryption  
-        const h1_result = try h1Hash(user_id, 0x02, system_params.N, allocator);
+        // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption  
+        const h1_result = try h1Hash(user_id, 0x03, system_params.N, allocator);
         
         // Step 2: Compute t2 = (H1 + s) mod N
         // TODO: Implement proper big integer arithmetic
@@ -177,7 +177,7 @@ pub const EncryptUserPrivateKey = struct {
         return EncryptUserPrivateKey{
             .id = user_id,
             .key = private_key,
-            .hid = 0x02, // Encryption hash identifier
+            .hid = 0x03, // Encryption hash identifier
         };
     }
     
@@ -186,7 +186,7 @@ pub const EncryptUserPrivateKey = struct {
         _ = system_params;
         
         // Check hash identifier
-        if (self.hid != 0x02) return false;
+        if (self.hid != 0x03) return false;
         
         // Check key format (should be uncompressed G2 point)
         if (self.key[0] != 0x04) return false;
@@ -219,7 +219,7 @@ pub const EncryptUserPrivateKey = struct {
         return EncryptUserPrivateKey{
             .id = user_id,
             .key = bytes[0..65].*,
-            .hid = 0x02,
+            .hid = 0x03,
         };
     }
 };
@@ -265,12 +265,12 @@ pub const UserPublicKey = struct {
         _ = master_public_key;
         
         // TODO: Implement public key derivation
-        // 1. Compute H1(ID||hid, N) where hid = 0x02
+        // 1. Compute H1(ID||hid, N) where hid = 0x03
         // 2. Compute public key point using master public key
         
         return UserPublicKey{
             .id = user_id,
-            .hid = 0x02,
+            .hid = 0x03,
             .point = std.mem.zeroes([64]u8),
         };
     }

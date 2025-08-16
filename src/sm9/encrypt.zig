@@ -192,7 +192,7 @@ pub const EncryptionContext = struct {
         options: EncryptionOptions,
     ) !Ciphertext {
         // Step 1: Compute Qb = H1(ID_B || hid, N) * P1 + P_pub-e
-        const h1_result = try key_extract.h1Hash(user_id, 0x02, self.system_params.N, self.allocator);
+        const h1_result = try key_extract.h1Hash(user_id, 0x03, self.system_params.N, self.allocator);
         
         // TODO: Implement elliptic curve point operations
         // For now, create a deterministic Qb point
