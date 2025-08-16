@@ -221,7 +221,7 @@ pub const Utils = struct {
     
     /// Generate cryptographically secure random bytes
     pub fn generateRandomBytes(length: usize, allocator: std.mem.Allocator) ![]u8 {
-        var bytes = try allocator.alloc(u8, length);
+        const bytes = try allocator.alloc(u8, length);
         crypto.random.bytes(bytes);
         return bytes;
     }
