@@ -12,30 +12,30 @@ pub const Signature = struct {
     /// Signature component h (hash value)
     h: [32]u8,
     
-    /// Signature component S (point on G1)
-    S: [32]u8,
+    /// Signature component S (point on G1, compressed)
+    S: [33]u8,
     
     /// Create signature from components
-    pub fn init(h: [32]u8, S: [32]u8) Signature {
+    pub fn init(h: [32]u8, S: [33]u8) Signature {
         return Signature{
             .h = h,
             .S = S,
         };
     }
     
-    /// Encode signature as raw bytes (h || S, 64 bytes total)
-    pub fn toBytes(self: Signature) [64]u8 {
-        var result: [64]u8 = undefined;
+    /// Encode signature as raw bytes (h || S, 65 bytes total)
+    pub fn toBytes(self: Signature) [65]u8 {
+        var result: [65]u8 = undefined;
         @memcpy(result[0..32], &self.h);
-        @memcpy(result[32..64], &self.S);
+        @memcpy(result[32..65], &self.S);
         return result;
     }
     
     /// Create signature from raw bytes
-    pub fn fromBytes(bytes: [64]u8) Signature {
+    pub fn fromBytes(bytes: [65]u8) Signature {
         return Signature{
             .h = bytes[0..32].*,
-            .S = bytes[32..64].*,
+            .S = bytes[32..65].*,
         };
     }
     
@@ -99,23 +99,71 @@ pub const SignatureContext = struct {
         user_private_key: key_extract.SignUserPrivateKey,
         options: SignatureOptions,
     ) !Signature {
-        _ = self;
-        _ = message;
-        _ = user_private_key;
         _ = options;
         
-        // TODO: Implement SM9 signature algorithm
-        // 1. Generate random number r ∈ [1, N-1]
-        // 2. Compute w = g^r (pairing computation)
-        // 3. Compute h = H2(M || w, N)
-        // 4. Compute l = (r - h) mod N
-        // 5. If l = 0, goto step 1
-        // 6. Compute S = l * ds_A
-        // 7. Return signature (h, S)
+        // Step 1: Generate random number r ∈ [1, N-1]
+        // TODO: Use proper cryptographic random number generation
+        var r = [32]u8{0};
+        r[31] = 1; // Placeholder: use 1 to avoid zero
+        
+        // Step 2: Compute w = g^r (pairing computation)
+        // TODO: Implement pairing computation e(P1, P_pub-s)^r
+        // For now, create a deterministic value based on message and key
+        var w = [32]u8{0};
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(message);
+        hasher.update(&user_private_key.key);
+        hasher.update(&r);
+        hasher.final(&w);
+        
+        // Step 3: Compute h = H2(M || w, N)
+        const h = try key_extract.h2Hash(message, &w, self.allocator);
+        
+        // Step 4: Compute l = (r - h) mod N
+        // TODO: Implement proper big integer modular arithmetic
+        var l = [32]u8{0};
+        // Simple subtraction (should be modular arithmetic)
+        var borrow: i16 = 0;
+        var i: i32 = 31;
+        while (i >= 0) : (i -= 1) {
+            const idx = @as(usize, @intCast(i));
+            const diff = @as(i16, r[idx]) - @as(i16, h[idx]) - borrow;
+            if (diff < 0) {
+                l[idx] = @as(u8, @intCast(diff + 256));
+                borrow = 1;
+            } else {
+                l[idx] = @as(u8, @intCast(diff));
+                borrow = 0;
+            }
+        }
+        
+        // Step 5: Check if l = 0, if so should regenerate r
+        var l_is_zero = true;
+        for (l) |byte| {
+            if (byte != 0) {
+                l_is_zero = false;
+                break;
+            }
+        }
+        if (l_is_zero) {
+            // For now, just modify l to avoid zero
+            l[31] = 1;
+        }
+        
+        // Step 6: Compute S = l * ds_A (elliptic curve scalar multiplication)
+        // TODO: Implement proper elliptic curve point multiplication
+        var S = [33]u8{0};
+        S[0] = 0x02; // Compressed point prefix
+        // Create deterministic but non-zero signature point
+        S[1] = l[0];
+        S[2] = l[1];
+        if (user_private_key.key.len > 1) {
+            S[3] = user_private_key.key[1];
+        }
         
         return Signature{
-            .h = std.mem.zeroes([32]u8),
-            .S = std.mem.zeroes([32]u8),
+            .h = h,
+            .S = S,
         };
     }
     
@@ -127,24 +175,51 @@ pub const SignatureContext = struct {
         user_id: key_extract.UserId,
         options: SignatureOptions,
     ) !bool {
-        _ = self;
-        _ = message;
-        _ = signature;
-        _ = user_id;
         _ = options;
         
-        // TODO: Implement SM9 signature verification
-        // 1. Check if h ∈ [1, N-1]
-        // 2. Compute g = e(P1, P_pub-s)
-        // 3. Compute t = g^h
-        // 4. Compute h1 = H1(ID_A || hid, N)
-        // 5. Compute P = [h1] * P2 + P_pub-s
-        // 6. Compute u = e(S, P)
-        // 7. Compute w = u * t
-        // 8. Compute h' = H2(M || w, N) 
-        // 9. Return h' == h
+        // Step 1: Check if h ∈ [1, N-1]
+        var h_is_zero = true;
+        for (signature.h) |byte| {
+            if (byte != 0) {
+                h_is_zero = false;
+                break;
+            }
+        }
+        if (h_is_zero) return false;
         
-        return true;
+        // TODO: Check if h < N (proper big integer comparison)
+        
+        // Step 2: Compute g = e(P1, P_pub-s) (pairing computation)
+        // TODO: Implement bilinear pairing
+        
+        // Step 3: Compute t = g^h (group exponentiation)
+        // TODO: Implement group exponentiation
+        
+        // Step 4: Compute h1 = H1(ID_A || hid, N)
+        const h1 = try key_extract.h1Hash(user_id, 0x01, self.system_params.N, self.allocator);
+        
+        // Step 5: Compute P = [h1] * P2 + P_pub-s (elliptic curve operations)
+        // TODO: Implement elliptic curve point addition and multiplication
+        
+        // Step 6: Compute u = e(S, P) (pairing computation)
+        // TODO: Implement bilinear pairing
+        
+        // Step 7: Compute w = u * t (group multiplication)
+        // TODO: Implement group multiplication
+        
+        // Step 8: Compute h' = H2(M || w, N)
+        // For now, create a mock w value
+        var w = [32]u8{0};
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(message);
+        hasher.update(&signature.S);
+        hasher.update(&h1);
+        hasher.final(&w);
+        
+        const h_prime = try key_extract.h2Hash(message, &w, self.allocator);
+        
+        // Step 9: Return h' == h
+        return std.mem.eql(u8, &signature.h, &h_prime);
     }
 };
 
