@@ -113,9 +113,9 @@ pub const SignUserPrivateKey = struct {
     
     /// Serialize private key
     pub fn toBytes(self: SignUserPrivateKey, allocator: std.mem.Allocator) ![]u8 {
-        _ = allocator;
-        // TODO: Implement serialization
-        return self.key[0..];
+        const result = try allocator.alloc(u8, 33);
+        @memcpy(result, &self.key);
+        return result;
     }
     
     /// Deserialize private key
@@ -223,9 +223,9 @@ pub const EncryptUserPrivateKey = struct {
     
     /// Serialize private key
     pub fn toBytes(self: EncryptUserPrivateKey, allocator: std.mem.Allocator) ![]u8 {
-        _ = allocator;
-        // TODO: Implement serialization
-        return self.key[0..];
+        const result = try allocator.alloc(u8, 65);
+        @memcpy(result, &self.key);
+        return result;
     }
     
     /// Deserialize private key  
