@@ -135,7 +135,7 @@ test "SM9 key extraction" {
     // Test encryption key extraction
     const encrypt_key = try context.extractEncryptKey(user_id);
     try testing.expect(encrypt_key.validate(system.params));
-    try testing.expect(encrypt_key.hid == 0x02);
+    try testing.expect(encrypt_key.hid == 0x03);
 }
 
 test "SM9 signature roundtrip" {
