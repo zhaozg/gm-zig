@@ -144,15 +144,15 @@ pub const SignatureContext = struct {
         // Step 4: Compute l = (r - h) mod N
         // Use proper big integer modular arithmetic
         const bigint = @import("bigint.zig");
-        const l = bigint.subMod(r, h, self.system_params.N) catch {
+        const l = bigint.subMod(r, h, self.system_params.N) catch blk: {
             // If modular subtraction fails, fall back to simple subtraction
             const sub_result = bigint.sub(r, h);
             if (sub_result.borrow) {
                 // If there was a borrow, add N to get positive result
                 const add_result = bigint.add(sub_result.result, self.system_params.N);
-                add_result.result;
+                break :blk add_result.result;
             } else {
-                sub_result.result;
+                break :blk sub_result.result;
             }
         };
         

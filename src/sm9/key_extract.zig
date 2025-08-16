@@ -49,11 +49,11 @@ pub const SignUserPrivateKey = struct {
         };
         
         // Step 3: Compute t1_inv = t1^(-1) mod N
-        const t1_inv = bigint.invMod(t1, system_params.N) catch {
+        const t1_inv = bigint.invMod(t1, system_params.N) catch blk: {
             // For simplified implementation, if inverse fails, use a deterministic fallback
             var fallback = t1;
             fallback[31] = fallback[31] ^ 1; // Simple modification
-            fallback;
+            break :blk fallback;
         };
         
         // Step 4: Compute ds_A = t1_inv * P1 (elliptic curve scalar multiplication)
