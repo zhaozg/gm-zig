@@ -7,6 +7,14 @@ const key_extract = @import("key_extract.zig");
 /// SM9 Public Key Encryption and Decryption
 /// Based on GM/T 0044-2016 standard
 
+/// Encryption/Decryption errors
+pub const EncryptionError = error{
+    InvalidCiphertext,
+    DecryptionFailed,
+    InvalidPlaintext,
+    KeyDerivationFailed,
+};
+
 /// SM9 ciphertext format options
 pub const CiphertextFormat = enum {
     c1_c3_c2, // C1 || C3 || C2 (standard format)
@@ -15,8 +23,8 @@ pub const CiphertextFormat = enum {
 
 /// SM9 ciphertext structure
 pub const Ciphertext = struct {
-    /// C1: Random point on G1 (32 bytes)
-    c1: [32]u8,
+    /// C1: Random point on G1 (33 bytes compressed)
+    c1: [33]u8,
     
     /// C2: Encrypted message (same length as plaintext)
     c2: []u8,
@@ -33,7 +41,7 @@ pub const Ciphertext = struct {
     /// Initialize ciphertext
     pub fn init(
         allocator: std.mem.Allocator,
-        c1: [32]u8,
+        c1: [33]u8,
         c2: []const u8,
         c3: [32]u8,
         format: CiphertextFormat,
@@ -55,19 +63,19 @@ pub const Ciphertext = struct {
     
     /// Encode ciphertext to bytes
     pub fn toBytes(self: Ciphertext, allocator: std.mem.Allocator) ![]u8 {
-        const total_len = 32 + self.c2.len + 32; // C1 + C2 + C3
+        const total_len = 33 + self.c2.len + 32; // C1(33) + C2(var) + C3(32)
         var result = try allocator.alloc(u8, total_len);
         
         switch (self.format) {
             .c1_c3_c2 => {
-                @memcpy(result[0..32], &self.c1);
-                @memcpy(result[32..64], &self.c3);
-                @memcpy(result[64..], self.c2);
+                @memcpy(result[0..33], &self.c1);
+                @memcpy(result[33..65], &self.c3);
+                @memcpy(result[65..], self.c2);
             },
             .c1_c2_c3 => {
-                @memcpy(result[0..32], &self.c1);
-                @memcpy(result[32..32 + self.c2.len], self.c2);
-                @memcpy(result[32 + self.c2.len..], &self.c3);
+                @memcpy(result[0..33], &self.c1);
+                @memcpy(result[33..33 + self.c2.len], self.c2);
+                @memcpy(result[33 + self.c2.len..], &self.c3);
             },
         }
         
@@ -81,24 +89,24 @@ pub const Ciphertext = struct {
         format: CiphertextFormat,
         allocator: std.mem.Allocator,
     ) !Ciphertext {
-        if (bytes.len != 32 + message_len + 32) {
+        if (bytes.len != 33 + message_len + 32) {
             return error.InvalidCiphertextLength;
         }
         
-        var c1: [32]u8 = undefined;
+        var c1: [33]u8 = undefined;
         var c3: [32]u8 = undefined;
         var c2 = try allocator.alloc(u8, message_len);
         
         switch (format) {
             .c1_c3_c2 => {
-                @memcpy(&c1, bytes[0..32]);
-                @memcpy(&c3, bytes[32..64]);
-                @memcpy(c2, bytes[64..]);
+                @memcpy(&c1, bytes[0..33]);
+                @memcpy(&c3, bytes[33..65]);
+                @memcpy(c2, bytes[65..]);
             },
             .c1_c2_c3 => {
-                @memcpy(&c1, bytes[0..32]);
-                @memcpy(c2, bytes[32..32 + message_len]);
-                @memcpy(&c3, bytes[32 + message_len..]);
+                @memcpy(&c1, bytes[0..33]);
+                @memcpy(c2, bytes[33..33 + message_len]);
+                @memcpy(&c3, bytes[33 + message_len..]);
             },
         }
         
@@ -156,26 +164,74 @@ pub const EncryptionContext = struct {
         user_id: key_extract.UserId,
         options: EncryptionOptions,
     ) !Ciphertext {
-        _ = self;
-        _ = message;
-        _ = user_id;
-        _ = options;
+        // Step 1: Compute Qb = H1(ID_B || hid, N) * P1 + P_pub-e
+        const h1_result = try key_extract.h1Hash(user_id, 0x03, self.system_params.N, self.allocator);
         
-        // TODO: Implement SM9 encryption algorithm
-        // 1. Compute Qb = H1(ID_B || hid, N) * P1 + P_pub-e
-        // 2. Generate random r ∈ [1, N-1]
-        // 3. Compute C1 = r * P1
-        // 4. Compute g = e(Qb, P_pub-e)
-        // 5. Compute w = g^r
-        // 6. Compute K = KDF(C1 || w || ID_B, klen)
-        // 7. Compute C2 = M ⊕ K
-        // 8. Compute C3 = H2(C1 || M || ID_B)
-        // 9. Return ciphertext C = (C1, C2, C3)
+        // TODO: Implement elliptic curve point operations
+        // For now, create a deterministic Qb point
+        var Qb = [33]u8{0};
+        Qb[0] = 0x02; // Compressed point prefix
+        Qb[1] = h1_result[0];
+        Qb[2] = h1_result[1];
         
-        const c1 = std.mem.zeroes([32]u8);
-        const c2 = try self.allocator.dupe(u8, message);
-        const c3 = std.mem.zeroes([32]u8);
+        // Step 2: Generate random r ∈ [1, N-1]
+        // TODO: Use proper cryptographic random number generation
+        var r = [32]u8{0};
+        r[31] = 1; // Placeholder: use 1 to avoid zero
         
+        // Step 3: Compute C1 = r * P1 (elliptic curve scalar multiplication)
+        // TODO: Implement proper elliptic curve point multiplication
+        var c1 = [33]u8{0};
+        c1[0] = 0x02; // Compressed point prefix
+        c1[1] = r[0] ^ self.system_params.P1[1];
+        c1[2] = r[1] ^ self.system_params.P1[2];
+        
+        // Step 4: Compute g = e(Qb, P_pub-e) (pairing computation)
+        // TODO: Implement bilinear pairing
+        
+        // Step 5: Compute w = g^r (group exponentiation)
+        // TODO: Implement group exponentiation
+        // For now, create a deterministic w value
+        var w = [32]u8{0};
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(&Qb);
+        hasher.update(&r);
+        hasher.update(user_id);
+        hasher.final(&w);
+        
+        // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
+        const kdf_len = options.kdf_len orelse message.len;
+        const K = try self.allocator.alloc(u8, kdf_len);
+        defer self.allocator.free(K);
+        
+        // Simple KDF implementation (should use proper KDF)
+        var kdf_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        kdf_hasher.update(&c1);
+        kdf_hasher.update(&w);
+        kdf_hasher.update(user_id);
+        var kdf_output = [32]u8{0};
+        kdf_hasher.final(&kdf_output);
+        
+        // Expand key if needed
+        for (K, 0..) |*byte, i| {
+            byte.* = kdf_output[i % 32];
+        }
+        
+        // Step 7: Compute C2 = M ⊕ K (XOR encryption)
+        const c2 = try self.allocator.alloc(u8, message.len);
+        for (message, c2, 0..) |m_byte, *c_byte, i| {
+            c_byte.* = m_byte ^ K[i % K.len];
+        }
+        
+        // Step 8: Compute C3 = H2(C1 || M || ID_B)
+        var c3_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        c3_hasher.update(&c1);
+        c3_hasher.update(message);
+        c3_hasher.update(user_id);
+        var c3 = [32]u8{0};
+        c3_hasher.final(&c3);
+        
+        // Step 9: Return ciphertext C = (C1, C2, C3)
         return try Ciphertext.init(
             self.allocator,
             c1,
@@ -192,21 +248,63 @@ pub const EncryptionContext = struct {
         user_private_key: key_extract.EncryptUserPrivateKey,
         options: EncryptionOptions,
     ) ![]u8 {
-        _ = self;
-        _ = ciphertext;
-        _ = user_private_key;
         _ = options;
         
-        // TODO: Implement SM9 decryption algorithm
-        // 1. Check if C1 is valid point on G1
-        // 2. Compute w = e(C1, de_B)
-        // 3. Compute K = KDF(C1 || w || ID_B, klen)
-        // 4. Compute M' = C2 ⊕ K
-        // 5. Compute u = H2(C1 || M' || ID_B)
-        // 6. If u != C3, return error
-        // 7. Return plaintext M'
+        // Step 1: Verify ciphertext format
+        if (ciphertext.c1[0] != 0x02 and ciphertext.c1[0] != 0x03) {
+            return error.InvalidCiphertext;
+        }
         
-        return try self.allocator.dupe(u8, ciphertext.c2);
+        // Step 2: Compute w = e(C1, de_B) (pairing computation)
+        // TODO: Implement bilinear pairing e(C1, user_private_key)
+        // For now, create a deterministic w value
+        var w = [32]u8{0};
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(&ciphertext.c1);
+        hasher.update(&user_private_key.key);
+        hasher.update(user_private_key.id);
+        hasher.final(&w);
+        
+        // Step 3: Compute K = KDF(C1 || w || ID_B, klen)
+        const kdf_len = ciphertext.c2.len;
+        const K = try self.allocator.alloc(u8, kdf_len);
+        defer self.allocator.free(K);
+        
+        // Simple KDF implementation (should use proper KDF)
+        var kdf_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        kdf_hasher.update(&ciphertext.c1);
+        kdf_hasher.update(&w);
+        kdf_hasher.update(user_private_key.id);
+        var kdf_output = [32]u8{0};
+        kdf_hasher.final(&kdf_output);
+        
+        // Expand key if needed
+        for (K, 0..) |*byte, i| {
+            byte.* = kdf_output[i % 32];
+        }
+        
+        // Step 4: Compute M' = C2 ⊕ K (XOR decryption)
+        const plaintext = try self.allocator.alloc(u8, ciphertext.c2.len);
+        for (ciphertext.c2, plaintext, 0..) |c_byte, *m_byte, i| {
+            m_byte.* = c_byte ^ K[i % K.len];
+        }
+        
+        // Step 5: Compute u = H2(C1 || M' || ID_B)
+        var u_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        u_hasher.update(&ciphertext.c1);
+        u_hasher.update(plaintext);
+        u_hasher.update(user_private_key.id);
+        var u = [32]u8{0};
+        u_hasher.final(&u);
+        
+        // Step 6: If u != C3, return error
+        if (!std.mem.eql(u8, &u, &ciphertext.c3)) {
+            self.allocator.free(plaintext);
+            return error.DecryptionFailed;
+        }
+        
+        // Step 7: Return plaintext M'
+        return plaintext;
     }
 };
 
