@@ -99,13 +99,32 @@ pub const SignatureContext = struct {
         user_private_key: key_extract.SignUserPrivateKey,
         options: SignatureOptions,
     ) !Signature {
-        _ = options;
+        // Step 0: Preprocess message based on hash_type option
+        var processed_message: []const u8 = message;
+        var message_hash: [32]u8 = undefined;
         
-        // Step 1: Generate deterministic r for consistent testing  
+        switch (options.hash_type) {
+            .sm3 => {
+                // Hash the message with SM3 (simplified as SHA256 for now)
+                var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+                hasher.update(message);
+                if (options.aad) |aad| {
+                    hasher.update(aad);
+                }
+                hasher.final(&message_hash);
+                processed_message = &message_hash;
+            },
+            .precomputed => {
+                // Message is already hashed, use as-is
+                processed_message = message;
+            },
+        }
+        
+        // Step 1: Generate deterministic r based on processed message
         // TODO: Use proper cryptographic random number generation in production
         var r = [_]u8{0} ** 32;
         var r_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        r_hasher.update(message);
+        r_hasher.update(processed_message);
         r_hasher.update(&user_private_key.key);
         r_hasher.update(user_private_key.id);
         r_hasher.update("random_r_sign");
@@ -129,8 +148,8 @@ pub const SignatureContext = struct {
         
         const w_bytes = &w;
         
-        // Step 3: Compute h = H2(M || w, N)
-        const h = try key_extract.h2Hash(message, w_bytes[0..32], self.allocator);
+        // Step 3: Compute h = H2(M || w, N) using processed message
+        const h = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator);
         
         // Step 4: Compute l = (r - h) mod N
         // Use proper big integer modular arithmetic
@@ -190,7 +209,26 @@ pub const SignatureContext = struct {
         user_id: key_extract.UserId,
         options: SignatureOptions,
     ) !bool {
-        _ = options;
+        // Step 0: Preprocess message based on hash_type option (same as signing)
+        var processed_message: []const u8 = message;
+        var message_hash: [32]u8 = undefined;
+        
+        switch (options.hash_type) {
+            .sm3 => {
+                // Hash the message with SM3 (simplified as SHA256 for now)
+                var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+                hasher.update(message);
+                if (options.aad) |aad| {
+                    hasher.update(aad);
+                }
+                hasher.final(&message_hash);
+                processed_message = &message_hash;
+            },
+            .precomputed => {
+                // Message is already hashed, use as-is
+                processed_message = message;
+            },
+        }
         
         // Step 1: Check if h ∈ [1, N-1]
         var h_is_zero = true;
@@ -214,7 +252,7 @@ pub const SignatureContext = struct {
         w_hasher.final(&w);
         
         const w_bytes = &w;
-        const h_prime = try key_extract.h2Hash(message, w_bytes[0..32], self.allocator);
+        const h_prime = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator);
         
         // Step 9: Return h' == h
         return std.mem.eql(u8, &signature.h, &h_prime);
