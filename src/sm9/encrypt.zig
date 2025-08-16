@@ -105,7 +105,7 @@ pub const Ciphertext = struct {
         
         var c1: [33]u8 = undefined;
         var c3: [32]u8 = undefined;
-        var c2 = try allocator.alloc(u8, message_len);
+        const c2 = try allocator.alloc(u8, message_len);
         
         switch (format) {
             .c1_c3_c2 => {
@@ -362,7 +362,6 @@ pub const KEMContext = struct {
         user_id: key_extract.UserId,
         key_length: usize,
     ) !KeyEncapsulation {
-        _ = self;
         _ = user_id;
         
         // TODO: Implement SM9 key encapsulation
@@ -388,7 +387,6 @@ pub const KEMContext = struct {
         encapsulation_data: [64]u8,
         user_private_key: key_extract.EncryptUserPrivateKey,
     ) ![]u8 {
-        _ = self;
         _ = encapsulation_data;
         _ = user_private_key;
         
