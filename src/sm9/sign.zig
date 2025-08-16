@@ -118,7 +118,6 @@ pub const SignatureContext = struct {
         
         // Compute h1 = H1(ID_A || hid, N) for consistent w computation
         const h1 = try key_extract.h1Hash(user_private_key.id, 0x01, self.system_params.N, self.allocator);
-        defer self.allocator.free(h1);
         
         // Step 2: Compute w = g^r (pairing computation)
         // TODO: Implement pairing computation e(P1, P_pub-s)^r
@@ -127,7 +126,7 @@ pub const SignatureContext = struct {
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         w_hasher.update(message);
         w_hasher.update(user_private_key.id);
-        w_hasher.update(h1); // Include h1 for consistency with verification
+        w_hasher.update(&h1); // Include h1 for consistency with verification
         w_hasher.update("signature_w_value");
         w_hasher.final(&w);
         
@@ -212,7 +211,6 @@ pub const SignatureContext = struct {
         
         // Step 4: Compute h1 = H1(ID_A || hid, N)
         const h1 = try key_extract.h1Hash(user_id, 0x01, self.system_params.N, self.allocator);
-        defer self.allocator.free(h1);
         
         // Step 5: Compute P = [h1] * P2 + P_pub-s (elliptic curve operations)
         // TODO: Implement elliptic curve point addition and multiplication
@@ -230,7 +228,7 @@ pub const SignatureContext = struct {
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         w_hasher.update(message);
         w_hasher.update(user_id);
-        w_hasher.update(h1); // Include h1 in the deterministic w computation
+        w_hasher.update(&h1); // Include h1 in the deterministic w computation
         w_hasher.update("signature_w_value");
         w_hasher.final(&w);
         
