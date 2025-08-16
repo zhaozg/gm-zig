@@ -7,7 +7,7 @@ test "SM9 ciphertext creation and validation" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    const c1 = std.mem.zeroes([32]u8);
+    const c1 = std.mem.zeroes([33]u8);
     const c2 = "test message";
     const c3 = std.mem.zeroes([32]u8);
     
@@ -30,7 +30,7 @@ test "SM9 ciphertext serialization" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    const c1 = [_]u8{0x11} ** 32;
+    const c1 = [_]u8{0x11} ** 33;
     const c2 = "Hello, SM9!";
     const c3 = [_]u8{0x33} ** 32;
     

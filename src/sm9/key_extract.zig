@@ -45,7 +45,7 @@ pub const SignUserPrivateKey = struct {
         // Step 2: Compute t1 = (H1 + s) mod N
         // TODO: Implement proper big integer arithmetic
         // For now, use placeholder calculation
-        var t1 = [32]u8{0};
+        var t1 = [_]u8{0} ** 32;
         
         // Simple addition (should be modular arithmetic)
         var carry: u16 = 0;
@@ -71,11 +71,10 @@ pub const SignUserPrivateKey = struct {
         
         // Step 4: Compute w = t1^(-1) mod N
         // TODO: Implement modular inverse
-        _ = t1; // Use t1 instead of unused w variable
         
         // Step 5: Compute ds_A = w * P1
         // TODO: Implement elliptic curve point multiplication
-        var private_key = [33]u8{0};
+        var private_key = [_]u8{0} ** 33;
         // For now, use a deterministic but non-zero result
         private_key[0] = 0x02; // Compressed point prefix
         private_key[1] = @as(u8, @intCast(user_id.len % 256)); // Use ID length as part of key
@@ -156,7 +155,7 @@ pub const EncryptUserPrivateKey = struct {
         
         // Step 2: Compute t2 = (H1 + s) mod N
         // TODO: Implement proper big integer arithmetic
-        var t2 = [32]u8{0};
+        var t2 = [_]u8{0} ** 32;
         
         // Simple addition (should be modular arithmetic)
         var carry: u16 = 0;
@@ -182,11 +181,10 @@ pub const EncryptUserPrivateKey = struct {
         
         // Step 4: Compute w = t2^(-1) mod N
         // TODO: Implement modular inverse
-        _ = t2; // Use t2 instead of unused w variable
         
         // Step 5: Compute de_B = w * P2
         // TODO: Implement elliptic curve point multiplication
-        var private_key = [65]u8{0};
+        var private_key = [_]u8{0} ** 65;
         // For now, use a deterministic but non-zero result
         private_key[0] = 0x04; // Uncompressed point prefix
         private_key[1] = @as(u8, @intCast(user_id.len % 256)); // Use ID length as part of key
@@ -396,7 +394,7 @@ pub fn h2Hash(message: []const u8, w: []const u8, allocator: std.mem.Allocator) 
     hasher.update(message);
     hasher.update(w);
     
-    var h = [32]u8{0};
+    var h = [_]u8{0} ** 32;
     hasher.final(&h);
     return h;
 }

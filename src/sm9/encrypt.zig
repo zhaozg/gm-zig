@@ -179,19 +179,19 @@ pub const EncryptionContext = struct {
         
         // TODO: Implement elliptic curve point operations
         // For now, create a deterministic Qb point
-        var Qb = [33]u8{0};
+        var Qb = [_]u8{0} ** 33;
         Qb[0] = 0x02; // Compressed point prefix
         Qb[1] = h1_result[0];
         Qb[2] = h1_result[1];
         
         // Step 2: Generate random r ∈ [1, N-1]
         // TODO: Use proper cryptographic random number generation
-        var r = [32]u8{0};
+        var r = [_]u8{0} ** 32;
         r[31] = 1; // Placeholder: use 1 to avoid zero
         
         // Step 3: Compute C1 = r * P1 (elliptic curve scalar multiplication)
         // TODO: Implement proper elliptic curve point multiplication
-        var c1 = [33]u8{0};
+        var c1 = [_]u8{0} ** 33;
         c1[0] = 0x02; // Compressed point prefix
         c1[1] = r[0] ^ self.system_params.P1[1];
         c1[2] = r[1] ^ self.system_params.P1[2];
@@ -202,7 +202,7 @@ pub const EncryptionContext = struct {
         // Step 5: Compute w = g^r (group exponentiation)
         // TODO: Implement group exponentiation
         // For now, create a deterministic w value
-        var w = [32]u8{0};
+        var w = [_]u8{0} ** 32;
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(&Qb);
         hasher.update(&r);
@@ -219,7 +219,7 @@ pub const EncryptionContext = struct {
         kdf_hasher.update(&c1);
         kdf_hasher.update(&w);
         kdf_hasher.update(user_id);
-        var kdf_output = [32]u8{0};
+        var kdf_output = [_]u8{0} ** 32;
         kdf_hasher.final(&kdf_output);
         
         // Expand key if needed
@@ -238,7 +238,7 @@ pub const EncryptionContext = struct {
         c3_hasher.update(&c1);
         c3_hasher.update(message);
         c3_hasher.update(user_id);
-        var c3 = [32]u8{0};
+        var c3 = [_]u8{0} ** 32;
         c3_hasher.final(&c3);
         
         // Step 9: Return ciphertext C = (C1, C2, C3)
@@ -268,7 +268,7 @@ pub const EncryptionContext = struct {
         // Step 2: Compute w = e(C1, de_B) (pairing computation)
         // TODO: Implement bilinear pairing e(C1, user_private_key)
         // For now, create a deterministic w value
-        var w = [32]u8{0};
+        var w = [_]u8{0} ** 32;
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(&ciphertext.c1);
         hasher.update(&user_private_key.key);
@@ -285,7 +285,7 @@ pub const EncryptionContext = struct {
         kdf_hasher.update(&ciphertext.c1);
         kdf_hasher.update(&w);
         kdf_hasher.update(user_private_key.id);
-        var kdf_output = [32]u8{0};
+        var kdf_output = [_]u8{0} ** 32;
         kdf_hasher.final(&kdf_output);
         
         // Expand key if needed
@@ -304,7 +304,7 @@ pub const EncryptionContext = struct {
         u_hasher.update(&ciphertext.c1);
         u_hasher.update(plaintext);
         u_hasher.update(user_private_key.id);
-        var u = [32]u8{0};
+        var u = [_]u8{0} ** 32;
         u_hasher.final(&u);
         
         // Step 6: If u != C3, return error
