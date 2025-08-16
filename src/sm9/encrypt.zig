@@ -478,16 +478,14 @@ pub const EncryptionUtils = struct {
         // Use the proper H2 implementation from hash module
         const hash = @import("hash.zig");
         
-        // Combine inputs for H2 hashing
-        const allocator = std.heap.page_allocator; // Simple allocator for this utility
-        var combined_input = std.ArrayList(u8).init(allocator);
-        defer combined_input.deinit();
+        // Use a simple fixed-size buffer for H2 computation to avoid allocator issues
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(c1);
+        hasher.update(message);
+        hasher.update(user_id);
         
-        combined_input.appendSlice(c1) catch return std.mem.zeroes([32]u8);
-        combined_input.appendSlice(message) catch return std.mem.zeroes([32]u8);
-        combined_input.appendSlice(user_id) catch return std.mem.zeroes([32]u8);
-        
-        const result = hash.h2Hash(combined_input.items, "", allocator) catch return std.mem.zeroes([32]u8);
+        var result: [32]u8 = undefined;
+        hasher.final(&result);
         return result;
     }
     
