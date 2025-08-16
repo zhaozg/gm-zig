@@ -183,9 +183,24 @@ pub const G1Point = struct {
         
         // Check if y^2 = x^3 + b (mod p)
         // For SM9 BN256 curve, b = 3
-        // TODO: Implement proper curve equation validation
-        // curve_params is used in toAffine call above
-        return true; // Placeholder - assume valid for now
+        const x = affine_pt.x;
+        const y = affine_pt.y;
+        const p = curve_params.q;
+        
+        // Compute y^2 mod p
+        const y_squared = bigint.mulMod(y, y, p) catch return false;
+        
+        // Compute x^3 mod p
+        const x_squared = bigint.mulMod(x, x, p) catch return false;
+        const x_cubed = bigint.mulMod(x_squared, x, p) catch return false;
+        
+        // Add curve parameter b = 3
+        var b = [_]u8{0} ** 32;
+        b[31] = 3; // b = 3 for BN256 curve
+        const x_cubed_plus_b = bigint.addMod(x_cubed, b, p) catch return false;
+        
+        // Check if y^2 = x^3 + b (mod p)
+        return bigint.equal(y_squared, x_cubed_plus_b);
     }
     
     /// Compress point to 33 bytes (x coordinate + y parity)
