@@ -68,7 +68,6 @@ pub const G1Point = struct {
         
         // Simple transformation to avoid returning the same point
         // Since this is a placeholder implementation, do a simple deterministic modification
-        var result_x = affine_pt.x;
         if (result_x[31] == 0xFF) {
             result_x[31] = 0xFE; // Avoid overflow
         } else {
@@ -106,21 +105,25 @@ pub const G1Point = struct {
         
         // For now, return a deterministic but simplified result
         // TODO: Implement proper elliptic curve point addition
-        const result_x = bigint.addMod(p1.x, p2.x, curve_params.q) catch {
-            // Fallback: simple XOR operation to combine coordinates
-            var fallback_x = p1.x;
-            for (&fallback_x, p2.x) |*x1_byte, x2_byte| {
-                x1_byte.* ^= x2_byte;
-            }
-            break :blk fallback_x;
+        const result_x = blk: {
+            break :blk bigint.addMod(p1.x, p2.x, curve_params.q) catch {
+                // Fallback: simple XOR operation to combine coordinates
+                var fallback_x = p1.x;
+                for (&fallback_x, p2.x) |*x1_byte, x2_byte| {
+                    x1_byte.* ^= x2_byte;
+                }
+                break :blk fallback_x;
+            };
         };
-        const result_y = bigint.addMod(p1.y, p2.y, curve_params.q) catch {
-            // Fallback: simple XOR operation to combine coordinates  
-            var fallback_y = p1.y;
-            for (&fallback_y, p2.y) |*y1_byte, y2_byte| {
-                y1_byte.* ^= y2_byte;
-            }
-            break :blk fallback_y;
+        const result_y = blk: {
+            break :blk bigint.addMod(p1.y, p2.y, curve_params.q) catch {
+                // Fallback: simple XOR operation to combine coordinates  
+                var fallback_y = p1.y;
+                for (&fallback_y, p2.y) |*y1_byte, y2_byte| {
+                    y1_byte.* ^= y2_byte;
+                }
+                break :blk fallback_y;
+            };
         };
         
         return G1Point.affine(result_x, result_y);
