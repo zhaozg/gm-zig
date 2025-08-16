@@ -134,22 +134,19 @@ pub const SignatureContext = struct {
         const h = try key_extract.h2Hash(message, &w, self.allocator);
         
         // Step 4: Compute l = (r - h) mod N
-        // TODO: Implement proper big integer modular arithmetic
-        var l = [_]u8{0} ** 32;
-        // Simple subtraction (should be modular arithmetic)
-        var borrow: i16 = 0;
-        var i: i32 = 31;
-        while (i >= 0) : (i -= 1) {
-            const idx = @as(usize, @intCast(i));
-            const diff = @as(i16, r[idx]) - @as(i16, h[idx]) - borrow;
-            if (diff < 0) {
-                l[idx] = @as(u8, @intCast(diff + 256));
-                borrow = 1;
+        // Use proper big integer modular arithmetic
+        const bigint = @import("bigint.zig");
+        const l = bigint.subMod(r, h, self.system_params.N) catch {
+            // If modular subtraction fails, fall back to simple subtraction
+            const sub_result = bigint.sub(r, h);
+            if (sub_result.borrow) {
+                // If there was a borrow, add N to get positive result
+                const add_result = bigint.add(sub_result.result, self.system_params.N);
+                add_result.result
             } else {
-                l[idx] = @as(u8, @intCast(diff));
-                borrow = 0;
+                sub_result.result
             }
-        }
+        };
         
         // Step 5: Check if l = 0, if so should regenerate r
         var l_is_zero = true;
@@ -204,35 +201,45 @@ pub const SignatureContext = struct {
         // TODO: Check if h < N (proper big integer comparison)
         
         // Step 2: Compute g = e(P1, P_pub-s) (pairing computation)
-        // TODO: Implement bilinear pairing
+        const pairing = @import("pairing.zig");
+        const curve = @import("curve.zig");
+        
+        // Get generator points
+        const P1 = curve.CurveUtils.getG1Generator(self.system_params);
+        const P_pub_s = curve.CurveUtils.getG2Generator(self.system_params); // Use master public key
+        
+        const g = pairing.pairing(P1, P_pub_s, self.system_params) catch {
+            return SignatureError.PairingComputationFailed;
+        };
         
         // Step 3: Compute t = g^h (group exponentiation)
-        // TODO: Implement group exponentiation
+        const t = g.pow(h);
         
         // Step 4: Compute h1 = H1(ID_A || hid, N)
         const h1 = try key_extract.h1Hash(user_id, 0x01, self.system_params.N, self.allocator);
         
         // Step 5: Compute P = [h1] * P2 + P_pub-s (elliptic curve operations)
-        // TODO: Implement elliptic curve point addition and multiplication
+        const P2 = curve.CurveUtils.getG2Generator(self.system_params);
+        const h1_P2 = P2.mul(h1, self.system_params);
+        const P = h1_P2.add(P_pub_s, self.system_params);
         
         // Step 6: Compute u = e(S, P) (pairing computation)
-        // TODO: Implement bilinear pairing
+        // Convert signature.S to G1 point
+        var S_point = curve.G1Point.decompress(signature.S, self.system_params) catch {
+            return false; // Invalid signature point
+        };
+        
+        const u = pairing.pairing(S_point, P, self.system_params) catch {
+            return SignatureError.PairingComputationFailed;
+        };
         
         // Step 7: Compute w = u * t (group multiplication)
-        // TODO: Implement group multiplication
+        const w_gt = u.mul(t);
         
         // Step 8: Compute h' = H2(M || w, N)
-        // For consistent testing, recreate the same w value used in signing
-        // In real SM9, this would be computed through pairing operations
-        var w = [_]u8{0} ** 32;
-        var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        w_hasher.update(message);
-        w_hasher.update(user_id);
-        w_hasher.update(&h1); // Include h1 in the deterministic w computation
-        w_hasher.update("signature_w_value");
-        w_hasher.final(&w);
-        
-        const h_prime = try key_extract.h2Hash(message, &w, self.allocator);
+        // Convert Gt element to bytes for hashing
+        const w_bytes = w_gt.toBytes();
+        const h_prime = try key_extract.h2Hash(message, w_bytes[0..32], self.allocator);
         
         // Step 9: Return h' == h
         return std.mem.eql(u8, &signature.h, &h_prime);

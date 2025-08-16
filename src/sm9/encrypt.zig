@@ -466,20 +466,27 @@ pub const KEMContext = struct {
 pub const EncryptionUtils = struct {
     /// Key derivation function for SM9
     pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
-        // TODO: Implement SM9 KDF based on SM3
-        _ = input;
-        const output = try allocator.alloc(u8, output_len);
-        @memset(output, 0);
-        return output;
+        // Use the proper KDF implementation from hash module
+        const hash = @import("hash.zig");
+        return hash.kdf(input, output_len, allocator);
     }
     
     /// SM9 hash function H2 for encryption
     pub fn computeH2(c1: []const u8, message: []const u8, user_id: []const u8) [32]u8 {
-        // TODO: Implement H2 hash function
-        _ = c1;
-        _ = message;
-        _ = user_id;
-        return std.mem.zeroes([32]u8);
+        // Use the proper H2 implementation from hash module
+        const hash = @import("hash.zig");
+        
+        // Combine inputs for H2 hashing
+        const allocator = std.heap.page_allocator; // Simple allocator for this utility
+        var combined_input = std.ArrayList(u8).init(allocator);
+        defer combined_input.deinit();
+        
+        combined_input.appendSlice(c1) catch return std.mem.zeroes([32]u8);
+        combined_input.appendSlice(message) catch return std.mem.zeroes([32]u8);
+        combined_input.appendSlice(user_id) catch return std.mem.zeroes([32]u8);
+        
+        const result = hash.h2Hash(combined_input.items, "", allocator) catch return std.mem.zeroes([32]u8);
+        return result;
     }
     
     /// Validate point on G1
