@@ -2,8 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// SM9 Digital Signature Tests
-
 test "SM9 signature creation and validation" {
     const signature = sm9.sign.Signature.init(
         std.mem.zeroes([32]u8),

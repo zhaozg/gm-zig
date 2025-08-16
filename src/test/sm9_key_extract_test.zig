@@ -2,8 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// SM9 User Key Extraction Tests
-
 test "SM9 signature user key extraction" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();

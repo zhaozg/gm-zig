@@ -2,8 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// SM9 Encryption and Decryption Tests
-
 test "SM9 ciphertext creation and validation" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
