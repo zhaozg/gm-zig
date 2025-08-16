@@ -116,8 +116,7 @@ pub const SignatureContext = struct {
             r[31] = 1;
         }
         
-        // Compute h1 = H1(ID_A || hid, N) for consistent w computation
-        const h1 = try key_extract.h1Hash(user_private_key.id, 0x01, self.system_params.N, self.allocator);
+        // Note: h1 computation not needed in this step (used in verification step)
         
         // Step 2: Compute w = g^r (pairing computation)
         const pairing = @import("pairing.zig");
@@ -144,7 +143,7 @@ pub const SignatureContext = struct {
         // Step 4: Compute l = (r - h) mod N
         // Use proper big integer modular arithmetic
         const bigint = @import("bigint.zig");
-        const l = bigint.subMod(r, h, self.system_params.N) catch blk: {
+        var l = bigint.subMod(r, h, self.system_params.N) catch blk: {
             // If modular subtraction fails, fall back to simple subtraction
             const sub_result = bigint.sub(r, h);
             if (sub_result.borrow) {
@@ -235,7 +234,7 @@ pub const SignatureContext = struct {
         
         // Step 6: Compute u = e(S, P) (pairing computation)
         // Convert signature.S to G1 point
-        var S_point = curve.G1Point.decompress(signature.S, self.system_params) catch {
+        const S_point = curve.G1Point.decompress(signature.S, self.system_params) catch {
             return false; // Invalid signature point
         };
         
