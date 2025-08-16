@@ -475,9 +475,6 @@ pub const EncryptionUtils = struct {
     
     /// SM9 hash function H2 for encryption
     pub fn computeH2(c1: []const u8, message: []const u8, user_id: []const u8) [32]u8 {
-        // Use the proper H2 implementation from hash module
-        const hash = @import("hash.zig");
-        
         // Use a simple fixed-size buffer for H2 computation to avoid allocator issues
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(c1);
