@@ -47,13 +47,12 @@ test "SM9 signature operation" {
     const user_id = "alice@example.com";
     const message = "Hello, SM9 signature!";
     
-    // Extract user signing key
-    const user_key = try sm9.key_extract.SignUserPrivateKey.extract(
-        system.sign_master,
-        system.params,
-        user_id,
-        allocator,
-    );
+    // Extract user signing key using the new key extraction context
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const user_key = try key_context.extractSignKey(user_id);
+    
+    // Test key validation
+    try testing.expect(user_key.validate(system.params));
     
     // Sign message
     const signature = try context.sign(
@@ -73,6 +72,17 @@ test "SM9 signature operation" {
     );
     
     try testing.expect(is_valid);
+    
+    // Test verification with wrong message should fail
+    const wrong_message = "Different message";
+    const is_invalid = try context.verify(
+        wrong_message,
+        signature,
+        user_id,
+        sm9.sign.SignatureOptions{},
+    );
+    
+    try testing.expect(!is_invalid);
 }
 
 test "SM9 signature with different options" {

@@ -11,4 +11,5 @@ test {
     _ = @import("test/sm9_sign_test.zig");
     _ = @import("test/sm9_encrypt_test.zig");
     _ = @import("test/sm9_mod_test.zig");
+    _ = @import("test/sm9_implementation_test.zig");
 }

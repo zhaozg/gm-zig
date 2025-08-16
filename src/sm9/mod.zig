@@ -12,6 +12,12 @@ pub const key_extract = @import("key_extract.zig");
 pub const sign = @import("sign.zig");
 pub const encrypt = @import("encrypt.zig");
 
+// Import new core modules
+pub const bigint = @import("bigint.zig");
+pub const curve = @import("curve.zig");
+pub const hash = @import("hash.zig");
+pub const pairing = @import("pairing.zig");
+
 // Re-export commonly used types for convenience
 pub const SystemParams = params.SystemParams;
 pub const SM9System = params.SM9System;

@@ -66,6 +66,23 @@ pub const Ciphertext = struct {
         };
     }
     
+    /// Initialize ciphertext taking ownership of c2 buffer (no copy)
+    pub fn initTakeOwnership(
+        allocator: std.mem.Allocator,
+        c1: [33]u8,
+        c2: []u8, // Take ownership of this buffer
+        c3: [32]u8,
+        format: CiphertextFormat,
+    ) Ciphertext {
+        return Ciphertext{
+            .c1 = c1,
+            .c2 = c2,
+            .c3 = c3,
+            .format = format,
+            .allocator = allocator,
+        };
+    }
+    
     /// Cleanup resources
     pub fn deinit(self: Ciphertext) void {
         self.allocator.free(self.c2);
@@ -179,10 +196,10 @@ pub const EncryptionContext = struct {
         
         // TODO: Implement elliptic curve point operations
         // For now, create a deterministic Qb point
-        var Qb = [_]u8{0} ** 33;
-        Qb[0] = 0x02; // Compressed point prefix
-        Qb[1] = h1_result[0];
-        Qb[2] = h1_result[1];
+        var qb_bytes = [_]u8{0} ** 33;
+        qb_bytes[0] = 0x02; // Compressed point prefix
+        qb_bytes[1] = h1_result[0];
+        qb_bytes[2] = h1_result[1];
         
         // Step 2: Generate deterministic r for consistent testing
         // TODO: Use proper cryptographic random number generation in production
@@ -205,41 +222,39 @@ pub const EncryptionContext = struct {
         c1[1] = r[0] ^ self.system_params.P1[1];
         c1[2] = r[1] ^ self.system_params.P1[2];
         
-        // Step 4: Compute g = e(Qb, P_pub-e) (pairing computation)
-        // TODO: Implement bilinear pairing
+        // Step 4: For SM9 encryption, pairing computation would be needed
+        // but this simplified implementation uses a deterministic approach
+        // const pairing = @import("pairing.zig");
+        // const curve = @import("curve.zig");
         
-        // Step 5: Compute w = g^r (group exponentiation)
-        // TODO: Implement group exponentiation
-        // For placeholder consistency, derive w from C1 and user_id in a way
-        // that can be reproduced during decryption
+        // Get Qb from user ID (hash to G2)
+        // const Qb = curve.CurveUtils.hashToG2(user_id, self.system_params);
+        
+        // Get P_pub-e from system parameters  
+        // const P_pub_e = curve.CurveUtils.getG1Generator(self.system_params);
+        
+        // In a full implementation, we would compute g = e(P_pub-e, Qb)
+        // but for this simplified version, we proceed directly to w computation
+        
+        // Step 5: Compute w deterministically for consistency 
+        // Use C1 as the basis for w computation so decryption can reproduce the same value
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        w_hasher.update(&c1);
         w_hasher.update(user_id);
-        w_hasher.update("derived_w_value");
+        w_hasher.update(&c1); // Use C1 to derive w
+        w_hasher.update("simplified_w_value");
         w_hasher.final(&w);
+        
+        const w_bytes = &w;
         
         // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
         const kdf_len = options.kdf_len orelse message.len;
-        const K = try self.allocator.alloc(u8, kdf_len);
+        const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
-        
-        // Simple KDF implementation (should use proper KDF)
-        var kdf_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        kdf_hasher.update(&c1);
-        kdf_hasher.update(&w);
-        kdf_hasher.update(user_id);
-        var kdf_output = [_]u8{0} ** 32;
-        kdf_hasher.final(&kdf_output);
-        
-        // Expand key if needed
-        for (K, 0..) |*byte, i| {
-            byte.* = kdf_output[i % 32];
-        }
         
         // Step 7: Compute C2 = M ⊕ K (XOR encryption)
         const c2 = try self.allocator.alloc(u8, message.len);
-        defer self.allocator.free(c2);  // Free immediately after use
+        // Note: c2 ownership will be transferred to Ciphertext
         
         for (message, c2, 0..) |m_byte, *c_byte, i| {
             c_byte.* = m_byte ^ K[i % K.len];
@@ -254,7 +269,7 @@ pub const EncryptionContext = struct {
         c3_hasher.final(&c3);
         
         // Step 9: Return ciphertext C = (C1, C2, C3)
-        return try Ciphertext.init(
+        return Ciphertext.initTakeOwnership(
             self.allocator,
             c1,
             c2,
@@ -277,34 +292,21 @@ pub const EncryptionContext = struct {
             return error.InvalidCiphertext;
         }
         
-        // Step 2: Compute w = e(C1, de_B) (pairing computation)
-        // TODO: Implement bilinear pairing e(C1, user_private_key)
-        // For placeholder consistency, derive w from C1 and user_id in a way
-        // that can be reproduced during decryption
+        // Step 2: Derive the same w value used during encryption
+        // Since we need to reproduce the same w value without the original message,
+        // we use C1 as a consistent source to derive the w value directly
+        // This bypasses the need to recover r and makes w computation consistent
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        w_hasher.update(&ciphertext.c1);
         w_hasher.update(user_private_key.id);
-        w_hasher.update("derived_w_value");
+        w_hasher.update(&ciphertext.c1); // Use C1 to derive w directly
+        w_hasher.update("simplified_w_value");
         w_hasher.final(&w);
         
-        // Step 3: Compute K = KDF(C1 || w || ID_B, klen)
+        // Step 3: Compute K = KDF(w, klen) using the same method as encryption
         const kdf_len = ciphertext.c2.len;
-        const K = try self.allocator.alloc(u8, kdf_len);
+        const K = try EncryptionUtils.kdf(w[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
-        
-        // Simple KDF implementation (should use proper KDF)
-        var kdf_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        kdf_hasher.update(&ciphertext.c1);
-        kdf_hasher.update(&w);
-        kdf_hasher.update(user_private_key.id);
-        var kdf_output = [_]u8{0} ** 32;
-        kdf_hasher.final(&kdf_output);
-        
-        // Expand key if needed
-        for (K, 0..) |*byte, i| {
-            byte.* = kdf_output[i % 32];
-        }
         
         // Step 4: Compute M' = C2 ⊕ K (XOR decryption)
         const plaintext = try self.allocator.alloc(u8, ciphertext.c2.len);
@@ -466,20 +468,22 @@ pub const KEMContext = struct {
 pub const EncryptionUtils = struct {
     /// Key derivation function for SM9
     pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
-        // TODO: Implement SM9 KDF based on SM3
-        _ = input;
-        const output = try allocator.alloc(u8, output_len);
-        @memset(output, 0);
-        return output;
+        // Use the proper KDF implementation from hash module
+        const hash = @import("hash.zig");
+        return hash.kdf(input, output_len, allocator);
     }
     
     /// SM9 hash function H2 for encryption
     pub fn computeH2(c1: []const u8, message: []const u8, user_id: []const u8) [32]u8 {
-        // TODO: Implement H2 hash function
-        _ = c1;
-        _ = message;
-        _ = user_id;
-        return std.mem.zeroes([32]u8);
+        // Use a simple fixed-size buffer for H2 computation to avoid allocator issues
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        hasher.update(c1);
+        hasher.update(message);
+        hasher.update(user_id);
+        
+        var result: [32]u8 = undefined;
+        hasher.final(&result);
+        return result;
     }
     
     /// Validate point on G1
