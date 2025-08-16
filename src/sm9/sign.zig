@@ -170,7 +170,6 @@ pub const SignatureContext = struct {
         }
         
         // Step 6: Compute S = [l] * ds_A (elliptic curve scalar multiplication)
-        const curve = @import("curve.zig");
         
         // Convert user private key to G1 point
         const ds_A_point = curve.G1Point.decompress(user_private_key.key, self.system_params) catch {
@@ -224,7 +223,7 @@ pub const SignatureContext = struct {
         };
         
         // Step 3: Compute t = g^h (group exponentiation)
-        const t = g.pow(h);
+        const t = g.pow(signature.h);
         
         // Step 4: Compute h1 = H1(ID_A || hid, N)
         const h1 = try key_extract.h1Hash(user_id, 0x01, self.system_params.N, self.allocator);

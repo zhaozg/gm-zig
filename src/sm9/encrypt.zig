@@ -220,20 +220,20 @@ pub const EncryptionContext = struct {
             return EncryptionError.PairingComputationFailed;
         };
         
-        // Step 5: Generate random r and compute w = g^r
-        var r = [_]u8{0} ** 32;
-        var r_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        r_hasher.update(user_id);
-        r_hasher.update(message);
-        r_hasher.update("encryption_random_r");
-        r_hasher.final(&r);
+        // Step 5: Generate random r_enc and compute w = g^r_enc
+        var r_enc = [_]u8{0} ** 32;
+        var r_hasher_enc = std.crypto.hash.sha2.Sha256.init(.{});
+        r_hasher_enc.update(user_id);
+        r_hasher_enc.update(message);
+        r_hasher_enc.update("encryption_random_r");
+        r_hasher_enc.final(&r_enc);
         
-        // Ensure r is not zero
-        if (std.mem.allEqual(u8, &r, 0)) {
-            r[31] = 1;
+        // Ensure r_enc is not zero
+        if (std.mem.allEqual(u8, &r_enc, 0)) {
+            r_enc[31] = 1;
         }
         
-        const w_gt = g.pow(r);
+        const w_gt = g.pow(r_enc);
         const w_bytes = w_gt.toBytes();
         
         // Step 6: Compute K = KDF(C1 || w || ID_B, klen)

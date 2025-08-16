@@ -165,7 +165,7 @@ pub const G1Point = struct {
         // Check if y^2 = x^3 + b (mod p)
         // For SM9 BN256 curve, b = 3
         // TODO: Implement proper curve equation validation
-        _ = curve_params;
+        // curve_params is used in toAffine call above
         return true; // Placeholder - assume valid for now
     }
     
@@ -394,7 +394,7 @@ pub const CurveUtils = struct {
         std.mem.copyForwards(u8, &x, system_params.P1[1..]);
         
         // Compute y coordinate (simplified)
-        var y = x; // Placeholder - should compute from curve equation
+        const y = x; // Placeholder - should compute from curve equation
         
         return G1Point.affine(x, y);
     }
