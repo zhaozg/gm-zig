@@ -6,4 +6,9 @@ test {
     _ = @import("test/sm2_signature_test.zig");
     _ = @import("test/sm2_encryption_test.zig");
     _ = @import("test/sm2_key_exchange_test.zig");
+    _ = @import("test/sm9_params_test.zig");
+    _ = @import("test/sm9_key_extract_test.zig");
+    _ = @import("test/sm9_sign_test.zig");
+    _ = @import("test/sm9_encrypt_test.zig");
+    _ = @import("test/sm9_mod_test.zig");
 }
