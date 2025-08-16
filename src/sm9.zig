@@ -45,7 +45,7 @@ pub const version = .{
 pub fn getVersion(allocator: std.mem.Allocator) ![]u8 {
     return std.fmt.allocPrint(
         allocator,
-        "{}.{}.{}-{}",
+        "{}.{}.{}-{s}",
         .{ version.major, version.minor, version.patch, version.pre_release },
     );
 }
