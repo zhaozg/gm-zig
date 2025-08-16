@@ -6,7 +6,7 @@ const kp = @import("../sm2/keypair.zig");
 const KeyPair = kp.KeyPair;
 
 test "SM2 signature creation and verification" {
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const message = "hello world";
     const options = signature.SignatureOptions{ .hash_type = .sm3 };
 
@@ -24,7 +24,7 @@ test "SM2 signature creation and verification" {
 }
 
 test "SM2 signature with precomputed hash" {
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const message_hash = [_]u8{0x01} ** 32;
     const options = signature.SignatureOptions{ .hash_type = .precomputed };
 
@@ -39,7 +39,7 @@ test "SM2 signature with precomputed hash" {
 test "SM2 signature serialization" {
     const allocator = testing.allocator;
 
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const message = "test message";
     const options = signature.SignatureOptions{};
 
@@ -62,7 +62,7 @@ test "SM2 signature serialization" {
 }
 
 test "SM2 public key from coordinates" {
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const coords = key_pair.getPublicKeyCoordinates();
 
     const reconstructed_key = try kp.publicKeyFromCoordinates(coords.x, coords.y);
@@ -71,7 +71,7 @@ test "SM2 public key from coordinates" {
 }
 
 test "SM2 public key from SEC1" {
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
 
     // Test uncompressed format
     const uncompressed = key_pair.getPublicKeyUncompressed();
@@ -88,11 +88,11 @@ test "SM2 signature comprehensive tests" {
     const allocator = testing.allocator;
 
     // Test 1: Basic key generation
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     try key_pair.public_key.rejectIdentity();
 
     // Test 2: Key pair from private key
-    const private_key = SM2.SM2.scalar.random(null, .big);
+    const private_key = SM2.SM2.scalar.random(.big);
     const key_pair2 = try KeyPair.fromPrivateKey(private_key);
     try testing.expect(std.mem.eql(u8, &key_pair2.private_key, &private_key));
 
@@ -158,7 +158,7 @@ test "SM2 signature comprehensive tests" {
 
 test "SM2 signature error handling" {
 
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const message = "test message";
     const options = signature.SignatureOptions{};
 
@@ -183,8 +183,8 @@ test "SM2 signature error handling" {
 
 test "SM2 signature compatibility" {
     // Test signature compatibility across different key pairs
-    const key_pair1 = kp.generateKeyPair(null);
-    const key_pair2 = kp.generateKeyPair(null);
+    const key_pair1 = kp.generateKeyPair();
+    const key_pair2 = kp.generateKeyPair();
 
     const message = "cross compatibility test";
     const options = signature.SignatureOptions{};
@@ -203,7 +203,7 @@ test "SM2 signature compatibility" {
 
 test "SM2 signature deterministic properties" {
     // Test that signatures are non-deterministic (due to random k)
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const message = "deterministic test";
     const options = signature.SignatureOptions{};
 
@@ -224,7 +224,7 @@ test "SM2 signature deterministic properties" {
 test "SM2 signature large message handling" {
     const allocator = testing.allocator;
 
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
     const options = signature.SignatureOptions{};
 
     // Test with large message (1MB)

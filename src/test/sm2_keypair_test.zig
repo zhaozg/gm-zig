@@ -5,7 +5,7 @@ const testing = std.testing;
 
 test "SM2 key pair generation" {
 
-    const key_pair = kp.generateKeyPair(null);
+    const key_pair = kp.generateKeyPair();
 
     // Verify public key is valid (not identity element)
     try key_pair.public_key.rejectIdentity();

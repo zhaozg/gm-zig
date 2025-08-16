@@ -29,10 +29,9 @@ pub const KeyExchangeContext = struct {
         private_key: [32]u8,
         public_key: SM2,
         user_id: []const u8,
-        rng: ?*std.Random
     ) KeyExchangeContext {
         // Generate ephemeral key pair
-        const ephemeral_private = SM2.scalar.random(rng, .big);
+        const ephemeral_private = SM2.scalar.random(.big);
         const ephemeral_public = SM2.basePoint.mul(ephemeral_private, .big) catch unreachable;
 
         return KeyExchangeContext{

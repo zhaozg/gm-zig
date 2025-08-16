@@ -6,7 +6,6 @@ const math = std.math;
 const mem = std.mem;
 
 const builtin = @import("builtin");
-const wasmRng = @import("../wasmRng.zig");
 
 const Field = common.Field;
 
@@ -71,8 +70,8 @@ pub fn sub(a: CompressedScalar, b: CompressedScalar, endian: std.builtin.Endian)
 }
 
 /// Return a random scalar
-pub fn random(rnd: ?*const std.Random, endian: std.builtin.Endian) CompressedScalar {
-    return Scalar.random(rnd).toBytes(endian);
+pub fn random(endian: std.builtin.Endian) CompressedScalar {
+    return Scalar.random().toBytes(endian);
 }
 
 /// A scalar in unpacked representation.
@@ -173,11 +172,13 @@ pub const Scalar = struct {
     }
 
     /// Return a random scalar < L.
-    pub fn random(rnd: ?* const std.Random) Scalar {
+    pub fn random() Scalar {
         var s: [48]u8 = undefined;
         if (builtin.os.tag == .freestanding) {
             // In WASI, we use the global random generator.
-            rnd.?.bytes(&s);
+            const wasmRng = @import("../wasmRng.zig");
+            wasmRng.random(&s);
+
             return Scalar.fromBytes48(s, .little);
         }
 

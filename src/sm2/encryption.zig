@@ -97,7 +97,6 @@ pub fn encrypt(
     message: []const u8,
     public_key: SM2,
     format: CiphertextFormat,
-    rng: ?*std.Random,
 ) !Ciphertext {
     if (message.len == 0) return error.EmptyMessage;
 
@@ -106,7 +105,7 @@ pub fn encrypt(
 
     while (true) {
         // Step 1: Generate random k ∈ [1, n-1]
-        const k_bytes = SM2.scalar.random(rng, .big);
+        const k_bytes = SM2.scalar.random(.big);
         const k_scalar = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
 
         if (k_scalar.isZero()) continue;
@@ -232,9 +231,8 @@ pub fn encryptWithFormat(
     message: []const u8,
     public_key: SM2,
     format: CiphertextFormat,
-    rng: ?*std.Random,
 ) ![]u8 {
-    const ciphertext = try encrypt(allocator, message, public_key, format, rng);
+    const ciphertext = try encrypt(allocator, message, public_key, format);
     defer ciphertext.deinit(allocator);
 
     return try ciphertext.toBytes(allocator);

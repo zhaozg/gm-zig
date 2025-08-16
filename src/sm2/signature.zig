@@ -47,7 +47,6 @@ pub const Signature = struct {
 pub const SignatureOptions = struct {
     user_id: ?[]const u8 = null, // If null, uses default "1234567812345678"
     hash_type: enum { sm3, precomputed } = .sm3,
-    random: ?* const std.Random = null, // Optional custom RNG for signing
 };
 
 /// Sign a message using SM2 digital signature algorithm
@@ -91,7 +90,7 @@ pub fn sign(
 
     while (true) {
         // Step 1: Generate random k
-        const k_bytes = SM2.scalar.random(options.random, .big);
+        const k_bytes = SM2.scalar.random(.big);
         const k = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
 
         // Ensure k is not zero

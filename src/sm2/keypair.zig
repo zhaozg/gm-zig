@@ -11,8 +11,8 @@ pub const KeyPair = struct {
     public_key: SM2,
 
     /// Generate a new SM2 key pair
-    pub fn generate(rng: ?*std.Random) KeyPair {
-        const private_key = SM2.scalar.random(rng, .big);
+    pub fn generate() KeyPair {
+        const private_key = SM2.scalar.random(.big);
         const public_key = SM2.basePoint.mul(private_key, .big) catch unreachable;
 
         return KeyPair{
@@ -70,7 +70,7 @@ pub fn publicKeyFromPrivateKey(private_key: [32]u8) !SM2 {
 
 
 /// Generate SM2 key pair
-pub fn generateKeyPair(rng: ?*std.Random) KeyPair {
-    return KeyPair.generate(rng);
+pub fn generateKeyPair() KeyPair {
+    return KeyPair.generate();
 }
 

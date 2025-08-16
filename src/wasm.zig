@@ -106,9 +106,7 @@ export fn sm2sign(priKey: [*]const u8, msg: [*]const u8, msg_len: usize, sigval:
 
     const msgSlice = msg[0..msg_len];
 
-    const options = sm2.signature.SignatureOptions{
-        .random = wasmRng.getDefault(),
-    };
+    const options = sm2.signature.SignatureOptions{};
     const sig = sm2.signature.sign(msgSlice, key_pair.private_key, key_pair.public_key, options) catch @panic("signature generation failed");
     const bytes = sig.toBytes();
     std.mem.copyForwards(u8, sigval[0..bytes.len], &bytes);
@@ -118,9 +116,7 @@ export fn sm2verify(pubKey: [*]const u8, msg: [*]const u8, msg_len: usize, signa
     const pubKeySlice = pubKey[0..65];
     const msgSlice = msg[0..msg_len];
     var sigSlice: [64]u8 = undefined;
-    const options = sm2.signature.SignatureOptions{
-        .random = wasmRng.getDefault(),
-    };
+    const options = sm2.signature.SignatureOptions{};
 
     const public_key = sm2.SM2.fromSec1(pubKeySlice) catch @panic("invalid public key");
     // Verify public key is valid (not identity element)

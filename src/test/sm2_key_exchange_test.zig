@@ -11,17 +11,17 @@ test "SM2 key exchange protocol" {
     const allocator = testing.allocator;
 
     // Generate key pairs for Alice and Bob
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@example.com";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@example.com";
 
     // Initialize contexts
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     // Perform key exchange
     const key_length = 32;
@@ -58,17 +58,17 @@ test "SM2 key exchange with confirmation" {
     const allocator = testing.allocator;
 
     // Generate key pairs
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@test.com";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@test.com";
 
     // Initialize contexts
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     // Perform key exchange with confirmation
     const key_length = 32;
@@ -121,17 +121,17 @@ test "SM2 key exchange comprehensive tests" {
     const allocator = testing.allocator;
 
     // Test 1: Basic key exchange setup
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@example.com";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@example.com";
 
     // Test 2: Context initialization
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     try testing.expect(alice_ctx.role == .initiator);
     try testing.expect(bob_ctx.role == .responder);
@@ -211,16 +211,16 @@ test "SM2 key exchange different key lengths" {
     const allocator = testing.allocator;
 
     // Setup participants
-    const alice_private = SM2.scalar.random(null,.big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob";
 
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     // Test different key lengths
     const key_lengths = [_]usize{ 16, 32, 48, 64, 128, 256 };
@@ -258,17 +258,17 @@ test "SM2 key exchange different key lengths" {
 test "SM2 key exchange role validation" {
     const allocator = testing.allocator;
 
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob";
 
     // Create contexts with wrong roles
-    var alice_ctx_wrong = key_exchange.KeyExchangeContext.init(.responder, alice_private, alice_public, alice_id, null);
-    var bob_ctx_wrong = key_exchange.KeyExchangeContext.init(.initiator, bob_private, bob_public, bob_id, null);
+    var alice_ctx_wrong = key_exchange.KeyExchangeContext.init(.responder, alice_private, alice_public, alice_id);
+    var bob_ctx_wrong = key_exchange.KeyExchangeContext.init(.initiator, bob_private, bob_public, bob_id);
 
     const key_length = 32;
 
@@ -303,16 +303,16 @@ test "SM2 key exchange role validation" {
 test "SM2 key exchange identity element rejection" {
     const allocator = testing.allocator;
 
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob";
 
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    const bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    const bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, );
 
     const identity = SM2.identityElement;
     const key_length = 32;
@@ -347,11 +347,11 @@ test "SM2 key exchange identity element rejection" {
 }
 
 test "SM2 key exchange coordinate extraction" {
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
 
     // Test coordinate extraction
     const coords = alice_ctx.getEphemeralCoordinates();
@@ -362,11 +362,11 @@ test "SM2 key exchange coordinate extraction" {
 }
 
 test "SM2 key exchange SEC1 format handling" {
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
 
     // Test SEC1 format
     const sec1_bytes = alice_ctx.getEphemeralPublicKey();
@@ -378,16 +378,16 @@ test "SM2 key exchange SEC1 format handling" {
 test "SM2 key exchange confirmation verification" {
     const allocator = testing.allocator;
 
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@test.com";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@test.com";
 
-    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     const key_length = 32;
 
@@ -424,19 +424,19 @@ test "SM2 key exchange multiple rounds" {
     const allocator = testing.allocator;
 
     // Test that multiple key exchanges with the same participants produce different keys
-    const alice_private = SM2.scalar.random(null, .big);
+    const alice_private = SM2.scalar.random(.big);
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    const bob_private = SM2.scalar.random(null, .big);
+    const bob_private = SM2.scalar.random(.big);
     const bob_public = try SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob";
 
     const key_length = 32;
 
     // First round
-    var alice_ctx1 = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    const bob_ctx1 = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx1 = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    const bob_ctx1 = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     const alice_result1 = try key_exchange.keyExchangeInitiator(
         allocator,
@@ -450,8 +450,8 @@ test "SM2 key exchange multiple rounds" {
     defer alice_result1.deinit(allocator);
 
     // Second round with new ephemeral keys
-    var alice_ctx2 = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    const bob_ctx2 = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx2 = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    const bob_ctx2 = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     const alice_result2 = try key_exchange.keyExchangeInitiator(
         allocator,

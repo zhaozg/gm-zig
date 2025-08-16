@@ -38,7 +38,7 @@ fn demonstrateSignature(allocator: std.mem.Allocator) !void {
 
     // Generate key pair
     print("1. Generating SM2 key pair...\n", .{});
-    const key_pair = sm2.kp.generateKeyPair(null);
+    const key_pair = sm2.kp.generateKeyPair();
 
     // Display public key in different formats
     const compressed = key_pair.getPublicKeyCompressed();
@@ -91,7 +91,7 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     print("1. Setting up key exchange participants...\n", .{});
 
     // Alice's setup
-    const alice_private = sm2.SM2.scalar.random(null, .big);
+    const alice_private = sm2.SM2.scalar.random(.big);
     const alice_public = try sm2.SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@company.com";
 
@@ -99,7 +99,7 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     printHex(&alice_private);
 
     // Bob's setup
-    const bob_private = sm2.SM2.scalar.random(null, .big);
+    const bob_private = sm2.SM2.scalar.random(.big);
     const bob_public = try sm2.SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@company.com";
 
@@ -107,8 +107,8 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     printHex(&bob_private);
 
     // Initialize key exchange contexts
-    var alice_ctx = sm2.key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id, null);
-    var bob_ctx = sm2.key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, null);
+    var alice_ctx = sm2.key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = sm2.key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
 
     print("2. Exchanging ephemeral keys...\n", .{});
 
@@ -173,7 +173,7 @@ fn demonstrateEncryption(allocator: std.mem.Allocator) !void {
     print("1. Setting up encryption...\n", .{});
 
     // Generate key pair
-    const private_key = sm2.SM2.scalar.random(null, .big);
+    const private_key = sm2.SM2.scalar.random(.big);
     const public_key = try sm2.kp.publicKeyFromPrivateKey(private_key);
 
     print("   Private key: ", .{});
@@ -199,7 +199,7 @@ fn demonstrateEncryption(allocator: std.mem.Allocator) !void {
         print("3. Testing {any} format...\n", .{name});
 
         // Encrypt
-        const ciphertext = try sm2.encryption.encrypt(allocator, message, public_key, format, null);
+        const ciphertext = try sm2.encryption.encrypt(allocator, message, public_key, format);
         defer ciphertext.deinit(allocator);
 
         print("   C1 (point): ", .{});
