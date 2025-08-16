@@ -141,7 +141,7 @@ pub const SignatureContext = struct {
         // Use a simplified approach that doesn't rely on unimplemented pairings
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        w_hasher.update(user_id);
+        w_hasher.update(user_private_key.id);
         w_hasher.update(&r);
         w_hasher.update("signature_w_value");
         w_hasher.final(&w);
