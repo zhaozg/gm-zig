@@ -5,7 +5,7 @@ const sm9 = @import("../sm9.zig");
 test "SM9 signature creation and validation" {
     const signature = sm9.sign.Signature.init(
         std.mem.zeroes([32]u8),
-        std.mem.zeroes([32]u8),
+        std.mem.zeroes([33]u8),
     );
     
     try testing.expect(signature.validate());
@@ -13,7 +13,7 @@ test "SM9 signature creation and validation" {
 
 test "SM9 signature serialization" {
     const h = [_]u8{0x12} ** 32;
-    const S = [_]u8{0x34} ** 32;
+    const S = [_]u8{0x34} ** 33;
     const signature = sm9.sign.Signature.init(h, S);
     
     // Test byte encoding/decoding

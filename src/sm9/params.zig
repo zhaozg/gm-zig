@@ -56,7 +56,7 @@ pub const SystemParams = struct {
         std.mem.copyForwards(u8, P1_bytes[1..], &P1_x);
         
         // G2 generator P2 (compressed format) 
-        var P2_bytes = [65]u8{0x04}; // 0x04 prefix for uncompressed point in G2
+        var P2_bytes = [_]u8{0x04} ++ [_]u8{0} ** 64; // 0x04 prefix for uncompressed point in G2
         const P2_x = [32]u8{
             0x85, 0xAE, 0xF3, 0xD0, 0x78, 0x64, 0x0C, 0x98, 
             0x59, 0x7B, 0x60, 0x27, 0xB4, 0x41, 0xA0, 0x1F, 
@@ -121,8 +121,8 @@ pub const SignMasterKeyPair = struct {
     /// Generate new signature master key pair
     pub fn generate(params: SystemParams) SignMasterKeyPair {
         // Generate random private key s ∈ [1, N-1]
-        var private_key = [32]u8{0};
-        var public_key = [65]u8{0};
+        var private_key = [_]u8{0} ** 32;
+        var public_key = [_]u8{0} ** 65;
         
         // Simple placeholder random generation - should use proper random generation
         // TODO: Replace with proper cryptographic random number generation
@@ -147,7 +147,7 @@ pub const SignMasterKeyPair = struct {
         }
         
         // Compute public key P_pub-s = s * P2
-        var public_key = [65]u8{0};
+        var public_key = [_]u8{0} ** 65;
         // TODO: Implement elliptic curve point multiplication
         // For now, copy P2 as placeholder
         std.mem.copyForwards(u8, &public_key, &params.P2);
@@ -187,7 +187,7 @@ pub const EncryptMasterKeyPair = struct {
     pub fn generate(params: SystemParams) EncryptMasterKeyPair {
         // Generate random private key s ∈ [1, N-1]
         var private_key = [_]u8{0} ** 32;
-        var public_key = [33]u8{0};
+        var public_key = [_]u8{0} ** 33;
         
         // Simple placeholder random generation - should use proper random generation
         // TODO: Replace with proper cryptographic random number generation
@@ -212,7 +212,7 @@ pub const EncryptMasterKeyPair = struct {
         }
         
         // Compute public key P_pub-e = s * P1
-        var public_key = [33]u8{0};
+        var public_key = [_]u8{0} ** 33;
         // TODO: Implement elliptic curve point multiplication
         // For now, copy P1 as placeholder
         std.mem.copyForwards(u8, &public_key, &params.P1);

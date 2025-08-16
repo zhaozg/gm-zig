@@ -103,13 +103,13 @@ pub const SignatureContext = struct {
         
         // Step 1: Generate random number r ∈ [1, N-1]
         // TODO: Use proper cryptographic random number generation
-        var r = [32]u8{0};
+        var r = [_]u8{0} ** 32;
         r[31] = 1; // Placeholder: use 1 to avoid zero
         
         // Step 2: Compute w = g^r (pairing computation)
         // TODO: Implement pairing computation e(P1, P_pub-s)^r
         // For now, create a deterministic value based on message and key
-        var w = [32]u8{0};
+        var w = [_]u8{0} ** 32;
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(message);
         hasher.update(&user_private_key.key);
@@ -121,7 +121,7 @@ pub const SignatureContext = struct {
         
         // Step 4: Compute l = (r - h) mod N
         // TODO: Implement proper big integer modular arithmetic
-        var l = [32]u8{0};
+        var l = [_]u8{0} ** 32;
         // Simple subtraction (should be modular arithmetic)
         var borrow: i16 = 0;
         var i: i32 = 31;
@@ -152,7 +152,7 @@ pub const SignatureContext = struct {
         
         // Step 6: Compute S = l * ds_A (elliptic curve scalar multiplication)
         // TODO: Implement proper elliptic curve point multiplication
-        var S = [33]u8{0};
+        var S = [_]u8{0} ** 33;
         S[0] = 0x02; // Compressed point prefix
         // Create deterministic but non-zero signature point
         S[1] = l[0];
@@ -209,7 +209,7 @@ pub const SignatureContext = struct {
         
         // Step 8: Compute h' = H2(M || w, N)
         // For now, create a mock w value
-        var w = [32]u8{0};
+        var w = [_]u8{0} ** 32;
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(message);
         hasher.update(&signature.S);
