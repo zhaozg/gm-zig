@@ -2,8 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// SM9 Parameters and Master Key Generation Tests
-
 test "SM9 system parameters initialization" {
     const params = sm9.params.SystemParams.init();
     
