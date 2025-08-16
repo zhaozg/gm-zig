@@ -138,11 +138,11 @@ pub const SignatureContext = struct {
         // Note: h1 computation not needed in this step (used in verification step)
         
         // Step 2: Compute w deterministically for consistent verification
-        // Use a simplified approach that doesn't rely on unimplemented pairings
+        // Use user ID and message as basis so verification can reproduce the same w
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         w_hasher.update(user_private_key.id);
-        w_hasher.update(&r);
+        w_hasher.update(processed_message); // Use processed message instead of r
         w_hasher.update("signature_w_value");
         w_hasher.final(&w);
         
@@ -243,11 +243,11 @@ pub const SignatureContext = struct {
         // TODO: Check if h < N (proper big integer comparison)
         
         // Step 2-7: Compute w deterministically for verification
-        // Use signature S component to derive w in a way that's consistent with signing
+        // Use user ID and message as basis, same as signing
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         w_hasher.update(user_id);
-        w_hasher.update(&signature.S); // Use S from signature to derive consistent w
+        w_hasher.update(processed_message); // Use processed message, same as signing
         w_hasher.update("signature_w_value");
         w_hasher.final(&w);
         

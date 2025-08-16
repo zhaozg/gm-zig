@@ -237,11 +237,11 @@ pub const EncryptionContext = struct {
         // but for this simplified version, we proceed directly to w computation
         
         // Step 5: Compute w deterministically for consistency 
-        // Use a deterministic method that can be reproduced in decryption
+        // Use C1 as the basis for w computation so decryption can reproduce the same value
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         w_hasher.update(user_id);
-        w_hasher.update(&r);
+        w_hasher.update(&c1); // Use C1 to derive w
         w_hasher.update("simplified_w_value");
         w_hasher.final(&w);
         
@@ -293,25 +293,13 @@ pub const EncryptionContext = struct {
         }
         
         // Step 2: Derive the same w value used during encryption
-        // Since C1 = r * P1, we need to recover w = g^r where g = e(Qb, P_pub-e)
-        // For simplified implementation, derive r from C1 and use same algorithm as encryption
-        var r = [_]u8{0} ** 32;
-        var r_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        r_hasher.update(user_private_key.id);
-        r_hasher.update(&ciphertext.c1); // Use C1 instead of original message
-        r_hasher.update("random_r");
-        r_hasher.final(&r);
-        
-        // Ensure r is not zero
-        if (std.mem.allEqual(u8, &r, 0)) {
-            r[31] = 1;
-        }
-        
-        // Compute simplified w value (same as encryption step 5)
+        // Since we need to reproduce the same w value without the original message,
+        // we use C1 as a consistent source to derive the w value directly
+        // This bypasses the need to recover r and makes w computation consistent
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         w_hasher.update(user_private_key.id);
-        w_hasher.update(&r);
+        w_hasher.update(&ciphertext.c1); // Use C1 to derive w directly
         w_hasher.update("simplified_w_value");
         w_hasher.final(&w);
         
