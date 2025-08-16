@@ -53,7 +53,7 @@ pub const SignUserPrivateKey = struct {
             // For simplified implementation, if inverse fails, use a deterministic fallback
             var fallback = t1;
             fallback[31] = fallback[31] ^ 1; // Simple modification
-            fallback
+            fallback;
         };
         
         // Step 4: Compute ds_A = t1_inv * P1 (elliptic curve scalar multiplication)

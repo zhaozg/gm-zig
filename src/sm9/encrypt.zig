@@ -179,10 +179,10 @@ pub const EncryptionContext = struct {
         
         // TODO: Implement elliptic curve point operations
         // For now, create a deterministic Qb point
-        var Qb = [_]u8{0} ** 33;
-        Qb[0] = 0x02; // Compressed point prefix
-        Qb[1] = h1_result[0];
-        Qb[2] = h1_result[1];
+        var qb_bytes = [_]u8{0} ** 33;
+        qb_bytes[0] = 0x02; // Compressed point prefix
+        qb_bytes[1] = h1_result[0];
+        qb_bytes[2] = h1_result[1];
         
         // Step 2: Generate deterministic r for consistent testing
         // TODO: Use proper cryptographic random number generation in production

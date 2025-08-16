@@ -2,7 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// Test SM9 core implementations
 test "SM9 bigint operations" {
     // Test basic arithmetic operations
     const a = sm9.bigint.fromU64(123456);

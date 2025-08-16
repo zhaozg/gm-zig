@@ -150,9 +150,9 @@ pub const SignatureContext = struct {
             if (sub_result.borrow) {
                 // If there was a borrow, add N to get positive result
                 const add_result = bigint.add(sub_result.result, self.system_params.N);
-                add_result.result
+                add_result.result;
             } else {
-                sub_result.result
+                sub_result.result;
             }
         };
         

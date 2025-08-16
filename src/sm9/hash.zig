@@ -254,7 +254,6 @@ pub fn deterministicRandom(seed: []const u8, length: usize, allocator: std.mem.A
 
 /// SM9 message authentication code
 pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) ![]u8 {
-    _ = allocator;
     
     // Simple HMAC-like construction using SHA-256
     const block_size = 64;

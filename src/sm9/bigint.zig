@@ -165,7 +165,7 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     
     var result = [_]u8{0} ** 32;
     var temp_a = a;
-    var temp_b = b;
+    const temp_b = b;
     
     // Simple double-and-add multiplication
     var bit_index: usize = 0;

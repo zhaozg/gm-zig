@@ -64,7 +64,7 @@ pub const G1Point = struct {
         // For now, return a deterministic but simplified result
         // TODO: Implement proper elliptic curve point doubling
         var result_x = affine_pt.x;
-        var result_y = affine_pt.y;
+        const result_y = affine_pt.y;
         
         // Simple transformation to avoid returning the same point
         const add_result = bigint.addMod(result_x, curve_params.q, curve_params.q) catch return G1Point.infinity();
@@ -138,7 +138,7 @@ pub const G1Point = struct {
     }
     
     /// Convert to affine coordinates
-    pub fn toAffine(self: G1Point, curve_params: params.SystemParams) G1Point {
+    pub fn toAffine(self: G1Point, _: params.SystemParams) G1Point {
         if (self.isInfinity()) return G1Point.infinity();
         
         // If z == 1, already in affine form
@@ -190,7 +190,7 @@ pub const G1Point = struct {
     }
     
     /// Decompress point from 33 bytes
-    pub fn decompress(compressed: [33]u8, curve_params: params.SystemParams) !G1Point {
+    pub fn decompress(compressed: [33]u8, _: params.SystemParams) !G1Point {
         if (compressed[0] == 0x00) {
             return G1Point.infinity();
         }
@@ -205,7 +205,7 @@ pub const G1Point = struct {
         // Compute y coordinate from curve equation y^2 = x^3 + b
         // TODO: Implement proper square root computation
         // For now, return a deterministic y coordinate
-        var y = x; // Placeholder
+        const y = x; // Placeholder
         
         return G1Point.affine(x, y);
     }
@@ -357,7 +357,7 @@ pub const G2Point = struct {
     }
     
     /// Decompress point from 65 bytes
-    pub fn decompress(compressed: [65]u8, curve_params: params.SystemParams) !G2Point {
+    pub fn decompress(compressed: [65]u8, _: params.SystemParams) !G2Point {
         if (compressed[0] == 0x00) {
             return G2Point.infinity();
         }
@@ -371,7 +371,7 @@ pub const G2Point = struct {
         
         // For G2 points, we need both x and y coordinates
         // TODO: Implement proper decompression for G2 points
-        var y = x; // Placeholder
+        const y = x; // Placeholder
         
         return G2Point.affine(x, y);
     }
@@ -388,10 +388,10 @@ pub const CurveError = error{
 /// Utility functions for curve operations
 pub const CurveUtils = struct {
     /// Generate G1 generator point from system parameters
-    pub fn getG1Generator(params: params.SystemParams) G1Point {
+    pub fn getG1Generator(system_params: params.SystemParams) G1Point {
         // Extract coordinates from compressed P1
         var x: [32]u8 = undefined;
-        std.mem.copyForwards(u8, &x, params.P1[1..]);
+        std.mem.copyForwards(u8, &x, system_params.P1[1..]);
         
         // Compute y coordinate (simplified)
         var y = x; // Placeholder - should compute from curve equation
@@ -400,14 +400,14 @@ pub const CurveUtils = struct {
     }
     
     /// Generate G2 generator point from system parameters
-    pub fn getG2Generator(params: params.SystemParams) G2Point {
+    pub fn getG2Generator(system_params: params.SystemParams) G2Point {
         // Extract coordinates from P2
         var x: [64]u8 = undefined;
         var y: [64]u8 = undefined;
         
         // For uncompressed format, extract x and y
-        std.mem.copyForwards(u8, x[0..32], params.P2[1..33]);
-        std.mem.copyForwards(u8, y[0..32], params.P2[33..65]);
+        std.mem.copyForwards(u8, x[0..32], system_params.P2[1..33]);
+        std.mem.copyForwards(u8, y[0..32], system_params.P2[33..65]);
         
         // Set the second Fp2 component to zero for simplicity
         std.mem.copyForwards(u8, x[32..64], &[_]u8{0} ** 32);
@@ -417,7 +417,7 @@ pub const CurveUtils = struct {
     }
     
     /// Hash to G1 point (simplified)
-    pub fn hashToG1(data: []const u8, curve_params: params.SystemParams) G1Point {
+    pub fn hashToG1(data: []const u8, _: params.SystemParams) G1Point {
         // Simple hash-to-point implementation
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(data);
@@ -427,13 +427,13 @@ pub const CurveUtils = struct {
         hasher.final(&hash);
         
         // Use hash as x-coordinate and derive y
-        var y = hash; // Simplified - should compute from curve equation
+        const y = hash; // Simplified - should compute from curve equation
         
         return G1Point.affine(hash, y);
     }
     
     /// Hash to G2 point (simplified)
-    pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) G2Point {
+    pub fn hashToG2(data: []const u8, _: params.SystemParams) G2Point {
         // Simple hash-to-point implementation
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(data);
