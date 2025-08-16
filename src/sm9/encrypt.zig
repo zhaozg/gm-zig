@@ -66,6 +66,23 @@ pub const Ciphertext = struct {
         };
     }
     
+    /// Initialize ciphertext taking ownership of c2 buffer (no copy)
+    pub fn initTakeOwnership(
+        allocator: std.mem.Allocator,
+        c1: [33]u8,
+        c2: []u8, // Take ownership of this buffer
+        c3: [32]u8,
+        format: CiphertextFormat,
+    ) Ciphertext {
+        return Ciphertext{
+            .c1 = c1,
+            .c2 = c2,
+            .c3 = c3,
+            .format = format,
+            .allocator = allocator,
+        };
+    }
+    
     /// Cleanup resources
     pub fn deinit(self: Ciphertext) void {
         self.allocator.free(self.c2);
@@ -253,7 +270,7 @@ pub const EncryptionContext = struct {
         c3_hasher.final(&c3);
         
         // Step 9: Return ciphertext C = (C1, C2, C3)
-        return try Ciphertext.init(
+        return Ciphertext.initTakeOwnership(
             self.allocator,
             c1,
             c2,
