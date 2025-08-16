@@ -48,7 +48,9 @@ test "SM9 system with custom parameters" {
 
 test "SM9 master key pair from private key" {
     const params = sm9.params.SystemParams.init();
-    const private_key = std.mem.zeroes([32]u8);
+    // Use a valid non-zero private key (value = 1 in big-endian format)
+    var private_key = std.mem.zeroes([32]u8);
+    private_key[31] = 1;
     
     const sign_keypair = try sm9.params.SignMasterKeyPair.fromPrivateKey(params, private_key);
     try testing.expect(sign_keypair.validate(params));
