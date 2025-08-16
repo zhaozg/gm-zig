@@ -71,7 +71,7 @@ pub const SignUserPrivateKey = struct {
         
         // Step 4: Compute w = t1^(-1) mod N
         // TODO: Implement modular inverse
-        var w = t1; // Placeholder
+        _ = t1; // Use t1 instead of unused w variable
         
         // Step 5: Compute ds_A = w * P1
         // TODO: Implement elliptic curve point multiplication
@@ -182,7 +182,7 @@ pub const EncryptUserPrivateKey = struct {
         
         // Step 4: Compute w = t2^(-1) mod N
         // TODO: Implement modular inverse
-        var w = t2; // Placeholder
+        _ = t2; // Use t2 instead of unused w variable
         
         // Step 5: Compute de_B = w * P2
         // TODO: Implement elliptic curve point multiplication
@@ -379,7 +379,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     hasher.update(data);
     hasher.update(&[1]u8{hid});
     
-    var h = [32]u8{0};
+    var h = [_]u8{0} ** 32;
     hasher.final(&h);
     
     // Reduce modulo order (simplified - should use proper modular arithmetic)

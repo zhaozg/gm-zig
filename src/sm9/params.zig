@@ -46,7 +46,7 @@ pub const SystemParams = struct {
         };
         
         // G1 generator P1 (compressed format)
-        var P1_bytes = [33]u8{0x02}; // 0x02 prefix for compressed point
+        var P1_bytes = [_]u8{0x02} ++ [_]u8{0} ** 32; // 0x02 prefix for compressed point
         const P1_x = [32]u8{
             0x93, 0xDE, 0x05, 0x1D, 0x62, 0xBF, 0x71, 0x8F, 
             0xF5, 0xED, 0x07, 0x04, 0x48, 0x7D, 0x01, 0xD6, 
@@ -186,7 +186,7 @@ pub const EncryptMasterKeyPair = struct {
     /// Generate new encryption master key pair
     pub fn generate(params: SystemParams) EncryptMasterKeyPair {
         // Generate random private key s ∈ [1, N-1]
-        var private_key = [32]u8{0};
+        var private_key = [_]u8{0} ** 32;
         var public_key = [33]u8{0};
         
         // Simple placeholder random generation - should use proper random generation

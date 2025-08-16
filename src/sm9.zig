@@ -33,12 +33,6 @@ const std = @import("std");
 // Export the main SM9 interface module
 pub usingnamespace @import("sm9/mod.zig");
 
-// Re-export core modules for direct access
-pub const params = @import("sm9/params.zig");
-pub const key_extract = @import("sm9/key_extract.zig");
-pub const sign = @import("sm9/sign.zig");
-pub const encrypt = @import("sm9/encrypt.zig");
-
 // Version information
 pub const version = .{
     .major = 1,
