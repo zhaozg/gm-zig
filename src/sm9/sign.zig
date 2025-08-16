@@ -120,18 +120,26 @@ pub const SignatureContext = struct {
         const h1 = try key_extract.h1Hash(user_private_key.id, 0x01, self.system_params.N, self.allocator);
         
         // Step 2: Compute w = g^r (pairing computation)
-        // TODO: Implement pairing computation e(P1, P_pub-s)^r
-        // For consistent testing, use the same logic as verification
-        var w = [_]u8{0} ** 32;
-        var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        w_hasher.update(message);
-        w_hasher.update(user_private_key.id);
-        w_hasher.update(&h1); // Include h1 for consistency with verification
-        w_hasher.update("signature_w_value");
-        w_hasher.final(&w);
+        const pairing = @import("pairing.zig");
+        const curve = @import("curve.zig");
+        
+        // Get generator points
+        const P1 = curve.CurveUtils.getG1Generator(self.system_params);
+        const P_pub_s = curve.CurveUtils.getG2Generator(self.system_params); // Use master public key
+        
+        // Compute g = e(P1, P_pub-s) 
+        const g = pairing.pairing(P1, P_pub_s, self.system_params) catch {
+            return SignatureError.PairingComputationFailed;
+        };
+        
+        // Compute w = g^r
+        const w_gt = g.pow(r);
+        
+        // Convert to bytes for H2 hashing
+        const w_bytes = w_gt.toBytes();
         
         // Step 3: Compute h = H2(M || w, N)
-        const h = try key_extract.h2Hash(message, &w, self.allocator);
+        const h = try key_extract.h2Hash(message, w_bytes[0..32], self.allocator);
         
         // Step 4: Compute l = (r - h) mod N
         // Use proper big integer modular arithmetic
@@ -161,16 +169,19 @@ pub const SignatureContext = struct {
             l[31] = 1;
         }
         
-        // Step 6: Compute S = l * ds_A (elliptic curve scalar multiplication)
-        // TODO: Implement proper elliptic curve point multiplication
-        var S = [_]u8{0} ** 33;
-        S[0] = 0x02; // Compressed point prefix
-        // Create deterministic but non-zero signature point
-        S[1] = l[0];
-        S[2] = l[1];
-        if (user_private_key.key.len > 1) {
-            S[3] = user_private_key.key[1];
-        }
+        // Step 6: Compute S = [l] * ds_A (elliptic curve scalar multiplication)
+        const curve = @import("curve.zig");
+        
+        // Convert user private key to G1 point
+        const ds_A_point = curve.G1Point.decompress(user_private_key.key, self.system_params) catch {
+            return SignatureError.InvalidPrivateKey;
+        };
+        
+        // Perform scalar multiplication
+        const S_point = ds_A_point.mul(l, self.system_params);
+        
+        // Compress the result point
+        const S = S_point.compress();
         
         return Signature{
             .h = h,

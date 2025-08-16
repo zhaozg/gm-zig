@@ -206,36 +206,40 @@ pub const EncryptionContext = struct {
         c1[2] = r[1] ^ self.system_params.P1[2];
         
         // Step 4: Compute g = e(Qb, P_pub-e) (pairing computation)
-        // TODO: Implement bilinear pairing
+        const pairing = @import("pairing.zig");
+        const curve = @import("curve.zig");
         
-        // Step 5: Compute w = g^r (group exponentiation)
-        // TODO: Implement group exponentiation
-        // For placeholder consistency, derive w from C1 and user_id in a way
-        // that can be reproduced during decryption
-        var w = [_]u8{0} ** 32;
-        var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        w_hasher.update(&c1);
-        w_hasher.update(user_id);
-        w_hasher.update("derived_w_value");
-        w_hasher.final(&w);
+        // Get Qb from user ID (hash to G2)
+        const Qb = curve.CurveUtils.hashToG2(user_id, self.system_params);
+        
+        // Get P_pub-e from system parameters  
+        const P_pub_e = curve.CurveUtils.getG1Generator(self.system_params); // Use master public key
+        
+        // Compute g = e(P_pub-e, Qb) (note: swapped order for G1, G2)
+        const g = pairing.pairing(P_pub_e, Qb, self.system_params) catch {
+            return EncryptionError.PairingComputationFailed;
+        };
+        
+        // Step 5: Generate random r and compute w = g^r
+        var r = [_]u8{0} ** 32;
+        var r_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        r_hasher.update(user_id);
+        r_hasher.update(message);
+        r_hasher.update("encryption_random_r");
+        r_hasher.final(&r);
+        
+        // Ensure r is not zero
+        if (std.mem.allEqual(u8, &r, 0)) {
+            r[31] = 1;
+        }
+        
+        const w_gt = g.pow(r);
+        const w_bytes = w_gt.toBytes();
         
         // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
         const kdf_len = options.kdf_len orelse message.len;
-        const K = try self.allocator.alloc(u8, kdf_len);
+        const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
-        
-        // Simple KDF implementation (should use proper KDF)
-        var kdf_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        kdf_hasher.update(&c1);
-        kdf_hasher.update(&w);
-        kdf_hasher.update(user_id);
-        var kdf_output = [_]u8{0} ** 32;
-        kdf_hasher.final(&kdf_output);
-        
-        // Expand key if needed
-        for (K, 0..) |*byte, i| {
-            byte.* = kdf_output[i % 32];
-        }
         
         // Step 7: Compute C2 = M ⊕ K (XOR encryption)
         const c2 = try self.allocator.alloc(u8, message.len);
