@@ -16,48 +16,63 @@ pub const HashError = error{
 /// SM9 H1 hash function for key derivation
 /// H1: {0,1}* × {0,1}* × Z+ → Z*_N
 /// Used to hash identity and additional data to an integer mod N
+/// Implementation follows GM/T 0044-2016 specification more closely
 pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
     
-    // Step 1: Initialize hash context
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    // Step 1: Prepare input according to GM/T 0044-2016
+    // Input format: data || HID || counter (4 bytes)
+    var counter: u32 = 1;
+    var result: [32]u8 = undefined;
     
-    // Step 2: Hash input data with HID byte
-    hasher.update(data);
-    hasher.update(&[1]u8{hid});
+    // Step 2: Use iterative hashing until result is in valid range
+    var attempts: u32 = 0;
+    const max_attempts: u32 = 256;
     
-    // Step 3: Add fixed suffix for H1 
-    hasher.update("SM9_H1_HASH_FUNCTION");
+    while (attempts < max_attempts) : (attempts += 1) {
+        // Initialize hash context
+        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        
+        // Hash input data
+        hasher.update(data);
+        
+        // Add HID byte (0x01 for signature, 0x02 for encryption)
+        hasher.update(&[1]u8{hid});
+        
+        // Add counter in big-endian format
+        const counter_bytes = [4]u8{
+            @as(u8, @intCast((counter >> 24) & 0xFF)),
+            @as(u8, @intCast((counter >> 16) & 0xFF)),
+            @as(u8, @intCast((counter >> 8) & 0xFF)),
+            @as(u8, @intCast(counter & 0xFF)),
+        };
+        hasher.update(&counter_bytes);
+        
+        // Compute hash
+        hasher.final(&result);
+        
+        // Check if result is in valid range [1, N-1]
+        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
+            return result;
+        }
+        
+        // Try next counter value
+        counter += 1;
+    }
     
-    // Step 4: Compute initial hash
-    var initial_hash: [32]u8 = undefined;
-    hasher.final(&initial_hash);
-    
-    // Step 5: Reduce modulo order N using iterative method
-    // This is a simplified reduction - proper implementation would use
-    // barrett reduction or Montgomery arithmetic
-    var result = initial_hash;
-    
-    // Ensure result is less than order N
+    // Fallback: ensure result is in valid range using modular reduction
+    const reduction_result = result;
     var reduction_iterations: u32 = 0;
-    const max_reduction_iterations: u32 = 256; // Should be enough for 256-bit numbers
+    const max_reduction_iterations: u32 = 256;
     
-    while (!bigint.lessThan(result, order) and reduction_iterations < max_reduction_iterations) {
-        // If result >= N, compute result = result - N
-        const sub_result = bigint.sub(result, order);
-        if (sub_result.borrow) break; // Shouldn't happen in valid cases
+    while (!bigint.lessThan(reduction_result, order) and reduction_iterations < max_reduction_iterations) {
+        const sub_result = bigint.sub(reduction_result, order);
+        if (sub_result.borrow) break;
         result = sub_result.result;
         reduction_iterations += 1;
     }
     
-    // If we hit max iterations, use a simple fallback
-    if (reduction_iterations >= max_reduction_iterations) {
-        // Just use the original hash result without reduction
-        // This shouldn't happen in practice but prevents infinite loops
-        result = initial_hash;
-    }
-    
-    // Step 6: Ensure result is not zero (required by SM9 spec)
+    // Ensure result is not zero (required by SM9 spec)
     if (bigint.isZero(result)) {
         result[31] = 1; // Set to 1 if zero
     }
@@ -68,26 +83,40 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 /// SM9 H2 hash function for signature and encryption
 /// H2: {0,1}* × {0,1}* → Z*_N
 /// Used to hash message and additional data for signature/encryption
+/// Implementation follows GM/T 0044-2016 specification more closely
 pub fn h2Hash(message: []const u8, additional_data: []const u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
     
-    // Step 1: Initialize hash context
+    // Step 1: Prepare input according to GM/T 0044-2016
+    // For H2, we hash message || additional_data directly
     var hasher = std.crypto.hash.sha2.Sha256.init(.{});
     
-    // Step 2: Hash message and additional data
+    // Step 2: Hash message data
     hasher.update(message);
+    
+    // Step 3: Hash additional data (e.g., ciphertext components)
     hasher.update(additional_data);
     
-    // Step 3: Add fixed suffix for H2
-    hasher.update("SM9_H2_HASH_FUNCTION");
+    // Step 4: Add domain separation for H2
+    const h2_suffix = "SM9H2";
+    hasher.update(h2_suffix);
     
-    // Step 4: Compute hash
+    // Step 5: Compute hash
     var result: [32]u8 = undefined;
     hasher.final(&result);
     
-    // Step 5: Ensure result is not zero
+    // Step 6: Ensure result is not zero (required by SM9 spec)
     if (bigint.isZero(result)) {
-        result[31] = 1; // Set to 1 if zero
+        // If result is zero, hash again with additional entropy
+        var retry_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        retry_hasher.update(&result);
+        retry_hasher.update("RETRY_H2");
+        retry_hasher.final(&result);
+        
+        // Ensure it's still not zero
+        if (bigint.isZero(result)) {
+            result[31] = 1; // Set to 1 as final fallback
+        }
     }
     
     return result;

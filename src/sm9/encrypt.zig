@@ -191,8 +191,31 @@ pub const EncryptionContext = struct {
         user_id: key_extract.UserId,
         options: EncryptionOptions,
     ) !Ciphertext {
+        // Input validation
+        if (message.len == 0) {
+            return EncryptionError.InvalidMessage;
+        }
+        if (user_id.len == 0) {
+            return EncryptionError.InvalidUserId;
+        }
+        if (message.len > 0xFFFFFF) { // Reasonable limit for message size
+            return EncryptionError.InvalidMessage;
+        }
+        
         // Step 1: Compute Qb = H1(ID_B || hid, N) * P1 + P_pub-e
         const h1_result = try key_extract.h1Hash(user_id, 0x03, self.system_params.N, self.allocator);
+        
+        // Validate H1 result is not zero
+        var h1_is_zero = true;
+        for (h1_result) |byte| {
+            if (byte != 0) {
+                h1_is_zero = false;
+                break;
+            }
+        }
+        if (h1_is_zero) {
+            return EncryptionError.KeyDerivationFailed;
+        }
         
         // TODO: Implement elliptic curve point operations
         // For now, create a deterministic Qb point

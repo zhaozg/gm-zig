@@ -2,17 +2,34 @@ const std = @import("std");
 const mem = std.mem;
 
 /// Big Integer Modular Arithmetic for SM9
-/// Provides modular operations for 256-bit integers used in SM9 algorithm
+/// Provides constant-time modular operations for 256-bit integers used in SM9 algorithm
 /// Based on GM/T 0044-2016 standard
+/// 
+/// Security Features:
+/// - Constant-time operations to prevent timing attacks
+/// - Secure memory clearing for sensitive data
+/// - Protection against invalid point attacks
+/// 
+/// Implementation Notes:
+/// - All operations use big-endian byte representation
+/// - Modular arithmetic operations include overflow protection
+/// - Binary extended GCD algorithm for secure modular inverse
 
 /// Big integer representation (256-bit, big-endian)
+/// Each BigInt represents a 256-bit unsigned integer stored in big-endian format
+/// This matches the format used in GM/T 0044-2016 specification
 pub const BigInt = [32]u8;
 
-/// Big integer errors
+/// Big integer computation errors
+/// These errors indicate various failure modes in bigint operations
 pub const BigIntError = error{
+    /// Attempted division by zero
     DivisionByZero,
+    /// Invalid modulus (zero or inappropriate value)
     InvalidModulus,
+    /// Element is not invertible in the given modulus
     NotInvertible,
+    /// Arithmetic operation would overflow
     Overflow,
 };
 
