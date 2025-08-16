@@ -292,23 +292,10 @@ pub const EncryptionContext = struct {
         w_hasher.update("derived_w_value");
         w_hasher.final(&w);
         
-        // Step 3: Compute K = KDF(C1 || w || ID_B, klen)
+        // Step 3: Compute K = KDF(w, klen) using the same method as encryption
         const kdf_len = ciphertext.c2.len;
-        const K = try self.allocator.alloc(u8, kdf_len);
+        const K = try EncryptionUtils.kdf(w[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
-        
-        // Simple KDF implementation (should use proper KDF)
-        var kdf_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        kdf_hasher.update(&ciphertext.c1);
-        kdf_hasher.update(&w);
-        kdf_hasher.update(user_private_key.id);
-        var kdf_output = [_]u8{0} ** 32;
-        kdf_hasher.final(&kdf_output);
-        
-        // Expand key if needed
-        for (K, 0..) |*byte, i| {
-            byte.* = kdf_output[i % 32];
-        }
         
         // Step 4: Compute M' = C2 ⊕ K (XOR decryption)
         const plaintext = try self.allocator.alloc(u8, ciphertext.c2.len);
