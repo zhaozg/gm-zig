@@ -15,6 +15,10 @@ pub const KeyExtractionError = error{
     InvalidUserId,
     InvalidMasterKey,
     InvalidKeyLength,
+    InvalidHashInput,
+    ZeroKeyValue,
+    KeyGenerationFailed,
+    MemoryAllocationFailed,
 };
 
 /// SM9 user private key for signature
@@ -300,16 +304,7 @@ pub const UserPublicKey = struct {
     }
 };
 
-/// Key extraction errors
-pub const KeyExtractionError = error{
-    InvalidUserId,
-    InvalidMasterKey,
-    InvalidHashInput,
-    ZeroKeyValue,
-    KeyGenerationFailed,
-    InvalidKeyLength,
-    MemoryAllocationFailed,
-};
+
 
 /// Key extraction context for batch operations
 pub const KeyExtractionContext = struct {

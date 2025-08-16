@@ -9,10 +9,20 @@ const key_extract = @import("key_extract.zig");
 
 /// Encryption/Decryption errors
 pub const EncryptionError = error{
+    InvalidMessage,
+    InvalidUserId,
+    InvalidPrivateKey,
     InvalidCiphertext,
+    InvalidCiphertextLength,
     DecryptionFailed,
     InvalidPlaintext,
     KeyDerivationFailed,
+    RandomGenerationFailed,
+    PairingComputationFailed,
+    KDFComputationFailed,
+    HashComputationFailed,
+    AuthenticationFailed,
+    MemoryAllocationFailed,
 };
 
 /// SM9 ciphertext format options
@@ -392,20 +402,7 @@ pub const KEMContext = struct {
     }
 };
 
-/// SM9 encryption errors
-pub const EncryptionError = error{
-    InvalidMessage,
-    InvalidUserId,
-    InvalidPrivateKey,
-    InvalidCiphertext,
-    InvalidCiphertextLength,
-    RandomGenerationFailed,
-    PairingComputationFailed,
-    KDFComputationFailed,
-    HashComputationFailed,
-    AuthenticationFailed,
-    MemoryAllocationFailed,
-};
+
 
 /// Utility functions for SM9 encryption
 pub const EncryptionUtils = struct {
