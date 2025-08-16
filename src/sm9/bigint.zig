@@ -255,7 +255,8 @@ pub fn fromHex(hex: []const u8) !BigInt {
     if (hex.len > 64) return error.InvalidLength;
     
     var result = [_]u8{0} ** 32;
-    const start_index = if (hex.len <= 64) 32 - (hex.len + 1) / 2 else 0;
+    const hex_bytes = (hex.len + 1) / 2; // Number of bytes this hex string represents
+    const start_index = 32 - hex_bytes; // Start from the end (big-endian)
     
     var i: usize = 0;
     while (i < hex.len) : (i += 2) {

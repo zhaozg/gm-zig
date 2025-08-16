@@ -163,7 +163,7 @@ pub fn expandedKdf(
     var offset: usize = 0;
     var counter: u8 = 1;
     var previous_block: [32]u8 = undefined;
-    std.mem.set(u8, &previous_block, 0);
+    @memset(&previous_block, 0);
     
     var i: u8 = 0;
     while (i < num_blocks) : (i += 1) {

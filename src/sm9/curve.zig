@@ -138,7 +138,8 @@ pub const G1Point = struct {
     }
     
     /// Convert to affine coordinates
-    pub fn toAffine(self: G1Point, _: params.SystemParams) G1Point {
+    pub fn toAffine(self: G1Point, curve_params: params.SystemParams) G1Point {
+        _ = curve_params;
         if (self.isInfinity()) return G1Point.infinity();
         
         // If z == 1, already in affine form
@@ -190,7 +191,8 @@ pub const G1Point = struct {
     }
     
     /// Decompress point from 33 bytes
-    pub fn decompress(compressed: [33]u8, _: params.SystemParams) !G1Point {
+    pub fn decompress(compressed: [33]u8, curve_params: params.SystemParams) !G1Point {
+        _ = curve_params;
         if (compressed[0] == 0x00) {
             return G1Point.infinity();
         }
@@ -357,7 +359,8 @@ pub const G2Point = struct {
     }
     
     /// Decompress point from 65 bytes
-    pub fn decompress(compressed: [65]u8, _: params.SystemParams) !G2Point {
+    pub fn decompress(compressed: [65]u8, curve_params: params.SystemParams) !G2Point {
+        _ = curve_params;
         if (compressed[0] == 0x00) {
             return G2Point.infinity();
         }
@@ -417,7 +420,8 @@ pub const CurveUtils = struct {
     }
     
     /// Hash to G1 point (simplified)
-    pub fn hashToG1(data: []const u8, _: params.SystemParams) G1Point {
+    pub fn hashToG1(data: []const u8, curve_params: params.SystemParams) G1Point {
+        _ = curve_params;
         // Simple hash-to-point implementation
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(data);
@@ -433,7 +437,8 @@ pub const CurveUtils = struct {
     }
     
     /// Hash to G2 point (simplified)
-    pub fn hashToG2(data: []const u8, _: params.SystemParams) G2Point {
+    pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) G2Point {
+        _ = curve_params;
         // Simple hash-to-point implementation
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(data);

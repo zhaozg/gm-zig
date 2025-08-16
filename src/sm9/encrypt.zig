@@ -243,7 +243,7 @@ pub const EncryptionContext = struct {
         
         // Step 7: Compute C2 = M ⊕ K (XOR encryption)
         const c2 = try self.allocator.alloc(u8, message.len);
-        defer self.allocator.free(c2);  // Free immediately after use
+        // Note: c2 ownership will be transferred to Ciphertext
         
         for (message, c2, 0..) |m_byte, *c_byte, i| {
             c_byte.* = m_byte ^ K[i % K.len];
