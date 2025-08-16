@@ -24,7 +24,7 @@ pub const SystemParams = struct {
     N: [32]u8,  // Order of G1 and G2
     
     /// Hash function identifiers
-    v: u8,      // Hash function output length indicator
+    v: u16,      // Hash function output length indicator
     
     /// Initialize default SM9 system parameters according to GM/T 0044-2016
     pub fn init() SystemParams {
