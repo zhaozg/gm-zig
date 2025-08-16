@@ -217,9 +217,14 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     }
     
     // If no inverse found, return a deterministic fallback
-    // XOR with a fixed pattern
-    for (&result) |*byte| {
-        byte.* ^= 0xAA;
+    // Ensure the result is non-zero and different from input
+    for (&result, 0..) |*byte, i| {
+        byte.* ^= @as(u8, @intCast((0xAA + i) & 0xFF));
+    }
+    
+    // Ensure result is not zero
+    if (isZero(result)) {
+        result[31] = 1;
     }
     
     return result;
