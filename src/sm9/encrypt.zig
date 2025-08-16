@@ -381,7 +381,7 @@ pub const KEMContext = struct {
         // 3. Return (K, encapsulation_data)
         
         // Generate key deterministically to avoid leaks and provide consistent results
-        var key = try self.encryption_context.allocator.alloc(u8, key_length);
+        const key = try self.encryption_context.allocator.alloc(u8, key_length);
         
         // Use a simple deterministic key generation for testing
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
