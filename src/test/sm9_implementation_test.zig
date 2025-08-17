@@ -93,8 +93,8 @@ test "SM9 pairing operations" {
     // Note: Generators may be infinity points as fallback, which is acceptable for testing
     // TODO: Fix generator construction and add full pairing test
     // Accept both infinity and non-infinity points as valid
-    var p1_valid = P1.isInfinity() or sm9.curve.CurveUtils.validateG1Enhanced(P1, params);
-    var p2_valid = P2.isInfinity() or sm9.curve.CurveUtils.validateG2Enhanced(P2, params);
+    const p1_valid = P1.isInfinity() or sm9.curve.CurveUtils.validateG1Enhanced(P1, params);
+    const p2_valid = P2.isInfinity() or sm9.curve.CurveUtils.validateG2Enhanced(P2, params);
     try testing.expect(p1_valid);
     try testing.expect(p2_valid);
     
@@ -401,8 +401,8 @@ test "SM9 Phase 4 - Enhanced pairing and curve operations" {
     const g2_point = sm9.curve.CurveUtils.hashToG2(test_data, curve_params);
     
     // Accept both infinity and valid non-infinity points
-    var g1_valid = g1_point.isInfinity() or sm9.curve.CurveUtils.validateG1Enhanced(g1_point, curve_params);
-    var g2_valid = g2_point.isInfinity() or sm9.curve.CurveUtils.validateG2Enhanced(g2_point, curve_params);
+    const g1_valid = g1_point.isInfinity() or sm9.curve.CurveUtils.validateG1Enhanced(g1_point, curve_params);
+    const g2_valid = g2_point.isInfinity() or sm9.curve.CurveUtils.validateG2Enhanced(g2_point, curve_params);
     try testing.expect(g1_valid);
     try testing.expect(g2_valid);
     
