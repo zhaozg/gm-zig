@@ -2,6 +2,13 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
+// Minimal test to check if basic imports work
+test "SM9 basic import test" {
+    // Test that we can access the modules
+    const zero = [_]u8{0} ** 32;
+    try testing.expect(sm9.bigint.isZero(zero));
+}
+
 // Test constant-time operations for timing attack resistance
 test "SM9 constant-time operations" {
     // Test constant-time equality
