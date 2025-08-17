@@ -1,6 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
-const sm9 = @import("../../sm9.zig");
+const sm9 = @import("../sm9.zig");
 
 test "SM9 Field Operations - Binary Extended Euclidean Algorithm" {
     const params = sm9.params.SystemParams.init();

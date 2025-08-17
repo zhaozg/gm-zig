@@ -216,7 +216,7 @@ pub fn secureRandomScalar(curve_params: params.SystemParams) RandomError!bigint.
 /// Key derivation from entropy
 /// Derives multiple independent keys from a master entropy source
 pub fn deriveKeys(master_entropy: []const u8, count: u32, allocator: std.mem.Allocator) ![]bigint.BigInt {
-    var keys = try allocator.alloc(bigint.BigInt, count);
+    const keys = try allocator.alloc(bigint.BigInt, count);
     
     for (keys, 0..) |*key, i| {
         var hasher = crypto.hash.sha2.Sha256.init(.{});

@@ -1,6 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
-const sm9 = @import("../../sm9.zig");
+const sm9 = @import("../sm9.zig");
 
 test "SM9 Curve Operations - G1 Point Creation and Validation" {
     const params = sm9.params.SystemParams.init();
@@ -125,12 +125,12 @@ test "SM9 Curve Operations - G2 Point Uncompressed Format" {
     }
     
     // Test infinity format
-    var inf_uncompressed = [_]u8{0x00} ++ [_]u8{0} ** 64;
+    const inf_uncompressed = [_]u8{0x00} ++ [_]u8{0} ** 64;
     const inf_point = try sm9.curve.G2Point.fromUncompressed(inf_uncompressed);
     try testing.expect(inf_point.isInfinity());
     
     // Test invalid format
-    var invalid_uncompressed = [_]u8{0x05} ++ [_]u8{0} ** 64; // Invalid prefix
+    const invalid_uncompressed = [_]u8{0x05} ++ [_]u8{0} ** 64; // Invalid prefix
     const invalid_result = sm9.curve.G2Point.fromUncompressed(invalid_uncompressed);
     try testing.expectError(error.InvalidPointFormat, invalid_result);
 }

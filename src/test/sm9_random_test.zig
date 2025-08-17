@@ -1,11 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
-const sm9 = @import("../../sm9.zig");
+const sm9 = @import("../sm9.zig");
 
 test "SM9 Random Number Generation - Secure Random" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){}; 
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
     
     const params = sm9.params.SystemParams.init();
     
@@ -165,7 +164,6 @@ test "SM9 Random Number Generation - Entropy Pool" {
     
     // Note: This might be the same due to deterministic implementation
     // but the interface is tested
-    _ = output3;
 }
 
 test "SM9 Random Number Generation - Test Entropy" {

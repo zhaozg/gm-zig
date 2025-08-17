@@ -77,23 +77,7 @@ pub const G1Point = struct {
         return G1Point.affine(x, y);
     }
     
-    /// Compress G1 point to 33 bytes
-    pub fn compress(self: G1Point) [33]u8 {
-        var result = [_]u8{0} ** 33;
-        
-        if (self.isInfinity()) {
-            result[0] = 0x00;
-            return result;
-        }
-        
-        const affine_pt = self.toAffineSimple();
-        
-        // Determine y parity and set prefix
-        result[0] = if ((affine_pt.y[31] & 1) == 0) 0x02 else 0x03;
-        std.mem.copyForwards(u8, result[1..33], &affine_pt.x);
-        
-        return result;
-    }
+
     
     /// Check if point is at infinity
     pub fn isInfinity(self: G1Point) bool {
