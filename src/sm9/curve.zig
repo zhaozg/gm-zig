@@ -562,22 +562,20 @@ pub const CurveUtils = struct {
     
     /// Hash to G1 point (simplified)
     pub fn hashToG1(data: []const u8, curve_params: params.SystemParams) G1Point {
-        _ = curve_params;
         _ = data;
         
         // Return the generator point for now (simplified implementation)
         // In a real implementation, this would use proper hash-to-curve algorithm
-        return G1Point.generator();
+        return CurveUtils.getG1Generator(curve_params);
     }
     
     /// Hash to G2 point (simplified)
     pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) G2Point {
-        _ = curve_params;
         _ = data;
         
         // Return the generator point for now (simplified implementation)
         // In a real implementation, this would use proper hash-to-curve algorithm
-        return G2Point.generator();
+        return CurveUtils.getG2Generator(curve_params);
     }
     
     /// Enhanced scalar multiplication with security features
