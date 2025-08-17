@@ -24,14 +24,14 @@ pub const RandomError = error{
 
 /// Cryptographically secure random number generator
 pub const SecureRandom = struct {
-    rng: std.rand.Random,
+    rng: std.Random,
     
     /// Initialize with system entropy
     pub fn init() SecureRandom {
         var seed: u64 = undefined;
         crypto.random.bytes(std.mem.asBytes(&seed));
         
-        var prng = std.rand.DefaultPrng.init(seed);
+        var prng = std.Random.DefaultPrng.init(seed);
         return SecureRandom{
             .rng = prng.random(),
         };
@@ -39,7 +39,7 @@ pub const SecureRandom = struct {
     
     /// Initialize with provided seed (for testing)
     pub fn initWithSeed(seed: u64) SecureRandom {
-        var prng = std.rand.DefaultPrng.init(seed);
+        var prng = std.Random.DefaultPrng.init(seed);
         return SecureRandom{
             .rng = prng.random(),
         };
@@ -190,9 +190,7 @@ pub const DeterministicRandom = struct {
 
 /// Generate cryptographically secure random bytes
 pub fn secureRandomBytes(buffer: []u8) RandomError!void {
-    crypto.random.bytes(buffer) catch {
-        return RandomError.EntropyFailure;
-    };
+    crypto.random.bytes(buffer);
 }
 
 /// Generate secure random BigInt in range [1, max)

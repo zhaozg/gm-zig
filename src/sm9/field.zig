@@ -48,6 +48,7 @@ pub const FieldError = error{
     NotInvertible,
     DivisionByZero,
     InvalidElement,
+    Overflow,
 };
 
 /// Binary Extended Euclidean Algorithm for modular inverse
