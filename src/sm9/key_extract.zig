@@ -88,9 +88,9 @@ pub const SignUserPrivateKey = struct {
                 // Final fallback: use a fixed adjustment
                 adjusted_t1 = t1;
                 adjusted_t1[31] = adjusted_t1[31] ^ 1;
-                bigint.invMod(adjusted_t1, system_params.N) catch {
+                return bigint.invMod(adjusted_t1, system_params.N) catch {
                     return KeyExtractionError.KeyGenerationFailed;
-                }
+                };
             };
         };
         
@@ -219,9 +219,9 @@ pub const EncryptUserPrivateKey = struct {
                 // Final fallback: use a fixed adjustment
                 adjusted_t2 = t2;
                 adjusted_t2[31] = adjusted_t2[31] ^ 1;
-                bigint.invMod(adjusted_t2, system_params.N) catch {
+                return bigint.invMod(adjusted_t2, system_params.N) catch {
                     return KeyExtractionError.KeyGenerationFailed;
-                }
+                };
             };
         };
         
