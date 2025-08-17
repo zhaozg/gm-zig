@@ -568,6 +568,7 @@ pub const CurveUtils = struct {
         // Return the generator point for now (simplified implementation)
         // In a real implementation, this would use proper hash-to-curve algorithm
         return G1Point.generator();
+    }
     
     /// Hash to G2 point (simplified)
     pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) G2Point {
