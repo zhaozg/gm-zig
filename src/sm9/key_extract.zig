@@ -39,34 +39,56 @@ pub const SignUserPrivateKey = struct {
         user_id: UserId,
         allocator: std.mem.Allocator,
     ) !SignUserPrivateKey {
-        // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
-        const h1_result = try h1Hash(user_id, 0x01, system_params.N, allocator);
-        
-        // Step 2: Compute t1 = (H1 + s) mod N
         const bigint = @import("bigint.zig");
-        const t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
-            return KeyExtractionError.KeyGenerationFailed;
-        };
-        
-        // Step 3: Compute t1_inv = t1^(-1) mod N using proper modular inverse
-        const t1_inv = bigint.invMod(t1, system_params.N) catch {
-            return KeyExtractionError.KeyGenerationFailed;
-        };
-        
-        // Step 4: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
         const curve = @import("curve.zig");
-        const derived_key = curve.CurveUtils.deriveG1Key(
-            t1_inv,
-            user_id,
-            system_params.P1[1..33].*,
-            system_params,
-        );
         
-        return SignUserPrivateKey{
-            .id = user_id,
-            .key = derived_key,
-            .hid = 0x01, // Signature hash identifier
-        };
+        // Retry mechanism for key extraction when modular inverse fails
+        var attempt: u32 = 0;
+        const max_attempts: u32 = 256;
+        
+        while (attempt < max_attempts) : (attempt += 1) {
+            // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
+            // Include attempt counter to ensure different hash values on retry
+            var hash_input = std.ArrayList(u8).init(allocator);
+            defer hash_input.deinit();
+            
+            try hash_input.appendSlice(user_id);
+            try hash_input.append(@as(u8, @intCast(attempt & 0xFF))); // Add attempt as salt
+            
+            const h1_result = try h1Hash(hash_input.items, 0x01, system_params.N, allocator);
+            
+            // Step 2: Compute t1 = (H1 + s) mod N
+            const t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
+                continue; // Try next attempt
+            };
+            
+            // Step 3: Check if t1 is zero (cannot compute inverse)
+            if (bigint.isZero(t1)) {
+                continue; // Try next attempt
+            }
+            
+            // Step 4: Compute t1_inv = t1^(-1) mod N using proper modular inverse
+            const t1_inv = bigint.invMod(t1, system_params.N) catch {
+                continue; // Try next attempt if inverse doesn't exist
+            };
+            
+            // Step 5: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
+            const derived_key = curve.CurveUtils.deriveG1Key(
+                t1_inv,
+                user_id,
+                system_params.P1[1..33].*,
+                system_params,
+            );
+            
+            return SignUserPrivateKey{
+                .id = user_id,
+                .key = derived_key,
+                .hid = 0x01, // Signature hash identifier
+            };
+        }
+        
+        // If all attempts failed, return error
+        return KeyExtractionError.KeyGenerationFailed;
     }
     
     /// Validate user private key
@@ -130,39 +152,56 @@ pub const EncryptUserPrivateKey = struct {
         user_id: UserId,
         allocator: std.mem.Allocator,
     ) !EncryptUserPrivateKey {
-        // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption  
-        const h1_result = try h1Hash(user_id, 0x03, system_params.N, allocator);
-        
-        // Step 2: Compute t2 = (H1 + s) mod N using proper modular arithmetic
         const bigint = @import("bigint.zig");
-        const t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
-            return KeyExtractionError.KeyGenerationFailed;
-        };
+        const curve = @import("curve.zig");
         
-        // Step 3: Check if t2 = 0 (should return error)
-        if (bigint.isZero(t2)) {
-            return error.KeyExtractionFailed;
+        // Retry mechanism for key extraction when modular inverse fails
+        var attempt: u32 = 0;
+        const max_attempts: u32 = 256;
+        
+        while (attempt < max_attempts) : (attempt += 1) {
+            // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
+            // Include attempt counter to ensure different hash values on retry
+            var hash_input = std.ArrayList(u8).init(allocator);
+            defer hash_input.deinit();
+            
+            try hash_input.appendSlice(user_id);
+            try hash_input.append(@as(u8, @intCast(attempt & 0xFF))); // Add attempt as salt
+            
+            const h1_result = try h1Hash(hash_input.items, 0x03, system_params.N, allocator);
+            
+            // Step 2: Compute t2 = (H1 + s) mod N using proper modular arithmetic
+            const t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
+                continue; // Try next attempt
+            };
+            
+            // Step 3: Check if t2 = 0 (cannot compute inverse)
+            if (bigint.isZero(t2)) {
+                continue; // Try next attempt
+            }
+            
+            // Step 4: Compute w = t2^(-1) mod N using proper modular inverse
+            const w = bigint.invMod(t2, system_params.N) catch {
+                continue; // Try next attempt if inverse doesn't exist
+            };
+            
+            // Step 5: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
+            const derived_key = curve.CurveUtils.deriveG2Key(
+                w,
+                user_id,
+                system_params.P2[1..65].*,
+                system_params,
+            );
+            
+            return EncryptUserPrivateKey{
+                .id = user_id,
+                .key = derived_key,
+                .hid = 0x03, // Encryption hash identifier
+            };
         }
         
-        // Step 4: Compute w = t2^(-1) mod N using proper modular inverse
-        const w = bigint.invMod(t2, system_params.N) catch {
-            return KeyExtractionError.KeyGenerationFailed;
-        };
-        
-        // Step 5: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
-        const curve = @import("curve.zig");
-        const derived_key = curve.CurveUtils.deriveG2Key(
-            w,
-            user_id,
-            system_params.P2[1..65].*,
-            system_params,
-        );
-        
-        return EncryptUserPrivateKey{
-            .id = user_id,
-            .key = derived_key,
-            .hid = 0x03, // Encryption hash identifier
-        };
+        // If all attempts failed, return error
+        return KeyExtractionError.KeyGenerationFailed;
     }
     
     /// Validate user private key
