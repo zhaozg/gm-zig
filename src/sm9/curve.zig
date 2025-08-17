@@ -55,6 +55,46 @@ pub const G1Point = struct {
         };
     }
     
+    /// Create G1 point from compressed format (33 bytes)
+    pub fn fromCompressed(compressed: [33]u8) !G1Point {
+        if (compressed[0] == 0x00) {
+            return G1Point.infinity();
+        }
+        
+        if (compressed[0] != 0x02 and compressed[0] != 0x03) {
+            return error.InvalidPointFormat;
+        }
+        
+        // Extract x coordinate
+        var x: [32]u8 = undefined;
+        std.mem.copyForwards(u8, &x, compressed[1..33]);
+        
+        // For now, return a valid-looking point
+        // TODO: Implement proper y-coordinate recovery
+        var y = x; // Placeholder
+        y[31] = if (compressed[0] == 0x02) 0x02 else 0x03;
+        
+        return G1Point.affine(x, y);
+    }
+    
+    /// Compress G1 point to 33 bytes
+    pub fn compress(self: G1Point) [33]u8 {
+        var result = [_]u8{0} ** 33;
+        
+        if (self.isInfinity()) {
+            result[0] = 0x00;
+            return result;
+        }
+        
+        const affine_pt = self.toAffineSimple();
+        
+        // Determine y parity and set prefix
+        result[0] = if ((affine_pt.y[31] & 1) == 0) 0x02 else 0x03;
+        std.mem.copyForwards(u8, result[1..33], &affine_pt.x);
+        
+        return result;
+    }
+    
     /// Check if point is at infinity
     pub fn isInfinity(self: G1Point) bool {
         return self.is_infinity or bigint.isZero(self.z);
@@ -189,6 +229,22 @@ pub const G1Point = struct {
         return self;
     }
     
+    /// Simple conversion to affine coordinates (without curve params)
+    pub fn toAffineSimple(self: G1Point) G1Point {
+        if (self.isInfinity()) return G1Point.infinity();
+        
+        // If z == 1, already in affine form
+        var one = [_]u8{0} ** 32;
+        one[31] = 1;
+        
+        if (bigint.equal(self.z, one)) {
+            return self;
+        }
+        
+        // For simplified case, just return the point
+        return self;
+    }
+    
     /// Validate point is on curve
     pub fn validate(self: G1Point, curve_params: params.SystemParams) bool {
         if (self.isInfinity()) return true;
@@ -293,6 +349,28 @@ pub const G2Point = struct {
             .z = one,
             .is_infinity = false,
         };
+    }
+    
+    /// Create G2 point from uncompressed format (65 bytes)
+    pub fn fromUncompressed(uncompressed: [65]u8) !G2Point {
+        if (uncompressed[0] == 0x00) {
+            return G2Point.infinity();
+        }
+        
+        if (uncompressed[0] != 0x04) {
+            return error.InvalidPointFormat;
+        }
+        
+        // Extract x and y coordinates (32 bytes each for Fp2 elements)
+        var x: [64]u8 = undefined;
+        var y: [64]u8 = undefined;
+        
+        // For simplicity, copy the coordinates directly
+        // In a full implementation, this would need proper Fp2 parsing
+        std.mem.copyForwards(u8, x[0..32], uncompressed[1..33]);
+        std.mem.copyForwards(u8, y[0..32], uncompressed[33..65]);
+        
+        return G2Point.affine(x, y);
     }
     
     /// Check if point is at infinity

@@ -14,4 +14,10 @@ test {
     _ = @import("test/sm9_implementation_test.zig");
     _ = @import("test/sm9_security_test.zig");
     _ = @import("test/sm9_standard_vectors_test.zig");
+    
+    // Phase 3: Enhanced SM9 Core Operations Tests
+    _ = @import("test/sm9_field_test.zig");
+    _ = @import("test/sm9_random_test.zig");
+    _ = @import("test/sm9_curve_test.zig");
+    _ = @import("test/sm9_pairing_test.zig");
 }

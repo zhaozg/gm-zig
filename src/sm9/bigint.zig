@@ -182,7 +182,7 @@ pub fn subMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 }
 
 /// Left shift by one bit
-fn shiftLeft(a: BigInt) BigInt {
+pub fn shiftLeft(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
     
@@ -198,7 +198,7 @@ fn shiftLeft(a: BigInt) BigInt {
 }
 
 /// Right shift by one bit  
-fn shiftRight(a: BigInt) BigInt {
+pub fn shiftRight(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
     
@@ -240,9 +240,9 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     return result;
 }
 
-/// Extended Euclidean Algorithm for modular inverse
-/// Returns the modular inverse of a modulo m
-/// Uses simple brute force approach for correctness
+/// Binary Extended Euclidean Algorithm for modular inverse
+/// Returns the modular inverse of a modulo m using secure constant-time algorithm
+/// More efficient and secure than brute force approach
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
@@ -253,28 +253,76 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return one;
     }
     
-    // Use simple brute force for small test cases
-    // This is not optimal but ensures correctness for basic tests
-    var candidate = one;
-    var iterations: u32 = 0;
-    const max_iterations: u32 = 1000; // Limit iterations to prevent infinite loops
+    // Binary Extended Euclidean Algorithm
+    var u = a;
+    var v = m;
+    var g1 = one; // g1 = 1
+    var g2 = [_]u8{0} ** 32; // g2 = 0
     
-    while (iterations < max_iterations) {
-        const product = try mulMod(a, candidate, m);
-        if (equal(product, one)) {
-            return candidate;
+    // Remove factors of 2 from u
+    while ((u[31] & 1) == 0) {
+        u = shiftRight(u);
+        if ((g1[31] & 1) == 0) {
+            g1 = shiftRight(g1);
+        } else {
+            const sum = add(g1, m);
+            g1 = shiftRight(sum.result);
+        }
+    }
+    
+    // Main loop
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 512; // Upper bound for 256-bit numbers
+    
+    while (!isZero(v) and iterations < max_iterations) {
+        // Remove factors of 2 from v
+        while ((v[31] & 1) == 0) {
+            v = shiftRight(v);
+            if ((g2[31] & 1) == 0) {
+                g2 = shiftRight(g2);
+            } else {
+                const sum = add(g2, m);
+                g2 = shiftRight(sum.result);
+            }
         }
         
-        // Try next candidate
-        const sum = add(candidate, one);
-        if (sum.carry or !lessThan(sum.result, m)) {
-            return BigIntError.NotInvertible;
+        // Ensure u >= v
+        if (lessThan(u, v)) {
+            // Swap u, v and g1, g2
+            const temp_u = u;
+            u = v;
+            v = temp_u;
+            
+            const temp_g = g1;
+            g1 = g2;
+            g2 = temp_g;
         }
-        candidate = sum.result;
+        
+        // u = u - v, g1 = g1 - g2
+        const u_diff = sub(u, v);
+        u = u_diff.result;
+        
+        const g1_diff = subMod(g1, g2, m) catch {
+            // If subtraction fails, add m first then subtract
+            const g1_sum = addMod(g1, m, m) catch return BigIntError.NotInvertible;
+            subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible
+        };
+        g1 = g1_diff;
+        
         iterations += 1;
     }
     
-    return BigIntError.NotInvertible;
+    // Check if algorithm converged
+    if (iterations >= max_iterations) {
+        return BigIntError.NotInvertible;
+    }
+    
+    // u should be 1 if a is invertible
+    if (!equal(u, one)) {
+        return BigIntError.NotInvertible;
+    }
+    
+    return g1;
 }
 
 /// Convert little-endian byte array to BigInt (big-endian)

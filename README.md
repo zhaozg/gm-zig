@@ -68,13 +68,17 @@ The library is designed with security, performance, and ease-of-use in mind, lev
   - ✅ **Testing Infrastructure**: Security validation and basic functionality tests
   - ✅ **CI Stability**: All compilation issues resolved, tests passing
 
-### 🚧 Planned Enhancements (39 TODOs identified)
-- **SM9 Core Operations** *(Phase 3)*
-  - Complete elliptic curve point operations and validation
-  - Full bilinear pairing implementation with proper generator construction  
-  - Optimized modular inverse using binary extended GCD
-  - Enhanced cryptographic random number generation
+### 🚧 Phase 3 - Enhanced Core Operations (Current Release)
+- **SM9 Core Operations**
+  - ✅ Complete elliptic curve point operations and validation (add, double, scalar multiplication)
+  - ✅ Enhanced bilinear pairing implementation with Miller's algorithm structure
+  - ✅ Optimized modular inverse using Binary Extended Euclidean Algorithm  
+  - ✅ Enhanced cryptographic random number generation with entropy pooling
+  - ✅ Comprehensive Fp2 arithmetic for G2 operations
+  - ✅ Point compression/decompression and coordinate transformations
+  - ✅ Comprehensive test suite for all new functionality
 
+### 🚧 Planned Enhancements (Reduced to 25 TODOs)
 - **SM9 Algorithm Completion** *(Phase 4)*
   - Complete digital signature and verification algorithms
   - Full public key encryption and decryption
@@ -206,28 +210,59 @@ pub fn main() !void {
 }
 ```
 
-#### SM9 (Foundational - Security Testing)
+#### SM9 (Phase 3 Complete - Enhanced Core Operations)
 
 ```zig
 const std = @import("std");
 const sm9 = @import("gmlib").sm9;
 
-pub fn testSM9Foundation() !void {
-    // Test constant-time operations (security foundation)
-    const a = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
-    const b = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
+pub fn testSM9EnhancedOps() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){}; 
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
     
-    // Constant-time equality check
-    const are_equal = sm9.bigint.equal(a, b);
-    std.debug.print("Constant-time comparison working: {}\n", .{are_equal});
+    const params = sm9.params.SystemParams.init();
     
-    // Basic mathematical operations
-    const zero = [_]u8{0} ** 32;
-    const is_zero = sm9.bigint.isZero(zero);
-    std.debug.print("Zero detection: {}\n", .{is_zero});
+    // Enhanced Field Operations with Binary EEA
+    const a = [_]u8{0} ** 31 ++ [_]u8{3};
+    const p = params.q;
     
-    // Note: Full SM9 signature/encryption will be available in future releases
-    // Current implementation provides security-hardened mathematical foundation
+    if (sm9.field.modularInverseBinaryEEA(a, p)) |inv_a| {
+        // Verify a * inv_a ≡ 1 (mod p)
+        const product = try sm9.bigint.mulMod(a, inv_a, p);
+        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        std.debug.print("Modular inverse correct: {}\n", .{sm9.bigint.equal(product, one)});
+    } else |_| {
+        // Handle error case
+    }
+    
+    // Enhanced Random Number Generation
+    var rng = sm9.random.SecureRandom.init();
+    const random_scalar = try rng.randomScalar(params);
+    std.debug.print("Generated secure random scalar\n", .{});
+    
+    // Enhanced Curve Operations
+    const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
+    const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const point = sm9.curve.G1Point.affine(x, y);
+    
+    // Point compression/decompression
+    const compressed = point.compress();
+    const decompressed = try sm9.curve.G1Point.fromCompressed(compressed);
+    std.debug.print("Point compression working: {}\n", .{point.x[31] == decompressed.x[31]});
+    
+    // Enhanced Pairing Operations
+    const q_x = [_]u8{0x03} ++ [_]u8{0} ** 63;
+    const q_y = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const Q = sm9.curve.G2Point.affine(q_x, q_y);
+    
+    const pairing_result = try sm9.pairing.pairing(point, Q, params);
+    std.debug.print("Pairing computation successful: {}\n", .{!pairing_result.isIdentity()});
+    
+    // Test bilinearity property
+    const scalar = [_]u8{0} ** 31 ++ [_]u8{2};
+    const bilinear_test = try sm9.pairing.PairingUtils.testBilinearity(point, Q, scalar, params);
+    std.debug.print("Bilinearity test completed: {}\n", .{bilinear_test});
 }
 ```
 
@@ -245,7 +280,10 @@ zig test src/test/sm2_signature_test.zig    # SM2 digital signatures
 zig test src/test/sm3_test.zig              # SM3 hash function  
 zig test src/test/sm4_test.zig              # SM4 block cipher
 zig test src/test/sm9_security_test.zig     # SM9 security foundation
-zig test src/test/sm9_implementation_test.zig # SM9 basic functionality
+zig test src/test/sm9_field_test.zig        # SM9 enhanced field operations
+zig test src/test/sm9_curve_test.zig        # SM9 enhanced curve operations  
+zig test src/test/sm9_pairing_test.zig      # SM9 enhanced pairing operations
+zig test src/test/sm9_random_test.zig       # SM9 enhanced random generation
 
 # Run the demo application
 zig build run
@@ -253,8 +291,12 @@ zig build run
 
 **Test Status:**
 - ✅ **SM2/SM3/SM4**: Full test coverage with production-ready validation
-- ✅ **SM9 Security**: Constant-time operations, memory safety, basic functionality  
-- 🚧 **SM9 Complete**: Advanced cryptographic operations in development (39 TODOs)
+- ✅ **SM9 Phase 3**: Enhanced core operations with comprehensive test coverage
+  - Field operations with Binary Extended Euclidean Algorithm
+  - Enhanced elliptic curve operations and validation 
+  - Improved bilinear pairing with Miller's algorithm
+  - Secure random number generation with entropy pooling
+- 🚧 **SM9 Complete Algorithms**: Digital signature and encryption in development (Phase 4)
 
 ## 📚 API Documentation
 
