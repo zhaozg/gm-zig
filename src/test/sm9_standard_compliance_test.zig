@@ -293,7 +293,6 @@ test "GM/T 0044-2016 - Performance and security validation" {
     const sign_context = sm9.sign.SignatureContext.init(system, allocator);
     
     const user_id = "performance_test@bupt.edu.cn";
-    const message = "Performance and security validation test";
     
     // Test batch key extraction (should be efficient)
     const batch_size = 10;

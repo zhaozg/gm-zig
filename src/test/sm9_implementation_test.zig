@@ -241,7 +241,6 @@ test "SM9 complete workflow" {
 test "SM9 Phase 4 - Enhanced mathematical correctness" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
     
     // Test enhanced modular arithmetic
     const a = sm9.bigint.fromU64(0x123456789ABCDEF0);
@@ -380,7 +379,6 @@ test "SM9 Phase 4 - Enhanced encryption operations" {
 test "SM9 Phase 4 - Enhanced pairing and curve operations" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
     
     const system = sm9.params.SM9System.init();
     const curve_params = system.params;
@@ -506,7 +504,6 @@ test "SM9 Phase 4 - DER signature encoding and validation" {
 test "SM9 Phase 4 - Enhanced curve operations and key derivation" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
     
     const system = sm9.params.SM9System.init();
     const curve_params = system.params;

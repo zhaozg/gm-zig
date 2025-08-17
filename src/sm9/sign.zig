@@ -111,7 +111,8 @@ pub const Signature = struct {
         offset += h_length;
         
         // Read S OCTET STRING
-        if (offset >= der_bytes.len || der_bytes[offset] != 0x04) return error.InvalidSignatureFormat;
+        if (offset >= der_bytes.len) return error.InvalidSignatureFormat;
+        if (der_bytes[offset] != 0x04) return error.InvalidSignatureFormat;
         offset += 1;
         
         const s_length = der_bytes[offset];

@@ -608,7 +608,7 @@ pub const CurveUtils = struct {
         }
         
         var result = G1Point.infinity();
-        var addend = point;
+        const addend = point;
         
         // Process all bits to maintain constant time
         var byte_index: usize = 0;
@@ -636,7 +636,7 @@ pub const CurveUtils = struct {
         }
         
         var result = G2Point.infinity();
-        var addend = point;
+        const addend = point;
         
         // Process all bits to maintain constant time
         var byte_index: usize = 0;
