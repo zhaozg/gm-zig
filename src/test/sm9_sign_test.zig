@@ -3,10 +3,11 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 signature creation and validation" {
-    const signature = sm9.sign.Signature.init(
-        std.mem.zeroes([32]u8),
-        std.mem.zeroes([33]u8),
-    );
+    // Create signature with non-zero values for valid test
+    const h = [_]u8{0x12} ** 32;
+    var S = [_]u8{0x34} ** 33;
+    S[0] = 0x02; // Set proper compressed point format
+    const signature = sm9.sign.Signature.init(h, S);
     
     try testing.expect(signature.validate());
 }

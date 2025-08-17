@@ -61,16 +61,18 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     }
     
     // Fallback: ensure result is in valid range using modular reduction
-    const reduction_result = result;
+    var reduction_result = result;
     var reduction_iterations: u32 = 0;
     const max_reduction_iterations: u32 = 256;
     
     while (!bigint.lessThan(reduction_result, order) and reduction_iterations < max_reduction_iterations) {
         const sub_result = bigint.sub(reduction_result, order);
         if (sub_result.borrow) break;
-        result = sub_result.result;
+        reduction_result = sub_result.result;
         reduction_iterations += 1;
     }
+    
+    result = reduction_result;
     
     // Ensure result is not zero (required by SM9 spec)
     if (bigint.isZero(result)) {
