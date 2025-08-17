@@ -32,15 +32,13 @@ test "SM9 Curve Operations - G1 Point Compression" {
     try testing.expect(compressed[0] == 0x02 or compressed[0] == 0x03);
     
     // Test decompression
-    const decompressed = sm9.curve.G1Point.fromCompressed(compressed);
-    try testing.expect(decompressed != error.InvalidPointFormat);
+    const decomp_point = sm9.curve.G1Point.fromCompressed(compressed) catch |err| {
+        std.debug.print("Point decompression failed: {}\n", .{err});
+        return err;
+    };
     
-    if (decompressed) |decomp_point| {
-        // X coordinates should match
-        try testing.expect(sm9.bigint.equal(point.x, decomp_point.x));
-    } else |_| {
-        // Decompression failed - might be expected for test coordinates
-    }
+    // X coordinates should match
+    try testing.expect(sm9.bigint.equal(point.x, decomp_point.x));
     
     // Test infinity compression
     const infinity = sm9.curve.G1Point.infinity();

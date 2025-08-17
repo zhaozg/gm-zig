@@ -26,28 +26,29 @@ test "SM9 Random Number Generation - Secure Random" {
     
     // Test random BigInt generation
     const max = params.N;
-    const random_bigint = rng.randomBigInt(max);
+    const random_bigint = rng.randomBigInt(max) catch |err| {
+        std.debug.print("Random BigInt generation failed: {}\n", .{err});
+        return err;
+    };
     
-    try testing.expect(random_bigint != sm9.random.RandomError.InvalidRange);
-    try testing.expect(random_bigint != sm9.random.RandomError.GenerationFailure);
-    
-    if (random_bigint) |result| {
-        // Should be less than max
-        try testing.expect(sm9.bigint.lessThan(result, max));
-        // Should not be zero
-        try testing.expect(!sm9.bigint.isZero(result));
-    } else |_| {
-        // Should not fail for valid inputs
-        try testing.expect(false);
-    }
+    // Should be less than max
+    try testing.expect(sm9.bigint.lessThan(random_bigint, max));
+    // Should not be zero (very unlikely for cryptographic random)
+    try testing.expect(!sm9.bigint.isZero(random_bigint));
     
     // Test random field element generation
-    const field_elem = rng.randomFieldElement(params.q);
-    try testing.expect(field_elem != sm9.random.RandomError.InvalidRange);
+    const field_elem = rng.randomFieldElement(params.q) catch |err| {
+        std.debug.print("Random field element generation failed: {}\n", .{err});
+        return err;
+    };
+    _ = field_elem; // Use the result
     
     // Test random scalar generation
-    const scalar = rng.randomScalar(params);
-    try testing.expect(scalar != sm9.random.RandomError.InvalidRange);
+    const scalar = rng.randomScalar(params) catch |err| {
+        std.debug.print("Random scalar generation failed: {}\n", .{err});
+        return err;
+    };
+    _ = scalar; // Use the result
 }
 
 test "SM9 Random Number Generation - Deterministic Random" {

@@ -83,14 +83,12 @@ test "SM9 Pairing Operations - Basic Pairing Computation" {
     const Q = sm9.curve.G2Point.affine(x2, y2);
     
     // Test basic pairing computation
-    const pairing_result = sm9.pairing.pairing(P, Q, params);
-    try testing.expect(pairing_result != sm9.pairing.PairingError.InvalidPoint);
+    const result = sm9.pairing.pairing(P, Q, params) catch |err| {
+        std.debug.print("Pairing computation failed: {}\n", .{err});
+        return err;
+    };
     
-    if (pairing_result) |result| {
-        try testing.expect(!result.isIdentity());
-    } else |_| {
-        try testing.expect(false);
-    }
+    try testing.expect(!result.isIdentity());
 }
 
 test "SM9 Pairing Operations - Pairing with Infinity" {
