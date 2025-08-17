@@ -58,7 +58,7 @@ pub const SignUserPrivateKey = struct {
         const derived_key = curve.CurveUtils.deriveG1Key(
             t1_inv,
             user_id,
-            system_params.P1,
+            system_params.P1[1..33].*,
             system_params,
         );
         
@@ -154,7 +154,7 @@ pub const EncryptUserPrivateKey = struct {
         const derived_key = curve.CurveUtils.deriveG2Key(
             w,
             user_id,
-            system_params.P2,
+            system_params.P2[1..65].*,
             system_params,
         );
         

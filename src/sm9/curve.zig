@@ -619,7 +619,7 @@ pub const CurveUtils = struct {
             while (bit_index < 8) : (bit_index += 1) {
                 result = result.double(curve_params);
                 
-                const bit = (byte >> (7 - bit_index)) & 1;
+                const bit = (byte >> @as(u3, @intCast(7 - bit_index))) & 1;
                 if (bit == 1) {
                     result = result.add(addend, curve_params);
                 }
@@ -647,7 +647,7 @@ pub const CurveUtils = struct {
             while (bit_index < 8) : (bit_index += 1) {
                 result = result.double(curve_params);
                 
-                const bit = (byte >> (7 - bit_index)) & 1;
+                const bit = (byte >> @as(u3, @intCast(7 - bit_index))) & 1;
                 if (bit == 1) {
                     result = result.add(addend, curve_params);
                 }
