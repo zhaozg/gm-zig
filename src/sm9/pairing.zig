@@ -62,16 +62,19 @@ pub const GtElement = struct {
         
         var result = GtElement.identity();
         var base = self;
+        var exp = exponent;
         
-        // Process exponent bit by bit (little-endian, from least significant bit)
-        for (exponent) |byte| {
-            var bit_mask: u8 = 1;
-            while (bit_mask != 0) : (bit_mask <<= 1) {
-                if ((byte & bit_mask) != 0) {
-                    result = result.mul(base);
-                }
-                base = base.mul(base); // Square
+        // Binary exponentiation: process from LSB to MSB
+        var bit_index: usize = 0;
+        while (bit_index < 256 and !bigint.isZero(exp)) : (bit_index += 1) {
+            // Check if current LSB is set
+            if ((exp[31] & 1) == 1) {
+                result = result.mul(base);
             }
+            
+            // Square the base and shift exponent right
+            base = base.mul(base);
+            exp = bigint.shiftRight(exp);
         }
         
         return result;
