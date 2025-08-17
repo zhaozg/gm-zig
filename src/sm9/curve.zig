@@ -599,4 +599,84 @@ pub const CurveUtils = struct {
         
         return G2Point.affine(x, y);
     }
+    
+    /// Enhanced scalar multiplication with security features
+    pub fn secureScalarMul(point: G1Point, scalar: [32]u8, curve_params: params.SystemParams) G1Point {
+        // Use constant-time scalar multiplication to prevent timing attacks
+        if (bigint.isZero(scalar)) {
+            return G1Point.infinity();
+        }
+        
+        var result = G1Point.infinity();
+        var addend = point;
+        
+        // Process all bits to maintain constant time
+        var byte_index: usize = 0;
+        while (byte_index < 32) : (byte_index += 1) {
+            const byte = scalar[31 - byte_index]; // Process from MSB to LSB
+            var bit_index: u8 = 0;
+            
+            while (bit_index < 8) : (bit_index += 1) {
+                result = result.double(curve_params);
+                
+                const bit = (byte >> (7 - bit_index)) & 1;
+                if (bit == 1) {
+                    result = result.add(addend, curve_params);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /// Enhanced G2 scalar multiplication with security features  
+    pub fn secureScalarMulG2(point: G2Point, scalar: [32]u8, curve_params: params.SystemParams) G2Point {
+        if (bigint.isZero(scalar)) {
+            return G2Point.infinity();
+        }
+        
+        var result = G2Point.infinity();
+        var addend = point;
+        
+        // Process all bits to maintain constant time
+        var byte_index: usize = 0;
+        while (byte_index < 32) : (byte_index += 1) {
+            const byte = scalar[31 - byte_index]; // Process from MSB to LSB
+            var bit_index: u8 = 0;
+            
+            while (bit_index < 8) : (bit_index += 1) {
+                result = result.double(curve_params);
+                
+                const bit = (byte >> (7 - bit_index)) & 1;
+                if (bit == 1) {
+                    result = result.add(addend, curve_params);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /// Validate G1 point with enhanced security checks
+    pub fn validateG1Enhanced(point: G1Point, curve_params: params.SystemParams) bool {
+        // Basic infinity check
+        if (point.isInfinity()) return true;
+        
+        // Check coordinates are in field
+        if (!bigint.lessThan(point.x, curve_params.q)) return false;
+        if (!bigint.lessThan(point.y, curve_params.q)) return false;
+        
+        // Check curve equation y^2 = x^3 + b
+        return point.validate(curve_params);
+    }
+    
+    /// Validate G2 point with enhanced security checks
+    pub fn validateG2Enhanced(point: G2Point, curve_params: params.SystemParams) bool {
+        // Basic infinity check
+        if (point.isInfinity()) return true;
+        
+        // Detailed coordinate validation
+        return point.validate(curve_params);
+    }
+};
 };

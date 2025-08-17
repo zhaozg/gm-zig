@@ -435,3 +435,156 @@ pub const PairingPrecompute = struct {
         return pairing(P, Q, curve_params);
     }
 };
+
+/// Enhanced Gt group operations for cryptographic applications
+pub const GtOperations = struct {
+    /// Multi-pairing computation: e(P1,Q1) * e(P2,Q2) * ... * e(Pn,Qn)
+    pub fn multiPairing(
+        P_points: []const curve.G1Point,
+        Q_points: []const curve.G2Point,
+        curve_params: params.SystemParams,
+    ) !GtElement {
+        if (P_points.len != Q_points.len) {
+            return PairingError.InvalidPoint;
+        }
+        if (P_points.len == 0) {
+            return GtElement.identity();
+        }
+        
+        // Compute first pairing
+        var result = try pairing(P_points[0], Q_points[0], curve_params);
+        
+        // Multiply with remaining pairings
+        var i: usize = 1;
+        while (i < P_points.len) : (i += 1) {
+            const next_pairing = try pairing(P_points[i], Q_points[i], curve_params);
+            result = result.mul(next_pairing);
+        }
+        
+        return result;
+    }
+    
+    /// Batch verification of multiple pairing equations
+    pub fn batchVerify(
+        left_P: []const curve.G1Point,
+        left_Q: []const curve.G2Point,
+        right_P: []const curve.G1Point,
+        right_Q: []const curve.G2Point,
+        curve_params: params.SystemParams,
+    ) !bool {
+        // Compute left side multi-pairing
+        const left_result = try multiPairing(left_P, left_Q, curve_params);
+        
+        // Compute right side multi-pairing
+        const right_result = try multiPairing(right_P, right_Q, curve_params);
+        
+        // Check if they are equal
+        return left_result.equal(right_result);
+    }
+    
+    /// Optimized pairing with precomputation support
+    pub fn optimizedPairing(
+        P: curve.G1Point,
+        Q_precomp: ?PrecomputedG2,
+        Q: ?curve.G2Point,
+        curve_params: params.SystemParams,
+    ) !GtElement {
+        if (Q_precomp) |precomputed| {
+            return precomputed.pairing(P, curve_params);
+        } else if (Q) |q_point| {
+            return pairing(P, q_point, curve_params);
+        } else {
+            return PairingError.InvalidPoint;
+        }
+    }
+    
+    /// Verify pairing equation: e(P1, Q1) = e(P2, Q2)
+    pub fn verifyPairingEquation(
+        P1: curve.G1Point,
+        Q1: curve.G2Point,
+        P2: curve.G1Point,
+        Q2: curve.G2Point,
+        curve_params: params.SystemParams,
+    ) !bool {
+        const left = try pairing(P1, Q1, curve_params);
+        const right = try pairing(P2, Q2, curve_params);
+        return left.equal(right);
+    }
+};
+
+/// Extended GtElement with additional cryptographic operations
+pub const GtElementExtended = struct {
+    base: GtElement,
+    
+    pub fn init(element: GtElement) GtElementExtended {
+        return GtElementExtended{ .base = element };
+    }
+    
+    /// Compute element^exponent using windowed method for efficiency
+    pub fn powWindowed(self: GtElementExtended, exponent: [32]u8, window_size: u8) GtElement {
+        if (bigint.isZero(exponent)) {
+            return GtElement.identity();
+        }
+        
+        const window_mask = (@as(u16, 1) << window_size) - 1;
+        
+        // Precompute powers: base^1, base^2, ..., base^(2^window_size - 1)
+        var precomputed: [16]GtElement = undefined; // Support up to 4-bit windows
+        precomputed[0] = GtElement.identity();
+        if (window_size > 0) {
+            precomputed[1] = self.base;
+            
+            var i: usize = 2;
+            while (i < (@as(usize, 1) << window_size)) : (i += 1) {
+                precomputed[i] = precomputed[i - 1].mul(self.base);
+            }
+        }
+        
+        var result = GtElement.identity();
+        
+        // Process exponent from MSB to LSB using windows
+        var bit_pos: i32 = 255; // Start from most significant bit
+        while (bit_pos >= 0) {
+            // Extract window_size bits
+            var window_value: u16 = 0;
+            var bits_extracted: u8 = 0;
+            
+            while (bits_extracted < window_size and bit_pos >= 0) {
+                const byte_index = @as(usize, @intCast(bit_pos / 8));
+                const bit_index = @as(u3, @intCast(bit_pos % 8));
+                const bit = (exponent[byte_index] >> bit_index) & 1;
+                
+                window_value = (window_value << 1) | bit;
+                bits_extracted += 1;
+                bit_pos -= 1;
+            }
+            
+            // Square result for each bit in the window
+            var j: u8 = 0;
+            while (j < bits_extracted) : (j += 1) {
+                result = result.mul(result); // Square
+            }
+            
+            // Multiply by precomputed value if window is non-zero
+            if (window_value > 0 and window_value < precomputed.len) {
+                result = result.mul(precomputed[window_value]);
+            }
+        }
+        
+        return result;
+    }
+    
+    /// Compute element^(-1) using Fermat's little theorem approach
+    pub fn invertFermat(self: GtElementExtended, curve_params: params.SystemParams) GtElement {
+        // Use the fact that in Gt, element^(r-1) = element^(-1) where r is the group order
+        // Compute (r-1) where r is the curve order
+        var r_minus_1 = curve_params.N;
+        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        const sub_result = bigint.sub(r_minus_1, one);
+        if (!sub_result.borrow) {
+            r_minus_1 = sub_result.result;
+        }
+        
+        return self.base.pow(r_minus_1);
+    }
+};

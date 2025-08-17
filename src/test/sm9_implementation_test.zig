@@ -237,3 +237,239 @@ test "SM9 complete workflow" {
     // Verify the decrypted message matches original
     try testing.expectEqualSlices(u8, message, decrypted);
 }
+
+/// Phase 4 Enhanced Tests - Complete Algorithm Validation
+test "SM9 Phase 4 - Enhanced mathematical correctness" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    // Test enhanced modular arithmetic
+    const a = sm9.bigint.fromU64(0x123456789ABCDEF0);
+    const b = sm9.bigint.fromU64(0xFEDCBA9876543210);
+    const m = sm9.bigint.fromU64(0xFFFFFFFFFFFFFFFF);
+    
+    // Test modular operations don't fail
+    const add_result = try sm9.bigint.addMod(a, b, m);
+    const sub_result = try sm9.bigint.subMod(a, b, m);
+    const mul_result = try sm9.bigint.mulMod(a, b, m);
+    const inv_result = try sm9.bigint.invMod(a, m);
+    
+    // Verify results are valid
+    try testing.expect(!sm9.bigint.isZero(add_result));
+    try testing.expect(!sm9.bigint.isZero(sub_result));
+    try testing.expect(!sm9.bigint.isZero(mul_result));
+    try testing.expect(!sm9.bigint.isZero(inv_result));
+    
+    // Test modular inverse property: a * a^(-1) ≡ 1 (mod m)
+    const verification = try sm9.bigint.mulMod(a, inv_result, m);
+    const one = sm9.bigint.fromU64(1);
+    try testing.expect(sm9.bigint.equal(verification, one));
+}
+
+test "SM9 Phase 4 - Enhanced key extraction" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    
+    const user_id = "enhanced_user@test.com";
+    
+    // Test signature key extraction with proper modular arithmetic
+    const sign_key = try context.extractSignKey(user_id);
+    try testing.expect(sign_key.validate(system.params));
+    try testing.expect(sign_key.hid == 0x01);
+    try testing.expect(sign_key.key[0] == 0x02 or sign_key.key[0] == 0x03); // Compressed G1 point
+    
+    // Test encryption key extraction with proper modular arithmetic
+    const encrypt_key = try context.extractEncryptKey(user_id);
+    try testing.expect(encrypt_key.validate(system.params));
+    try testing.expect(encrypt_key.hid == 0x03);
+    try testing.expect(encrypt_key.key[0] == 0x04); // Uncompressed G2 point
+    
+    // Verify keys are deterministic (same input produces same output)
+    const sign_key2 = try context.extractSignKey(user_id);
+    const encrypt_key2 = try context.extractEncryptKey(user_id);
+    
+    try testing.expectEqualSlices(u8, &sign_key.key, &sign_key2.key);
+    try testing.expectEqualSlices(u8, &encrypt_key.key, &encrypt_key2.key);
+}
+
+test "SM9 Phase 4 - Enhanced signature operations" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    
+    const user_id = "signer@enhanced.test";
+    const message = "Enhanced SM9 signature with proper modular arithmetic";
+    
+    // Extract signing key
+    const user_key = try key_context.extractSignKey(user_id);
+    
+    // Sign message with enhanced algorithm
+    const signature = try sign_context.sign(message, user_key, .{});
+    try testing.expect(signature.validate());
+    try testing.expect(!sm9.bigint.isZero(signature.h));
+    try testing.expect(signature.S[0] == 0x02 or signature.S[0] == 0x03); // Compressed point
+    
+    // Verify signature with enhanced algorithm
+    const is_valid = try sign_context.verify(message, signature, user_id, .{});
+    try testing.expect(is_valid);
+    
+    // Test signature determinism
+    const signature2 = try sign_context.sign(message, user_key, .{});
+    try testing.expectEqualSlices(u8, &signature.h, &signature2.h);
+    try testing.expectEqualSlices(u8, &signature.S, &signature2.S);
+    
+    // Test that different messages produce different signatures
+    const different_message = "Different message for signature test";
+    const different_sig = try sign_context.sign(different_message, user_key, .{});
+    try testing.expect(!std.mem.eql(u8, &signature.h, &different_sig.h));
+}
+
+test "SM9 Phase 4 - Enhanced encryption operations" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    
+    const user_id = "recipient@enhanced.test";
+    const message = "Enhanced SM9 encryption with proper KDF and security";
+    
+    // Extract encryption key
+    const user_key = try key_context.extractEncryptKey(user_id);
+    
+    // Encrypt message with enhanced algorithm
+    const ciphertext = try encrypt_context.encrypt(message, user_id, .{});
+    defer ciphertext.deinit();
+    
+    try testing.expect(ciphertext.validate());
+    try testing.expect(ciphertext.c1[0] == 0x02 or ciphertext.c1[0] == 0x03); // Valid point format
+    try testing.expect(ciphertext.c2.len == message.len);
+    try testing.expect(!sm9.bigint.isZero(ciphertext.c3));
+    
+    // Decrypt message with enhanced algorithm
+    const decrypted = try encrypt_context.decrypt(ciphertext, user_key, .{});
+    defer allocator.free(decrypted);
+    
+    // Verify decryption correctness
+    try testing.expectEqualSlices(u8, message, decrypted);
+    
+    // Test that KDF produces proper non-zero keys
+    const kdf_result = try sm9.encrypt.EncryptionUtils.kdf("test_input", 64, allocator);
+    defer allocator.free(kdf_result);
+    
+    var kdf_all_zero = true;
+    for (kdf_result) |byte| {
+        if (byte != 0) {
+            kdf_all_zero = false;
+            break;
+        }
+    }
+    try testing.expect(!kdf_all_zero); // KDF should never return all zeros
+}
+
+test "SM9 Phase 4 - Enhanced pairing and curve operations" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const curve_params = system.params;
+    
+    // Test enhanced hash-to-point functions
+    const test_data = "hash_to_point_test_data";
+    const g1_point = sm9.curve.CurveUtils.hashToG1(test_data, curve_params);
+    const g2_point = sm9.curve.CurveUtils.hashToG2(test_data, curve_params);
+    
+    try testing.expect(!g1_point.isInfinity());
+    try testing.expect(!g2_point.isInfinity());
+    try testing.expect(sm9.curve.CurveUtils.validateG1Enhanced(g1_point, curve_params));
+    try testing.expect(sm9.curve.CurveUtils.validateG2Enhanced(g2_point, curve_params));
+    
+    // Test secure scalar multiplication
+    const scalar = sm9.bigint.fromU64(123456789);
+    const g1_multiplied = sm9.curve.CurveUtils.secureScalarMul(g1_point, scalar, curve_params);
+    const g2_multiplied = sm9.curve.CurveUtils.secureScalarMulG2(g2_point, scalar, curve_params);
+    
+    try testing.expect(sm9.curve.CurveUtils.validateG1Enhanced(g1_multiplied, curve_params));
+    try testing.expect(sm9.curve.CurveUtils.validateG2Enhanced(g2_multiplied, curve_params));
+    
+    // Test basic pairing computation
+    const pairing_result = try sm9.pairing.pairing(g1_point, g2_point, curve_params);
+    try testing.expect(!pairing_result.isIdentity());
+    
+    // Test Gt group operations
+    const identity = sm9.pairing.GtElement.identity();
+    const multiplied = pairing_result.mul(pairing_result);
+    const powered = pairing_result.pow(scalar);
+    
+    try testing.expect(identity.isIdentity());
+    try testing.expect(!multiplied.isIdentity());
+    try testing.expect(!powered.isIdentity());
+}
+
+test "SM9 Phase 4 - Complete end-to-end enhanced workflow" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    // Initialize enhanced SM9 system
+    const system = sm9.params.SM9System.init();
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    
+    // Test users
+    const alice_id = "alice@enhanced.sm9.test";
+    const bob_id = "bob@enhanced.sm9.test";
+    const message = "Enhanced SM9 Phase 4 complete implementation test message";
+    
+    // Extract keys using enhanced key extraction
+    const alice_sign_key = try key_context.extractSignKey(alice_id);
+    const alice_encrypt_key = try key_context.extractEncryptKey(alice_id);
+    const bob_sign_key = try key_context.extractSignKey(bob_id);
+    const bob_encrypt_key = try key_context.extractEncryptKey(bob_id);
+    
+    // Alice signs message with enhanced signature
+    const alice_signature = try sign_context.sign(message, alice_sign_key, .{});
+    try testing.expect(alice_signature.validate());
+    
+    // Verify Alice's signature
+    const alice_sig_valid = try sign_context.verify(message, alice_signature, alice_id, .{});
+    try testing.expect(alice_sig_valid);
+    
+    // Alice encrypts message for Bob with enhanced encryption
+    const ciphertext_for_bob = try encrypt_context.encrypt(message, bob_id, .{});
+    defer ciphertext_for_bob.deinit();
+    try testing.expect(ciphertext_for_bob.validate());
+    
+    // Bob decrypts message with enhanced decryption
+    const decrypted_by_bob = try encrypt_context.decrypt(ciphertext_for_bob, bob_encrypt_key, .{});
+    defer allocator.free(decrypted_by_bob);
+    
+    // Verify complete workflow
+    try testing.expectEqualSlices(u8, message, decrypted_by_bob);
+    
+    // Test cross-verification (Alice encrypts for Alice, Bob signs)
+    const ciphertext_for_alice = try encrypt_context.encrypt(message, alice_id, .{});
+    defer ciphertext_for_alice.deinit();
+    
+    const bob_signature = try sign_context.sign(message, bob_sign_key, .{});
+    const bob_sig_valid = try sign_context.verify(message, bob_signature, bob_id, .{});
+    
+    const decrypted_by_alice = try encrypt_context.decrypt(ciphertext_for_alice, alice_encrypt_key, .{});
+    defer allocator.free(decrypted_by_alice);
+    
+    try testing.expect(bob_sig_valid);
+    try testing.expectEqualSlices(u8, message, decrypted_by_alice);
+}
