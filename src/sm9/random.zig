@@ -24,30 +24,28 @@ pub const RandomError = error{
 
 /// Cryptographically secure random number generator
 pub const SecureRandom = struct {
-    rng: std.Random,
+    prng: std.Random.DefaultPrng,
     
     /// Initialize with system entropy
     pub fn init() SecureRandom {
         var seed: u64 = undefined;
         crypto.random.bytes(std.mem.asBytes(&seed));
         
-        var prng = std.Random.DefaultPrng.init(seed);
         return SecureRandom{
-            .rng = prng.random(),
+            .prng = std.Random.DefaultPrng.init(seed),
         };
     }
     
     /// Initialize with provided seed (for testing)
     pub fn initWithSeed(seed: u64) SecureRandom {
-        var prng = std.Random.DefaultPrng.init(seed);
         return SecureRandom{
-            .rng = prng.random(),
+            .prng = std.Random.DefaultPrng.init(seed),
         };
     }
     
     /// Generate random bytes
     pub fn bytes(self: *SecureRandom, buffer: []u8) void {
-        self.rng.bytes(buffer);
+        self.prng.random().bytes(buffer);
     }
     
     /// Generate random BigInt in range [1, max)
@@ -59,7 +57,7 @@ pub const SecureRandom = struct {
         
         while (attempts < max_attempts) {
             var result: bigint.BigInt = undefined;
-            self.rng.bytes(&result);
+            self.prng.random().bytes(&result);
             
             // Ensure result is in range [1, max)
             if (!bigint.isZero(result) and bigint.lessThan(result, max)) {
@@ -74,7 +72,7 @@ pub const SecureRandom = struct {
     
     /// Generate random field element in Fp
     pub fn randomFieldElement(self: *SecureRandom, p: bigint.BigInt) RandomError!bigint.BigInt {
-        return field.randomFieldElement(p, self.rng);
+        return field.randomFieldElement(p, self.prng.random());
     }
     
     /// Generate random scalar for elliptic curve operations
