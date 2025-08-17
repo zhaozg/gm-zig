@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// Test constant-time operations for timing attack resistance
+// Test constant-time operations for timing attack resistance
 test "SM9 constant-time operations" {
     // Test constant-time equality
     var a = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
@@ -21,7 +21,7 @@ test "SM9 constant-time operations" {
     try testing.expect(sm9.bigint.compare(c, a) > 0);
 }
 
-/// Test secure memory clearing
+// Test secure memory clearing
 test "SM9 secure memory clearing" {
     var sensitive_data = [_]u8{0xDE, 0xAD, 0xBE, 0xEF} ++ [_]u8{0xFF} ** 28;
     
@@ -35,7 +35,7 @@ test "SM9 secure memory clearing" {
     try testing.expect(sm9.bigint.isZero(sensitive_data));
 }
 
-/// Test improved modular inverse
+// Test improved modular inverse
 test "SM9 modular inverse improvements" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -56,7 +56,7 @@ test "SM9 modular inverse improvements" {
     try testing.expect(!sm9.bigint.isZero(product));
 }
 
-/// Test point validation security
+// Test point validation security
 test "SM9 curve point validation" {
     const params = sm9.params.SystemParams.init();
     
@@ -76,7 +76,7 @@ test "SM9 curve point validation" {
     try testing.expect(is_valid == true or is_valid == false);
 }
 
-/// Test hash function improvements
+// Test hash function improvements
 test "SM9 improved hash functions" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -112,7 +112,7 @@ test "SM9 improved hash functions" {
     try testing.expect(!sm9.bigint.equal(h2_result, h2_result3));
 }
 
-/// Test input validation in encryption
+// Test input validation in encryption
 test "SM9 encryption input validation" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -137,7 +137,7 @@ test "SM9 encryption input validation" {
     try testing.expectError(sm9.encrypt.EncryptionError.InvalidUserId, result2);
 }
 
-/// Test G2 point validation improvements
+// Test G2 point validation improvements
 test "SM9 G2 point validation" {
     const params = sm9.params.SystemParams.init();
     
@@ -164,7 +164,7 @@ test "SM9 G2 point validation" {
     try testing.expect(is_valid == true or is_valid == false);
 }
 
-/// Test edge cases and boundary conditions
+// Test edge cases and boundary conditions
 test "SM9 edge cases and boundary conditions" {
     // Test zero values
     const zero = [_]u8{0} ** 32;

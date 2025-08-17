@@ -2,11 +2,11 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// GM/T 0044-2016 Standard Test Vectors for SM9
-/// This file contains test vectors from the official GM/T 0044-2016 specification
-/// to ensure compliance with the national standard
+// GM/T 0044-2016 Standard Test Vectors for SM9
+// This file contains test vectors from the official GM/T 0044-2016 specification
+// to ensure compliance with the national standard
 
-/// Test vectors for H1 hash function from GM/T 0044-2016
+// Test vectors for H1 hash function from GM/T 0044-2016
 test "SM9 H1 standard test vectors" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -45,7 +45,7 @@ test "SM9 H1 standard test vectors" {
     try testing.expect(sm9.bigint.lessThan(h1_result3, order));
 }
 
-/// Test vectors for H2 hash function from GM/T 0044-2016
+// Test vectors for H2 hash function from GM/T 0044-2016
 test "SM9 H2 standard test vectors" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -76,7 +76,7 @@ test "SM9 H2 standard test vectors" {
     try testing.expect(!sm9.bigint.equal(h2_result1, h2_result3));
 }
 
-/// Test vectors for KDF from GM/T 0044-2016
+// Test vectors for KDF from GM/T 0044-2016
 test "SM9 KDF standard test vectors" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -117,7 +117,7 @@ test "SM9 KDF standard test vectors" {
     try testing.expect(!std.mem.eql(u8, output1, output3));
 }
 
-/// Test vectors for curve operations from GM/T 0044-2016
+// Test vectors for curve operations from GM/T 0044-2016
 test "SM9 curve standard test vectors" {
     const params = sm9.params.SystemParams.init();
     
@@ -157,7 +157,7 @@ test "SM9 curve standard test vectors" {
     try testing.expect(G1_plus_inf.validate(params));
 }
 
-/// Test vectors for bigint operations
+// Test vectors for bigint operations
 test "SM9 bigint standard test vectors" {
     // Test Vector 1: Known arithmetic operations
     var a = [_]u8{0} ** 32;
@@ -194,7 +194,7 @@ test "SM9 bigint standard test vectors" {
     try testing.expect(sm9.bigint.compare(a, a) == 0); // 123 == 123
 }
 
-/// Test vectors for pairing operations from GM/T 0044-2016
+// Test vectors for pairing operations from GM/T 0044-2016
 test "SM9 pairing standard test vectors" {
     const params = sm9.params.SystemParams.init();
     
@@ -227,7 +227,7 @@ test "SM9 pairing standard test vectors" {
     try testing.expect(e_infQ.isIdentity());
 }
 
-/// Test compliance with GM/T 0044-2016 parameter requirements
+// Test compliance with GM/T 0044-2016 parameter requirements
 test "SM9 parameter compliance test" {
     const params = sm9.params.SystemParams.init();
     
