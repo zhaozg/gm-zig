@@ -118,8 +118,8 @@ test "SM9 encryption input validation" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    const params = sm9.params.SystemParams.init();
-    const ctx = sm9.encrypt.EncryptionContext.init(allocator, params);
+    const system = sm9.params.SM9System.init();
+    const ctx = sm9.encrypt.EncryptionContext.init(system, allocator);
     
     // Test empty message
     const empty_message = "";
@@ -148,14 +148,8 @@ test "SM9 G2 point validation" {
     // Test with constructed G2 point
     var x = [_]u8{0x01} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
     var y = [_]u8{0x02} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
-    var z = [_]u8{0x01} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
     
-    const point = sm9.curve.G2Point{
-        .x = x,
-        .y = y,
-        .z = z,
-        .is_infinity = false,
-    };
+    const point = sm9.curve.G2Point.affine(x, y);
     
     // Validation should complete without errors
     const is_valid = point.validate(params);
