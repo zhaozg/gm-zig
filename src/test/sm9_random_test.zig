@@ -81,14 +81,20 @@ test "SM9 Random Number Generation - Random Point Generation" {
     var rng = sm9.random.SecureRandom.init();
     
     // Test G1 point generation
-    const g1_point = rng.randomG1Point(params);
+    const g1_point = rng.randomG1Point(params) catch |err| {
+        std.debug.print("G1 point generation failed: {}\n", .{err});
+        return err;
+    };
     
     // Should not error (though implementation might not be complete)
     // This test mainly ensures the interface works
     _ = g1_point;
     
     // Test G2 point generation  
-    const g2_point = rng.randomG2Point(params);
+    const g2_point = rng.randomG2Point(params) catch |err| {
+        std.debug.print("G2 point generation failed: {}\n", .{err});
+        return err;
+    };
     _ = g2_point;
 }
 
