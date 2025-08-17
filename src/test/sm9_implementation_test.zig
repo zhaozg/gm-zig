@@ -536,7 +536,7 @@ test "SM9 Phase 4 - Enhanced curve operations and key derivation" {
     const g2_key = sm9.curve.CurveUtils.deriveG2Key(
         scalar,
         user_id,
-        system.params.P2,
+        system.params.P2[1..65].*,
         curve_params,
     );
     
@@ -556,13 +556,13 @@ test "SM9 Phase 4 - Enhanced curve operations and key derivation" {
     const g1_key2 = sm9.curve.CurveUtils.deriveG1Key(
         scalar,
         user_id,
-        system.params.P1,
+        system.params.P1[1..33].*,
         curve_params,
     );
     const g2_key2 = sm9.curve.CurveUtils.deriveG2Key(
         scalar,
         user_id,
-        system.params.P2,
+        system.params.P2[1..65].*,
         curve_params,
     );
     
