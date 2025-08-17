@@ -98,7 +98,7 @@ test "SM9 pairing operations" {
     const identity_gt = sm9.pairing.GtElement.identity();
     try testing.expect(identity_gt.isIdentity());
     const exponent = sm9.bigint.fromU64(7);
-    const gt_pow = gt_result.pow(exponent);
+    const gt_pow = identity_gt.pow(exponent);
     try testing.expect(!gt_pow.isIdentity());
 }
 
