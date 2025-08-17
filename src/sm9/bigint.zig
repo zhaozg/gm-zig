@@ -302,10 +302,10 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         const u_diff = sub(u, v);
         u = u_diff.result;
         
-        const g1_diff = subMod(g1, g2, m) catch {
+        const g1_diff = subMod(g1, g2, m) catch blk: {
             // If subtraction fails, add m first then subtract
             const g1_sum = addMod(g1, m, m) catch return BigIntError.NotInvertible;
-            subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible
+            break :blk subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible;
         };
         g1 = g1_diff;
         
