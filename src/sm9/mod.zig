@@ -18,6 +18,10 @@ pub const curve = @import("curve.zig");
 pub const hash = @import("hash.zig");
 pub const pairing = @import("pairing.zig");
 
+// Phase 3: Enhanced core operations
+pub const field = @import("field.zig");
+pub const random = @import("random.zig");
+
 // Re-export commonly used types for convenience
 pub const SystemParams = params.SystemParams;
 pub const SM9System = params.SM9System;

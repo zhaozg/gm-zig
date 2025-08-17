@@ -97,9 +97,16 @@ test "SM9 pairing operations" {
     // Test basic operations without pairing for now
     const identity_gt = sm9.pairing.GtElement.identity();
     try testing.expect(identity_gt.isIdentity());
+    
+    // Test exponentiation with non-identity element
+    const non_identity_gt = sm9.pairing.GtElement.random("test_base");
     const exponent = sm9.bigint.fromU64(7);
-    const gt_pow = identity_gt.pow(exponent);
+    const gt_pow = non_identity_gt.pow(exponent);
     try testing.expect(!gt_pow.isIdentity());
+    
+    // Test that identity raised to any power remains identity
+    const identity_pow = identity_gt.pow(exponent);
+    try testing.expect(identity_pow.isIdentity());
 }
 
 test "SM9 system parameters" {
