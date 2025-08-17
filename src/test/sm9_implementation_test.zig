@@ -473,3 +473,103 @@ test "SM9 Phase 4 - Complete end-to-end enhanced workflow" {
     try testing.expect(bob_sig_valid);
     try testing.expectEqualSlices(u8, message, decrypted_by_alice);
 }
+
+test "SM9 Phase 4 - DER signature encoding and validation" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    // Create a test signature
+    const h = [_]u8{0x12} ** 32;
+    const S = [_]u8{0x02} ++ [_]u8{0x34} ** 32; // Valid compressed point format
+    const signature = sm9.sign.Signature.init(h, S);
+    
+    // Test signature validation
+    try testing.expect(signature.validate());
+    
+    // Test DER encoding
+    const der_bytes = try signature.toDER(allocator);
+    defer allocator.free(der_bytes);
+    
+    // Verify DER format structure
+    try testing.expect(der_bytes.len > 4);
+    try testing.expect(der_bytes[0] == 0x30); // SEQUENCE tag
+    
+    // Test DER decoding
+    const decoded_signature = try sm9.sign.Signature.fromDER(der_bytes);
+    
+    // Verify roundtrip correctness
+    try testing.expectEqualSlices(u8, &signature.h, &decoded_signature.h);
+    try testing.expectEqualSlices(u8, &signature.S, &decoded_signature.S);
+    try testing.expect(decoded_signature.validate());
+}
+
+test "SM9 Phase 4 - Enhanced curve operations and key derivation" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const curve_params = system.params;
+    
+    // Test enhanced scalar multiplication
+    const scalar = sm9.bigint.fromU64(987654321);
+    const user_id = "curve_test_user@example.com";
+    
+    // Test G1 key derivation
+    const g1_key = sm9.curve.CurveUtils.deriveG1Key(
+        scalar,
+        user_id,
+        system.params.P1,
+        curve_params,
+    );
+    
+    try testing.expect(g1_key[0] == 0x02 or g1_key[0] == 0x03); // Valid compressed point
+    
+    // Verify derived key is not all zeros
+    var g1_all_zero = true;
+    for (g1_key[1..]) |byte| {
+        if (byte != 0) {
+            g1_all_zero = false;
+            break;
+        }
+    }
+    try testing.expect(!g1_all_zero);
+    
+    // Test G2 key derivation  
+    const g2_key = sm9.curve.CurveUtils.deriveG2Key(
+        scalar,
+        user_id,
+        system.params.P2,
+        curve_params,
+    );
+    
+    try testing.expect(g2_key[0] == 0x04); // Valid uncompressed point
+    
+    // Verify derived G2 key is not all zeros
+    var g2_all_zero = true;
+    for (g2_key[1..]) |byte| {
+        if (byte != 0) {
+            g2_all_zero = false;
+            break;
+        }
+    }
+    try testing.expect(!g2_all_zero);
+    
+    // Test determinism: same inputs produce same outputs
+    const g1_key2 = sm9.curve.CurveUtils.deriveG1Key(
+        scalar,
+        user_id,
+        system.params.P1,
+        curve_params,
+    );
+    const g2_key2 = sm9.curve.CurveUtils.deriveG2Key(
+        scalar,
+        user_id,
+        system.params.P2,
+        curve_params,
+    );
+    
+    try testing.expectEqualSlices(u8, &g1_key, &g1_key2);
+    try testing.expectEqualSlices(u8, &g2_key, &g2_key2);
+}

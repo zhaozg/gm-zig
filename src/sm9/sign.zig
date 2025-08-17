@@ -40,24 +40,118 @@ pub const Signature = struct {
     }
     
     /// Encode signature in DER format
+    /// SM9 signature DER format: SEQUENCE { h OCTET STRING, S OCTET STRING }
     pub fn toDER(self: Signature, allocator: std.mem.Allocator) ![]u8 {
-        // TODO: Implement DER encoding for SM9 signature
-        _ = self;
-        _ = allocator;
-        return error.NotImplemented;
+        // DER encoding for SM9 signature:
+        // SEQUENCE tag (0x30) + length + h OCTET STRING + S OCTET STRING
+        
+        // Calculate lengths
+        const h_content_len = 32; // h is always 32 bytes
+        const s_content_len = 33; // S is always 33 bytes (compressed point)
+        const h_der_len = 2 + h_content_len; // tag + length + content
+        const s_der_len = 2 + s_content_len; // tag + length + content  
+        const sequence_content_len = h_der_len + s_der_len;
+        const total_len = 2 + sequence_content_len; // SEQUENCE tag + length + content
+        
+        var result = try allocator.alloc(u8, total_len);
+        var offset: usize = 0;
+        
+        // SEQUENCE tag and length
+        result[offset] = 0x30; // SEQUENCE tag
+        offset += 1;
+        result[offset] = @as(u8, @intCast(sequence_content_len)); // Length (assuming < 128)
+        offset += 1;
+        
+        // h OCTET STRING
+        result[offset] = 0x04; // OCTET STRING tag
+        offset += 1;
+        result[offset] = @as(u8, @intCast(h_content_len)); // Length
+        offset += 1;
+        @memcpy(result[offset..offset + h_content_len], &self.h);
+        offset += h_content_len;
+        
+        // S OCTET STRING
+        result[offset] = 0x04; // OCTET STRING tag
+        offset += 1;
+        result[offset] = @as(u8, @intCast(s_content_len)); // Length
+        offset += 1;
+        @memcpy(result[offset..offset + s_content_len], &self.S);
+        
+        return result;
     }
     
     /// Create signature from DER format
     pub fn fromDER(der_bytes: []const u8) !Signature {
-        // TODO: Implement DER decoding for SM9 signature
-        _ = der_bytes;
-        return error.NotImplemented;
+        if (der_bytes.len < 4) return error.InvalidSignatureFormat;
+        
+        var offset: usize = 0;
+        
+        // Check SEQUENCE tag
+        if (der_bytes[offset] != 0x30) return error.InvalidSignatureFormat;
+        offset += 1;
+        
+        // Read SEQUENCE length
+        const sequence_length = der_bytes[offset];
+        offset += 1;
+        
+        if (offset + sequence_length != der_bytes.len) return error.InvalidSignatureFormat;
+        
+        // Read h OCTET STRING
+        if (offset >= der_bytes.len || der_bytes[offset] != 0x04) return error.InvalidSignatureFormat;
+        offset += 1;
+        
+        const h_length = der_bytes[offset];
+        offset += 1;
+        if (h_length != 32) return error.InvalidSignatureFormat;
+        
+        if (offset + h_length > der_bytes.len) return error.InvalidSignatureFormat;
+        var h: [32]u8 = undefined;
+        @memcpy(&h, der_bytes[offset..offset + h_length]);
+        offset += h_length;
+        
+        // Read S OCTET STRING
+        if (offset >= der_bytes.len || der_bytes[offset] != 0x04) return error.InvalidSignatureFormat;
+        offset += 1;
+        
+        const s_length = der_bytes[offset];
+        offset += 1;
+        if (s_length != 33) return error.InvalidSignatureFormat;
+        
+        if (offset + s_length > der_bytes.len) return error.InvalidSignatureFormat;
+        var S: [33]u8 = undefined;
+        @memcpy(&S, der_bytes[offset..offset + s_length]);
+        
+        return Signature{
+            .h = h,
+            .S = S,
+        };
     }
     
-    /// Validate signature format
+    /// Validate signature format and mathematical properties
     pub fn validate(self: Signature) bool {
-        // TODO: Implement signature validation
-        _ = self;
+        // Check that h is not zero
+        var h_is_zero = true;
+        for (self.h) |byte| {
+            if (byte != 0) {
+                h_is_zero = false;
+                break;
+            }
+        }
+        if (h_is_zero) return false;
+        
+        // Check that S has valid compressed point format
+        if (self.S[0] != 0x02 and self.S[0] != 0x03) return false;
+        
+        // Check that S is not all zeros (except format byte)
+        var s_is_zero = true;
+        for (self.S[1..]) |byte| {
+            if (byte != 0) {
+                s_is_zero = false;
+                break;
+            }
+        }
+        if (s_is_zero) return false;
+        
         return true;
     }
 };

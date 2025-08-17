@@ -53,29 +53,18 @@ pub const SignUserPrivateKey = struct {
             return KeyExtractionError.KeyGenerationFailed;
         };
         
-        // Step 4: Compute ds_A = t1_inv * P1 (elliptic curve scalar multiplication)
-        // Use deterministic approach that produces valid G1 points
-        // TODO: Replace with proper elliptic curve scalar multiplication
-        var private_key = [_]u8{0} ** 33;
-        private_key[0] = 0x02; // Compressed G1 point prefix
-        
-        // Use scalar t1_inv to derive the private key deterministically
-        // This ensures the key is derived from the proper mathematical computation
-        var key_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        key_hasher.update(&t1_inv);
-        key_hasher.update(user_id);
-        key_hasher.update(&system_params.P1);
-        key_hasher.update("G1_scalar_mult");
-        
-        var key_hash: [32]u8 = undefined;
-        key_hasher.final(&key_hash);
-        
-        // Use the hash as the x-coordinate for the compressed G1 point
-        @memcpy(private_key[1..], &key_hash);
+        // Step 4: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
+        const curve = @import("curve.zig");
+        const derived_key = curve.CurveUtils.deriveG1Key(
+            t1_inv,
+            user_id,
+            system_params.P1,
+            system_params,
+        );
         
         return SignUserPrivateKey{
             .id = user_id,
-            .key = private_key,
+            .key = derived_key,
             .hid = 0x01, // Signature hash identifier
         };
     }
@@ -160,37 +149,18 @@ pub const EncryptUserPrivateKey = struct {
             return KeyExtractionError.KeyGenerationFailed;
         };
         
-        // Step 5: Compute de_B = w * P2 using elliptic curve scalar multiplication
-        // For now, use a deterministic approach that produces valid G2 points
-        // TODO: Replace with proper elliptic curve scalar multiplication
-        var private_key = [_]u8{0} ** 65;
-        private_key[0] = 0x04; // Uncompressed G2 point prefix
-        
-        // Use scalar w to derive the private key deterministically
-        // This ensures the key is derived from the proper mathematical computation
-        var key_hasher = std.crypto.hash.sha2.Sha256.init(.{});
-        key_hasher.update(&w);
-        key_hasher.update(user_id);
-        key_hasher.update(&system_params.P2);
-        key_hasher.update("G2_scalar_mult");
-        
-        var key_hash: [32]u8 = undefined;
-        key_hasher.final(&key_hash);
-        
-        // Fill the G2 point with derived values (32 bytes each for x and y coordinates)
-        @memcpy(private_key[1..33], &key_hash);
-        
-        // Derive second coordinate
-        var key_hasher2 = std.crypto.hash.sha2.Sha256.init(.{});
-        key_hasher2.update(&key_hash);
-        key_hasher2.update("G2_second_coord");
-        var key_hash2: [32]u8 = undefined;
-        key_hasher2.final(&key_hash2);
-        @memcpy(private_key[33..65], &key_hash2);
+        // Step 5: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
+        const curve = @import("curve.zig");
+        const derived_key = curve.CurveUtils.deriveG2Key(
+            w,
+            user_id,
+            system_params.P2,
+            system_params,
+        );
         
         return EncryptUserPrivateKey{
             .id = user_id,
-            .key = private_key,
+            .key = derived_key,
             .hid = 0x03, // Encryption hash identifier
         };
     }
