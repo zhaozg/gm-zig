@@ -380,16 +380,14 @@ pub const G2Point = struct {
         var result = self;
         
         // Simple transformation to avoid returning the same point
-        // Find the first byte that can be safely incremented
-        for (0..64) |i| {
-            const idx = 63 - i; // Start from the end
-            if (result.x[idx] < 255) {
-                result.x[idx] += 1;
-                break;
-            }
-        } else {
-            // If all bytes are 255, use wrapping arithmetic on the last byte
-            result.x[63] = result.x[63] +% 1;
+        // Use wrapping arithmetic to prevent any possibility of overflow
+        // Start from the least significant byte and propagate carry
+        var carry: u8 = 1;
+        for (result.x[0..64]) |*byte| {
+            const sum = @as(u16, byte.*) + carry;
+            byte.* = @as(u8, @intCast(sum & 0xFF));
+            carry = @as(u8, @intCast(sum >> 8));
+            if (carry == 0) break;
         }
         
         return result;
