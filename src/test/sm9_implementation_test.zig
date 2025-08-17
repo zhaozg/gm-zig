@@ -272,7 +272,6 @@ test "SM9 Phase 4 - Enhanced mathematical correctness" {
     try testing.expect(!sm9.bigint.isZero(mul_result));
     try testing.expect(!sm9.bigint.isZero(inv_result));
 }
-}
 
 test "SM9 Phase 4 - Enhanced key extraction" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
