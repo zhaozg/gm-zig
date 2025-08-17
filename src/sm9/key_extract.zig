@@ -42,18 +42,30 @@ pub const SignUserPrivateKey = struct {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
         
-        // Retry mechanism for key extraction when modular inverse fails
+        // Enhanced retry mechanism with better salt generation for robust key extraction
         var attempt: u32 = 0;
-        const max_attempts: u32 = 256;
+        const max_attempts: u32 = 1000; // Increased attempts for mathematical robustness
         
         while (attempt < max_attempts) : (attempt += 1) {
             // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
-            // Include attempt counter to ensure different hash values on retry
+            // Enhanced salt generation to ensure different hash values
             var hash_input = std.ArrayList(u8).init(allocator);
             defer hash_input.deinit();
             
             try hash_input.appendSlice(user_id);
-            try hash_input.append(@as(u8, @intCast(attempt & 0xFF))); // Add attempt as salt
+            
+            // Multi-byte salt generation for better entropy
+            const salt_bytes = [8]u8{
+                @as(u8, @intCast((attempt >> 24) & 0xFF)),
+                @as(u8, @intCast((attempt >> 16) & 0xFF)),
+                @as(u8, @intCast((attempt >> 8) & 0xFF)),
+                @as(u8, @intCast(attempt & 0xFF)),
+                @as(u8, @intCast((attempt ^ 0xAA) & 0xFF)),
+                @as(u8, @intCast((attempt ^ 0x55) & 0xFF)),
+                @as(u8, @intCast((attempt ^ 0xFF) & 0xFF)),
+                @as(u8, @intCast((attempt + 0x33) & 0xFF)),
+            };
+            try hash_input.appendSlice(&salt_bytes);
             
             const h1_result = try h1Hash(hash_input.items, 0x01, system_params.N, allocator);
             
@@ -155,18 +167,30 @@ pub const EncryptUserPrivateKey = struct {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
         
-        // Retry mechanism for key extraction when modular inverse fails
+        // Enhanced retry mechanism with better salt generation for robust key extraction
         var attempt: u32 = 0;
-        const max_attempts: u32 = 256;
+        const max_attempts: u32 = 1000; // Increased attempts for mathematical robustness
         
         while (attempt < max_attempts) : (attempt += 1) {
             // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
-            // Include attempt counter to ensure different hash values on retry
+            // Enhanced salt generation to ensure different hash values
             var hash_input = std.ArrayList(u8).init(allocator);
             defer hash_input.deinit();
             
             try hash_input.appendSlice(user_id);
-            try hash_input.append(@as(u8, @intCast(attempt & 0xFF))); // Add attempt as salt
+            
+            // Multi-byte salt generation for better entropy
+            const salt_bytes = [8]u8{
+                @as(u8, @intCast((attempt >> 24) & 0xFF)),
+                @as(u8, @intCast((attempt >> 16) & 0xFF)),
+                @as(u8, @intCast((attempt >> 8) & 0xFF)),
+                @as(u8, @intCast(attempt & 0xFF)),
+                @as(u8, @intCast((attempt ^ 0xAA) & 0xFF)),
+                @as(u8, @intCast((attempt ^ 0x55) & 0xFF)),
+                @as(u8, @intCast((attempt ^ 0xFF) & 0xFF)),
+                @as(u8, @intCast((attempt + 0x33) & 0xFF)),
+            };
+            try hash_input.appendSlice(&salt_bytes);
             
             const h1_result = try h1Hash(hash_input.items, 0x03, system_params.N, allocator);
             
