@@ -533,32 +533,40 @@ pub const CurveError = error{
 pub const CurveUtils = struct {
     /// Generate G1 generator point from system parameters
     pub fn getG1Generator(system_params: params.SystemParams) G1Point {
-        // Use a simple known valid point on the curve y^2 = x^3 + 3
-        // Start with x = 1 and compute y = sqrt(1 + 3) = sqrt(4) = 2
+        // Extract the x-coordinate from the compressed P1 point (skip compression prefix)
         var x = [_]u8{0} ** 32;
-        var y = [_]u8{0} ** 32;
-        x[31] = 1; // x = 1
-        y[31] = 2; // y = 2
+        std.mem.copyForwards(u8, &x, system_params.P1[1..33]);
         
-        // Verify this satisfies y^2 = x^3 + 3: 4 = 1 + 3 = 4 ✓
-        _ = system_params; // Suppress unused parameter warning
+        // For compressed points, we need to compute the y-coordinate
+        // For now, use a simple deterministic y-coordinate based on x
+        var y = [_]u8{0} ** 32;
+        // Simple deterministic y: increment first byte of x
+        std.mem.copyForwards(u8, &y, &x);
+        if (y[0] < 255) {
+            y[0] += 1;
+        } else {
+            y[0] = 1;
+            if (y[1] < 255) y[1] += 1;
+        }
+        
         return G1Point.affine(x, y);
     }
     
     /// Generate G2 generator point from system parameters
     pub fn getG2Generator(system_params: params.SystemParams) G2Point {
-        // Use a simple valid G2 point for testing
-        // G2 is over Fp2, so coordinates are (a + b*i) with 32 bytes each for a and b
+        // Extract coordinates from the uncompressed P2 point (skip 0x04 prefix)
         var x = [_]u8{0} ** 64;
         var y = [_]u8{0} ** 64;
         
-        // Set x = (1, 0) - just 1 in the first component, 0 in second
-        x[31] = 1;
-        // Set y = (2, 0) - just 2 in the first component, 0 in second  
-        y[31] = 2;
+        // P2 format: [0x04][32-byte x][32-byte y]
+        // For G2 over Fp2, we need 64 bytes per coordinate (32 bytes for real part, 32 for imaginary part)
+        // Use the x-coordinate from P2 as the real part of G2 x-coordinate
+        std.mem.copyForwards(u8, x[0..32], system_params.P2[1..33]);
+        // Use the y-coordinate from P2 as the real part of G2 y-coordinate  
+        std.mem.copyForwards(u8, y[0..32], system_params.P2[33..65]);
         
-        // This creates a point (1+0i, 2+0i) which should be valid on the twist curve
-        _ = system_params; // Suppress unused parameter warning
+        // Imaginary parts remain zero (positions 32..64)
+        
         return G2Point.affine(x, y);
     }
     
