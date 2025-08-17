@@ -473,10 +473,10 @@ pub const GtOperations = struct {
         curve_params: params.SystemParams,
     ) !bool {
         // Compute left side multi-pairing
-        const left_result = try multiPairing(left_P, left_Q, curve_params);
+        const left_result = try GtOperations.multiPairing(left_P, left_Q, curve_params);
         
         // Compute right side multi-pairing
-        const right_result = try multiPairing(right_P, right_Q, curve_params);
+        const right_result = try GtOperations.multiPairing(right_P, right_Q, curve_params);
         
         // Check if they are equal
         return left_result.equal(right_result);
@@ -485,17 +485,10 @@ pub const GtOperations = struct {
     /// Optimized pairing with precomputation support
     pub fn optimizedPairing(
         P: curve.G1Point,
-        Q_precomp: ?PrecomputedG2,
-        Q: ?curve.G2Point,
+        Q: curve.G2Point,
         curve_params: params.SystemParams,
     ) !GtElement {
-        if (Q_precomp) |precomputed| {
-            return precomputed.pairing(P, curve_params);
-        } else if (Q) |q_point| {
-            return pairing(P, q_point, curve_params);
-        } else {
-            return PairingError.InvalidPoint;
-        }
+        return pairing(P, Q, curve_params);
     }
     
     /// Verify pairing equation: e(P1, Q1) = e(P2, Q2)
@@ -525,8 +518,6 @@ pub const GtElementExtended = struct {
         if (bigint.isZero(exponent)) {
             return GtElement.identity();
         }
-        
-        const window_mask = (@as(u16, 1) << window_size) - 1;
         
         // Precompute powers: base^1, base^2, ..., base^(2^window_size - 1)
         var precomputed: [16]GtElement = undefined; // Support up to 4-bit windows

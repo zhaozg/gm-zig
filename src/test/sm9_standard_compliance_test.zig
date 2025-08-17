@@ -2,9 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// GM/T 0044-2016 Standard Compliance Test Suite
-/// Tests SM9 implementation against official test vectors and requirements
-
 test "GM/T 0044-2016 - Basic parameter validation" {
     const system = sm9.params.SM9System.init();
     

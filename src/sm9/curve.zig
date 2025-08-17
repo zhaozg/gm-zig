@@ -824,4 +824,3 @@ pub const CurveUtils = struct {
         return derived_key;
     }
 };
-};

@@ -238,7 +238,6 @@ test "SM9 complete workflow" {
     try testing.expectEqualSlices(u8, message, decrypted);
 }
 
-/// Phase 4 Enhanced Tests - Complete Algorithm Validation
 test "SM9 Phase 4 - Enhanced mathematical correctness" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
