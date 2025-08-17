@@ -270,7 +270,7 @@ pub fn conditionalMove(dest: *FieldElement, src: FieldElement, condition: u8) vo
 
 /// Secure random field element generation
 /// Generates a uniformly random element in [0, p)
-pub fn randomFieldElement(p: FieldElement, rng: std.rand.Random) FieldElement {
+pub fn randomFieldElement(p: FieldElement, rng: std.Random) FieldElement {
     var result: FieldElement = undefined;
     
     // Generate random bytes and reduce modulo p
