@@ -12,9 +12,9 @@ test "SM9 basic import test" {
 // Test constant-time operations for timing attack resistance
 test "SM9 constant-time operations" {
     // Test constant-time equality
-    var a = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
-    var b = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
-    var c = [_]u8{0x12, 0x34, 0x56, 0x79} ++ [_]u8{0} ** 28;
+    const a = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
+    const b = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
+    const c = [_]u8{0x12, 0x34, 0x56, 0x79} ++ [_]u8{0} ** 28;
     
     // Test equal values
     try testing.expect(sm9.bigint.equal(a, b));
@@ -58,9 +58,8 @@ test "SM9 modular inverse improvements" {
     const product = try sm9.bigint.mulMod(a, inv, m);
     const one = sm9.bigint.fromU64(1);
     
-    // Note: This may not be perfect due to simplified implementation
-    // but should at least return a deterministic result
-    try testing.expect(!sm9.bigint.isZero(product));
+    // Verify the inverse relationship
+    try testing.expect(sm9.bigint.equal(product, one));
 }
 
 // Test point validation security
@@ -72,8 +71,8 @@ test "SM9 curve point validation" {
     try testing.expect(infinity.validate(params));
     
     // Test with constructed point (may or may not be on curve)
-    var x = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    var y = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
+    const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
     const point = sm9.curve.G1Point.affine(x, y);
     
     // Validation should complete without errors
@@ -153,8 +152,8 @@ test "SM9 G2 point validation" {
     try testing.expect(infinity.validate(params));
     
     // Test with constructed G2 point
-    var x = [_]u8{0x01} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
-    var y = [_]u8{0x02} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
+    const x = [_]u8{0x01} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
+    const y = [_]u8{0x02} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
     
     const point = sm9.curve.G2Point.affine(x, y);
     
