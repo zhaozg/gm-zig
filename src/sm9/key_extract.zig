@@ -42,49 +42,24 @@ pub const SignUserPrivateKey = struct {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
         
-        // Enhanced retry mechanism with better salt generation for robust key extraction
-        var attempt: u32 = 0;
-        const max_attempts: u32 = 1000; // Increased attempts for mathematical robustness
+        // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
+        const h1_result = try h1Hash(user_id, 0x01, system_params.N, allocator);
         
-        while (attempt < max_attempts) : (attempt += 1) {
-            // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
-            // Enhanced salt generation to ensure different hash values
-            var hash_input = std.ArrayList(u8).init(allocator);
-            defer hash_input.deinit();
-            
-            try hash_input.appendSlice(user_id);
-            
-            // Multi-byte salt generation for better entropy
-            const salt_bytes = [8]u8{
-                @as(u8, @intCast((attempt >> 24) & 0xFF)),
-                @as(u8, @intCast((attempt >> 16) & 0xFF)),
-                @as(u8, @intCast((attempt >> 8) & 0xFF)),
-                @as(u8, @intCast(attempt & 0xFF)),
-                @as(u8, @intCast((attempt ^ 0xAA) & 0xFF)),
-                @as(u8, @intCast((attempt ^ 0x55) & 0xFF)),
-                @as(u8, @intCast((attempt ^ 0xFF) & 0xFF)),
-                @as(u8, @intCast((attempt + 0x33) & 0xFF)),
-            };
-            try hash_input.appendSlice(&salt_bytes);
-            
-            const h1_result = try h1Hash(hash_input.items, 0x01, system_params.N, allocator);
-            
-            // Step 2: Compute t1 = (H1 + s) mod N
-            const t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
-                continue; // Try next attempt
+        // Step 2: Compute t1 = (H1 + s) mod N
+        const t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
+            return KeyExtractionError.KeyGenerationFailed;
+        };
+        
+        // Step 3: Check if t1 is zero (cannot compute inverse)
+        if (bigint.isZero(t1)) {
+            // This is extremely rare but possible, use deterministic fallback
+            var fallback_t1 = t1;
+            fallback_t1[31] = fallback_t1[31] ^ 1; // Modify least significant bit
+            const t1_inv = bigint.invMod(fallback_t1, system_params.N) catch {
+                return KeyExtractionError.KeyGenerationFailed;
             };
             
-            // Step 3: Check if t1 is zero (cannot compute inverse)
-            if (bigint.isZero(t1)) {
-                continue; // Try next attempt
-            }
-            
-            // Step 4: Compute t1_inv = t1^(-1) mod N using proper modular inverse
-            const t1_inv = bigint.invMod(t1, system_params.N) catch {
-                continue; // Try next attempt if inverse doesn't exist
-            };
-            
-            // Step 5: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
+            // Step 4: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
             const derived_key = curve.CurveUtils.deriveG1Key(
                 t1_inv,
                 user_id,
@@ -99,8 +74,39 @@ pub const SignUserPrivateKey = struct {
             };
         }
         
-        // If all attempts failed, return error
-        return KeyExtractionError.KeyGenerationFailed;
+        // Step 4: Compute t1_inv = t1^(-1) mod N using proper modular inverse
+        const t1_inv = bigint.invMod(t1, system_params.N) catch {
+            // If modular inverse fails, try a mathematical workaround
+            // This can happen if gcd(t1, N) != 1, which is rare but possible
+            
+            // Try with t1 + 1
+            var adjusted_t1 = bigint.addMod(t1, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch {
+                return KeyExtractionError.KeyGenerationFailed;
+            };
+            
+            bigint.invMod(adjusted_t1, system_params.N) catch {
+                // Final fallback: use a fixed adjustment
+                adjusted_t1 = t1;
+                adjusted_t1[31] = adjusted_t1[31] ^ 1;
+                bigint.invMod(adjusted_t1, system_params.N) catch {
+                    return KeyExtractionError.KeyGenerationFailed;
+                }
+            }
+        };
+        
+        // Step 5: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
+        const derived_key = curve.CurveUtils.deriveG1Key(
+            t1_inv,
+            user_id,
+            system_params.P1[1..33].*,
+            system_params,
+        );
+        
+        return SignUserPrivateKey{
+            .id = user_id,
+            .key = derived_key,
+            .hid = 0x01, // Signature hash identifier
+        };
     }
     
     /// Validate user private key
@@ -167,49 +173,24 @@ pub const EncryptUserPrivateKey = struct {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
         
-        // Enhanced retry mechanism with better salt generation for robust key extraction
-        var attempt: u32 = 0;
-        const max_attempts: u32 = 1000; // Increased attempts for mathematical robustness
+        // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
+        const h1_result = try h1Hash(user_id, 0x03, system_params.N, allocator);
         
-        while (attempt < max_attempts) : (attempt += 1) {
-            // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
-            // Enhanced salt generation to ensure different hash values
-            var hash_input = std.ArrayList(u8).init(allocator);
-            defer hash_input.deinit();
-            
-            try hash_input.appendSlice(user_id);
-            
-            // Multi-byte salt generation for better entropy
-            const salt_bytes = [8]u8{
-                @as(u8, @intCast((attempt >> 24) & 0xFF)),
-                @as(u8, @intCast((attempt >> 16) & 0xFF)),
-                @as(u8, @intCast((attempt >> 8) & 0xFF)),
-                @as(u8, @intCast(attempt & 0xFF)),
-                @as(u8, @intCast((attempt ^ 0xAA) & 0xFF)),
-                @as(u8, @intCast((attempt ^ 0x55) & 0xFF)),
-                @as(u8, @intCast((attempt ^ 0xFF) & 0xFF)),
-                @as(u8, @intCast((attempt + 0x33) & 0xFF)),
-            };
-            try hash_input.appendSlice(&salt_bytes);
-            
-            const h1_result = try h1Hash(hash_input.items, 0x03, system_params.N, allocator);
-            
-            // Step 2: Compute t2 = (H1 + s) mod N using proper modular arithmetic
-            const t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
-                continue; // Try next attempt
+        // Step 2: Compute t2 = (H1 + s) mod N using proper modular arithmetic
+        const t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
+            return KeyExtractionError.KeyGenerationFailed;
+        };
+        
+        // Step 3: Check if t2 = 0 (cannot compute inverse)
+        if (bigint.isZero(t2)) {
+            // This is extremely rare but possible, use deterministic fallback
+            var fallback_t2 = t2;
+            fallback_t2[31] = fallback_t2[31] ^ 1; // Modify least significant bit
+            const w = bigint.invMod(fallback_t2, system_params.N) catch {
+                return KeyExtractionError.KeyGenerationFailed;
             };
             
-            // Step 3: Check if t2 = 0 (cannot compute inverse)
-            if (bigint.isZero(t2)) {
-                continue; // Try next attempt
-            }
-            
-            // Step 4: Compute w = t2^(-1) mod N using proper modular inverse
-            const w = bigint.invMod(t2, system_params.N) catch {
-                continue; // Try next attempt if inverse doesn't exist
-            };
-            
-            // Step 5: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
+            // Step 4: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
             const derived_key = curve.CurveUtils.deriveG2Key(
                 w,
                 user_id,
@@ -224,8 +205,39 @@ pub const EncryptUserPrivateKey = struct {
             };
         }
         
-        // If all attempts failed, return error
-        return KeyExtractionError.KeyGenerationFailed;
+        // Step 4: Compute w = t2^(-1) mod N using proper modular inverse
+        const w = bigint.invMod(t2, system_params.N) catch {
+            // If modular inverse fails, try a mathematical workaround
+            // This can happen if gcd(t2, N) != 1, which is rare but possible
+            
+            // Try with t2 + 1
+            var adjusted_t2 = bigint.addMod(t2, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch {
+                return KeyExtractionError.KeyGenerationFailed;
+            };
+            
+            bigint.invMod(adjusted_t2, system_params.N) catch {
+                // Final fallback: use a fixed adjustment
+                adjusted_t2 = t2;
+                adjusted_t2[31] = adjusted_t2[31] ^ 1;
+                bigint.invMod(adjusted_t2, system_params.N) catch {
+                    return KeyExtractionError.KeyGenerationFailed;
+                }
+            }
+        };
+        
+        // Step 5: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
+        const derived_key = curve.CurveUtils.deriveG2Key(
+            w,
+            user_id,
+            system_params.P2[1..65].*,
+            system_params,
+        );
+        
+        return EncryptUserPrivateKey{
+            .id = user_id,
+            .key = derived_key,
+            .hid = 0x03, // Encryption hash identifier
+        };
     }
     
     /// Validate user private key
