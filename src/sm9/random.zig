@@ -4,6 +4,7 @@ const bigint = @import("bigint.zig");
 const field = @import("field.zig");
 const curve = @import("curve.zig");
 const params = @import("params.zig");
+const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Cryptographic Random Number Generation
 /// Provides secure random number generation for SM9 operations
@@ -126,7 +127,7 @@ pub const DeterministicRandom = struct {
         var offset: usize = 0;
 
         while (offset < buffer.len) {
-            var hasher = crypto.hash.sha2.Sha256.init(.{});
+            var hasher = SM3.init(.{});
 
             // Add seed and counter to ensure different outputs
             const seed_bytes = std.mem.asBytes(&self.seed);
@@ -215,7 +216,7 @@ pub fn deriveKeys(master_entropy: []const u8, count: u32, allocator: std.mem.All
     const keys = try allocator.alloc(bigint.BigInt, count);
 
     for (keys, 0..) |*key, i| {
-        var hasher = crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(master_entropy);
         hasher.update("SM9_KEY_DERIVATION");
 
@@ -252,14 +253,14 @@ pub const EntropyPool = struct {
     /// Extract randomness from the pool
     pub fn extract(self: *EntropyPool, buffer: []u8) void {
         // Hash the entire pool to extract randomness
-        var hasher = crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(&self.pool);
 
         var offset: usize = 0;
         var counter: u64 = 0;
 
         while (offset < buffer.len) {
-            var round_hasher = crypto.hash.sha2.Sha256.init(.{});
+            var round_hasher = SM3.init(.{});
             round_hasher.update(&self.pool);
 
             const counter_bytes = std.mem.asBytes(&counter);
@@ -281,7 +282,7 @@ pub const EntropyPool = struct {
 
     /// Mix the entropy pool
     fn mixPool(self: *EntropyPool) void {
-        var hasher = crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(&self.pool);
         hasher.update("POOL_MIX");
 
@@ -297,7 +298,7 @@ pub const EntropyPool = struct {
 
 /// Test entropy source (for testing only)
 pub fn testEntropy(seed: []const u8, output: []u8) void {
-    var hasher = crypto.hash.sha2.Sha256.init(.{});
+    var hasher = SM3.init(.{});
     hasher.update(seed);
     hasher.update("TEST_ENTROPY");
 
@@ -305,7 +306,7 @@ pub fn testEntropy(seed: []const u8, output: []u8) void {
     var counter: u64 = 0;
 
     while (offset < output.len) {
-        var round_hasher = crypto.hash.sha2.Sha256.init(.{});
+        var round_hasher = SM3.init(.{});
         round_hasher.update(seed);
 
         const counter_bytes = std.mem.asBytes(&counter);

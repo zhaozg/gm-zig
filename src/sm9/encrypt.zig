@@ -3,6 +3,7 @@ const crypto = std.crypto;
 const mem = std.mem;
 const params = @import("params.zig");
 const key_extract = @import("key_extract.zig");
+const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Public Key Encryption and Decryption
 /// Based on GM/T 0044-2016 standard
@@ -227,7 +228,7 @@ pub const EncryptionContext = struct {
         // Step 2: Generate deterministic r for consistent testing
         // TODO: Use proper cryptographic random number generation in production
         var r = [_]u8{0} ** 32;
-        var r_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var r_hasher = SM3.init(.{});
         r_hasher.update(user_id);
         r_hasher.update(message);
         r_hasher.update("random_r");
@@ -262,7 +263,7 @@ pub const EncryptionContext = struct {
         // Step 5: Compute w deterministically for consistency
         // Use C1 as the basis for w computation so decryption can reproduce the same value
         var w = [_]u8{0} ** 32;
-        var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var w_hasher = SM3.init(.{});
         w_hasher.update(user_id);
         w_hasher.update(&c1); // Use C1 to derive w
         w_hasher.update("simplified_w_value");
@@ -284,7 +285,7 @@ pub const EncryptionContext = struct {
         }
 
         // Step 8: Compute C3 = H2(C1 || M || ID_B)
-        var c3_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var c3_hasher = SM3.init(.{});
         c3_hasher.update(&c1);
         c3_hasher.update(message);
         c3_hasher.update(user_id);
@@ -320,7 +321,7 @@ pub const EncryptionContext = struct {
         // we use C1 as a consistent source to derive the w value directly
         // This bypasses the need to recover r and makes w computation consistent
         var w = [_]u8{0} ** 32;
-        var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var w_hasher = SM3.init(.{});
         w_hasher.update(user_private_key.id);
         w_hasher.update(&ciphertext.c1); // Use C1 to derive w directly
         w_hasher.update("simplified_w_value");
@@ -338,7 +339,7 @@ pub const EncryptionContext = struct {
         }
 
         // Step 5: Compute u = H2(C1 || M' || ID_B)
-        var u_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var u_hasher = SM3.init(.{});
         u_hasher.update(&ciphertext.c1);
         u_hasher.update(plaintext);
         u_hasher.update(user_private_key.id);
@@ -409,7 +410,7 @@ pub const KEMContext = struct {
         const key = try self.encryption_context.allocator.alloc(u8, key_length);
 
         // Use a simple deterministic key generation for testing
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(user_id);
         hasher.update("key_encapsulation");
         var hash = [_]u8{0} ** 32;
@@ -420,13 +421,13 @@ pub const KEMContext = struct {
         }
 
         // Generate deterministic encapsulation data
-        var enc_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var enc_hasher = SM3.init(.{});
         enc_hasher.update(user_id);
         enc_hasher.update("encapsulation_data");
         var enc_hash1 = [_]u8{0} ** 32;
         enc_hasher.final(&enc_hash1);
 
-        var enc_hasher2 = std.crypto.hash.sha2.Sha256.init(.{});
+        var enc_hasher2 = SM3.init(.{});
         enc_hasher2.update(&enc_hash1);
         enc_hasher2.update("second_part");
         var enc_hash2 = [_]u8{0} ** 32;
@@ -458,7 +459,7 @@ pub const KEMContext = struct {
         const key = try self.encryption_context.allocator.alloc(u8, 32);
 
         // Use the same deterministic key generation as encapsulate
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(user_private_key.id);
         hasher.update("key_encapsulation");
         var hash = [_]u8{0} ** 32;
@@ -469,7 +470,7 @@ pub const KEMContext = struct {
         }
 
         // Verify encapsulation data matches (simple validation)
-        var enc_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var enc_hasher = SM3.init(.{});
         enc_hasher.update(user_private_key.id);
         enc_hasher.update("encapsulation_data");
         var enc_hash1 = [_]u8{0} ** 32;
@@ -499,7 +500,7 @@ pub const EncryptionUtils = struct {
     /// SM9 hash function H2 for encryption
     pub fn computeH2(c1: []const u8, message: []const u8, user_id: []const u8) [32]u8 {
         // Use a simple fixed-size buffer for H2 computation to avoid allocator issues
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(c1);
         hasher.update(message);
         hasher.update(user_id);

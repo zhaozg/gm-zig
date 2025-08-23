@@ -1,6 +1,7 @@
 const std = @import("std");
 const bigint = @import("bigint.zig");
 const params = @import("params.zig");
+const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Elliptic Curve Operations
 /// Provides secure point arithmetic for G1 and G2 groups used in SM9
@@ -736,7 +737,7 @@ pub const CurveUtils = struct {
         derived_key[0] = 0x02; // Compressed point prefix
 
         // Use the computed point and user ID to derive final key
-        var key_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var key_hasher = SM3.init(.{});
         key_hasher.update(&compressed);
         key_hasher.update(user_id);
         key_hasher.update("G1_key_derivation");
@@ -767,7 +768,7 @@ pub const CurveUtils = struct {
         derived_key[0] = 0x04; // Uncompressed point prefix
 
         // Use the computed point and user ID to derive final key
-        var key_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var key_hasher = SM3.init(.{});
         key_hasher.update(&multiplied_point.x);
         key_hasher.update(&multiplied_point.y);
         key_hasher.update(user_id);
@@ -778,7 +779,7 @@ pub const CurveUtils = struct {
         @memcpy(derived_key[1..33], &key_hash);
 
         // Derive second coordinate
-        var key_hasher2 = std.crypto.hash.sha2.Sha256.init(.{});
+        var key_hasher2 = SM3.init(.{});
         key_hasher2.update(&key_hash);
         key_hasher2.update(user_id);
         key_hasher2.update("G2_key_derivation_y");

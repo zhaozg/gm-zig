@@ -1,6 +1,7 @@
 const std = @import("std");
 const crypto = std.crypto;
 const bigint = @import("bigint.zig");
+const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Hash Functions Implementation
 /// Provides H1, H2, and KDF functions as specified in GM/T 0044-2016
@@ -31,7 +32,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 
     while (attempts < max_attempts) : (attempts += 1) {
         // Initialize hash context
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
 
         // Hash input data
         hasher.update(data);
@@ -91,7 +92,7 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, allocator: std.m
 
     // Step 1: Prepare input according to GM/T 0044-2016
     // For H2, we hash message || additional_data directly
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var hasher = SM3.init(.{});
 
     // Step 2: Hash message data
     hasher.update(message);
@@ -110,7 +111,7 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, allocator: std.m
     // Step 6: Ensure result is not zero (required by SM9 spec)
     if (bigint.isZero(result)) {
         // If result is zero, hash again with additional entropy
-        var retry_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var retry_hasher = SM3.init(.{});
         retry_hasher.update(&result);
         retry_hasher.update("RETRY_H2");
         retry_hasher.final(&result);
@@ -144,7 +145,7 @@ pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) !
     var i: u32 = 0;
     while (i < num_blocks) : (i += 1) {
         // Initialize hasher for this block
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
 
         // Hash input data
         hasher.update(input);
@@ -188,7 +189,7 @@ pub fn expandedKdf(
     if (output_len == 0) return error.InvalidLength;
 
     // Step 1: Extract phase - create pseudorandom key from input and salt
-    var extract_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var extract_hasher = SM3.init(.{});
     extract_hasher.update(salt);
     extract_hasher.update(input);
     extract_hasher.update("SM9_HKDF_EXTRACT");
@@ -209,7 +210,7 @@ pub fn expandedKdf(
 
     var i: u8 = 0;
     while (i < num_blocks) : (i += 1) {
-        var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var expand_hasher = SM3.init(.{});
 
         // For first block, don't include previous block
         if (i > 0) {
@@ -240,7 +241,7 @@ pub fn expandedKdf(
 
 /// Hash data to field element for curve operations
 pub fn hashToField(data: []const u8, field_order: [32]u8) [32]u8 {
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var hasher = SM3.init(.{});
     hasher.update(data);
     hasher.update("SM9_HASH_TO_FIELD");
 
@@ -279,7 +280,7 @@ pub fn deterministicRandom(seed: []const u8, length: usize, allocator: std.mem.A
     var counter: u32 = 0;
 
     while (offset < length) {
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(seed);
 
         const counter_bytes = [4]u8{
@@ -316,7 +317,7 @@ pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) !
         std.mem.copyForwards(u8, &key_pad, key);
     } else {
         // Hash long keys
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(key);
         var key_hash: [32]u8 = undefined;
         hasher.final(&key_hash);
@@ -329,7 +330,7 @@ pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) !
         byte.* ^= 0x36;
     }
 
-    var inner_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var inner_hasher = SM3.init(.{});
     inner_hasher.update(&inner_key);
     inner_hasher.update(message);
 
@@ -342,7 +343,7 @@ pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) !
         byte.* ^= 0x5c;
     }
 
-    var outer_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var outer_hasher = SM3.init(.{});
     outer_hasher.update(&outer_key);
     outer_hasher.update(&inner_hash);
 
@@ -368,11 +369,11 @@ pub fn constantTimeHashEqual(a: []const u8, b: []const u8) bool {
 pub const HashUtils = struct {
     /// Create hash context for incremental hashing
     pub const HashContext = struct {
-        hasher: std.crypto.hash.sha2.Sha256,
+        hasher: SM3,
 
         pub fn init() HashContext {
             return HashContext{
-                .hasher = std.crypto.hash.sha2.Sha256.init(.{}),
+                .hasher = SM3.init(.{}),
             };
         }
 
@@ -389,7 +390,7 @@ pub const HashUtils = struct {
 
     /// Hash integer to bytes (big-endian)
     pub fn hashInteger(value: u64) [32]u8 {
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
 
         const bytes = [8]u8{
             @as(u8, @intCast((value >> 56) & 0xFF)),
@@ -412,7 +413,7 @@ pub const HashUtils = struct {
 
     /// Hash array of bytes with separator
     pub fn hashArray(arrays: []const []const u8, separator: []const u8, allocator: std.mem.Allocator) ![]u8 {
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
 
         for (arrays, 0..) |array, i| {
             if (i > 0) {

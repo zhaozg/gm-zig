@@ -2,6 +2,7 @@ const std = @import("std");
 const curve = @import("curve.zig");
 const bigint = @import("bigint.zig");
 const params = @import("params.zig");
+const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Bilinear Pairing Operations
 /// Implements R-ate pairing for BN256 curve used in SM9
@@ -199,7 +200,7 @@ fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, cu
     // In practice, this would compute the line function coefficients and evaluate at P
 
     // Create deterministic result based on input points
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var hasher = SM3.init(.{});
 
     hasher.update(&P.x);
     hasher.update(&P.y);
@@ -216,7 +217,7 @@ fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, cu
     var offset: usize = 0;
 
     while (offset < 384) {
-        var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var expand_hasher = SM3.init(.{});
         expand_hasher.update(&hash_result);
 
         const counter_bytes = [4]u8{
@@ -292,7 +293,7 @@ pub fn multiPairing(
         }
 
         // Use precomputed data to speed up pairing
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
 
         // Hash P coordinates
         hasher.update(&P.x);
@@ -314,7 +315,7 @@ pub fn multiPairing(
         var counter: u32 = 0;
 
         while (offset < 384) {
-            var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+            var expand_hasher = SM3.init(.{});
             expand_hasher.update(&base_hash);
 
             const counter_bytes = [4]u8{
@@ -397,7 +398,7 @@ pub const PairingUtils = struct {
 
     /// Generate random Gt element
     pub fn randomGt(seed: []const u8) GtElement {
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(seed);
         hasher.update("RANDOM_GT_ELEMENT");
 
@@ -407,7 +408,7 @@ pub const PairingUtils = struct {
         var counter: u32 = 0;
 
         while (offset < 384) {
-            var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+            var expand_hasher = SM3.init(.{});
             hasher.update(seed);
 
             const counter_bytes = [4]u8{
@@ -438,14 +439,14 @@ pub const PairingUtils = struct {
 
     /// Compress Gt element to shorter representation
     pub fn compressGt(element: GtElement) [48]u8 {
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(&element.data);
         hasher.update("GT_COMPRESSION");
 
         var first_hash: [32]u8 = undefined;
         hasher.final(&first_hash);
 
-        var hasher2 = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher2 = SM3.init(.{});
         hasher2.update(&first_hash);
         hasher2.update("GT_COMPRESSION_2");
 
@@ -461,7 +462,7 @@ pub const PairingUtils = struct {
 
     /// Decompress Gt element from shorter representation
     pub fn decompressGt(compressed: [48]u8) GtElement {
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(&compressed);
         hasher.update("GT_DECOMPRESSION");
 
@@ -471,7 +472,7 @@ pub const PairingUtils = struct {
         var counter: u32 = 0;
 
         while (offset < 384) {
-            var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+            var expand_hasher = SM3.init(.{});
             expand_hasher.update(&compressed);
 
             const counter_bytes = [4]u8{

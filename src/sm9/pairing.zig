@@ -2,6 +2,7 @@ const std = @import("std");
 const curve = @import("curve.zig");
 const bigint = @import("bigint.zig");
 const params = @import("params.zig");
+const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Bilinear Pairing Operations
 /// Implements R-ate pairing for BN256 curve used in SM9
@@ -125,7 +126,7 @@ pub const GtElement = struct {
         var counter: u32 = 0;
 
         while (offset < 384) {
-            var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+            var expand_hasher = SM3.init(.{});
             expand_hasher.update(seed);
             expand_hasher.update("RANDOM_GT_ELEMENT");
 
@@ -234,7 +235,7 @@ fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, cu
     // In practice, this would compute the line function coefficients and evaluate at P
 
     // Create deterministic result based on input points
-    var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+    var hasher = SM3.init(.{});
 
     hasher.update(&P.x);
     hasher.update(&P.y);
@@ -251,7 +252,7 @@ fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, cu
     var offset: usize = 0;
 
     while (offset < 384) {
-        var expand_hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var expand_hasher = SM3.init(.{});
         expand_hasher.update(&hash_result);
 
         const counter_bytes = [4]u8{
@@ -384,7 +385,7 @@ pub const PairingPrecompute = struct {
         std.mem.copyForwards(u8, result.precomputed_data[128..192], &Q.z);
 
         // Fill remaining space with derived data
-        var hasher = std.crypto.hash.sha2.Sha256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(&Q.x);
         hasher.update(&Q.y);
         hasher.update(&Q.z);
