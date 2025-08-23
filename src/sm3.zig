@@ -4,6 +4,17 @@ const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
 
+const builtin = @import("builtin");
+
+/// 编译时检测是否为 Zig 0.15 或更新版本
+pub const isZig015OrNewer = blk: {
+    // Zig 版本号结构: major.minor.patch
+    const version = builtin.zig_version;
+
+    // 0.15.0 或更新版本
+    break :blk (version.major == 0 and version.minor >= 15);
+};
+
 /// SM3哈希算法实现 - 严格按照GM/T 0004-2012标准
 pub const SM3 = struct {
     const Self = @This();
@@ -170,7 +181,7 @@ pub const SM3 = struct {
     }
 
     pub const Error = error{};
-    pub const Writer = std.io.Writer(*Self, Error, write);
+    pub const Writer = std.io.GenericWriter(*Self, Error, write);
 
     fn write(self: *Self, bytes: []const u8) Error!usize {
         self.update(bytes);
@@ -237,8 +248,14 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
 
     for (test_sizes) |size| {
         // 分配对齐的内存
-        const alignment = 16;
-        const buffer = try allocator.alignedAlloc(u8, alignment, size);
+        var buffer: []u8 = undefined;
+        if (isZig015OrNewer) {
+            const alignment = mem.Alignment.@"64";
+            buffer = try allocator.alignedAlloc(u8, alignment, size);
+        } else {
+            const alignment = 16;
+            buffer = try allocator.alignedAlloc(u8, alignment, size);
+        }
         defer allocator.free(buffer);
 
         // 填充随机数据

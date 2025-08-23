@@ -35,19 +35,19 @@ pub const CiphertextFormat = enum {
 pub const Ciphertext = struct {
     /// C1: Random point on G1 (33 bytes compressed)
     c1: [33]u8,
-    
+
     /// C2: Encrypted message (same length as plaintext)
     c2: []u8,
-    
+
     /// C3: MAC value (32 bytes hash)
     c3: [32]u8,
-    
+
     /// Ciphertext format
     format: CiphertextFormat,
-    
+
     /// Allocator used for c2
     allocator: std.mem.Allocator,
-    
+
     /// Initialize ciphertext
     pub fn init(
         allocator: std.mem.Allocator,
@@ -65,7 +65,7 @@ pub const Ciphertext = struct {
             .allocator = allocator,
         };
     }
-    
+
     /// Initialize ciphertext taking ownership of c2 buffer (no copy)
     pub fn initTakeOwnership(
         allocator: std.mem.Allocator,
@@ -82,17 +82,17 @@ pub const Ciphertext = struct {
             .allocator = allocator,
         };
     }
-    
+
     /// Cleanup resources
     pub fn deinit(self: Ciphertext) void {
         self.allocator.free(self.c2);
     }
-    
+
     /// Encode ciphertext to bytes
     pub fn toBytes(self: Ciphertext, allocator: std.mem.Allocator) ![]u8 {
         const total_len = 33 + self.c2.len + 32; // C1(33) + C2(var) + C3(32)
         var result = try allocator.alloc(u8, total_len);
-        
+
         switch (self.format) {
             .c1_c3_c2 => {
                 @memcpy(result[0..33], &self.c1);
@@ -105,10 +105,10 @@ pub const Ciphertext = struct {
                 @memcpy(result[33 + self.c2.len..], &self.c3);
             },
         }
-        
+
         return result;
     }
-    
+
     /// Create ciphertext from bytes
     pub fn fromBytes(
         bytes: []const u8,
@@ -119,11 +119,11 @@ pub const Ciphertext = struct {
         if (bytes.len != 33 + message_len + 32) {
             return error.InvalidCiphertextLength;
         }
-        
+
         var c1: [33]u8 = undefined;
         var c3: [32]u8 = undefined;
         const c2 = try allocator.alloc(u8, message_len);
-        
+
         switch (format) {
             .c1_c3_c2 => {
                 @memcpy(&c1, bytes[0..33]);
@@ -136,7 +136,7 @@ pub const Ciphertext = struct {
                 @memcpy(&c3, bytes[33 + message_len..]);
             },
         }
-        
+
         return Ciphertext{
             .c1 = c1,
             .c2 = c2,
@@ -145,7 +145,7 @@ pub const Ciphertext = struct {
             .allocator = allocator,
         };
     }
-    
+
     /// Validate ciphertext format
     pub fn validate(self: Ciphertext) bool {
         // TODO: Implement ciphertext validation
@@ -158,10 +158,10 @@ pub const Ciphertext = struct {
 pub const EncryptionOptions = struct {
     /// Ciphertext format
     format: CiphertextFormat = .c1_c3_c2,
-    
+
     /// Key derivation function output length
     kdf_len: ?usize = null, // If null, uses message length
-    
+
     /// Additional authenticated data (optional)
     aad: ?[]const u8 = null,
 };
@@ -171,7 +171,7 @@ pub const EncryptionContext = struct {
     system_params: params.SystemParams,
     encrypt_master_public: params.EncryptMasterKeyPair,
     allocator: std.mem.Allocator,
-    
+
     /// Initialize encryption context
     pub fn init(
         system: params.SM9System,
@@ -183,7 +183,7 @@ pub const EncryptionContext = struct {
             .allocator = allocator,
         };
     }
-    
+
     /// Encrypt message for user
     pub fn encrypt(
         self: EncryptionContext,
@@ -201,10 +201,10 @@ pub const EncryptionContext = struct {
         if (message.len > 0xFFFFFF) { // Reasonable limit for message size
             return EncryptionError.InvalidMessage;
         }
-        
+
         // Step 1: Compute Qb = H1(ID_B || hid, N) * P1 + P_pub-e
         const h1_result = try key_extract.h1Hash(user_id, 0x03, self.system_params.N, self.allocator);
-        
+
         // Validate H1 result is not zero
         var h1_is_zero = true;
         for (h1_result) |byte| {
@@ -216,14 +216,14 @@ pub const EncryptionContext = struct {
         if (h1_is_zero) {
             return EncryptionError.KeyDerivationFailed;
         }
-        
+
         // TODO: Implement elliptic curve point operations
         // For now, create a deterministic Qb point
         var qb_bytes = [_]u8{0} ** 33;
         qb_bytes[0] = 0x02; // Compressed point prefix
         qb_bytes[1] = h1_result[0];
         qb_bytes[2] = h1_result[1];
-        
+
         // Step 2: Generate deterministic r for consistent testing
         // TODO: Use proper cryptographic random number generation in production
         var r = [_]u8{0} ** 32;
@@ -232,34 +232,34 @@ pub const EncryptionContext = struct {
         r_hasher.update(message);
         r_hasher.update("random_r");
         r_hasher.final(&r);
-        
+
         // Ensure r is not zero (avoid degenerate case)
         if (std.mem.allEqual(u8, &r, 0)) {
             r[31] = 1;
         }
-        
+
         // Step 3: Compute C1 = r * P1 (elliptic curve scalar multiplication)
         // TODO: Implement proper elliptic curve point multiplication
         var c1 = [_]u8{0} ** 33;
         c1[0] = 0x02; // Compressed point prefix
         c1[1] = r[0] ^ self.system_params.P1[1];
         c1[2] = r[1] ^ self.system_params.P1[2];
-        
+
         // Step 4: For SM9 encryption, pairing computation would be needed
         // but this simplified implementation uses a deterministic approach
         // const pairing = @import("pairing.zig");
         // const curve = @import("curve.zig");
-        
+
         // Get Qb from user ID (hash to G2)
         // const Qb = curve.CurveUtils.hashToG2(user_id, self.system_params);
-        
-        // Get P_pub-e from system parameters  
+
+        // Get P_pub-e from system parameters
         // const P_pub_e = curve.CurveUtils.getG1Generator(self.system_params);
-        
+
         // In a full implementation, we would compute g = e(P_pub-e, Qb)
         // but for this simplified version, we proceed directly to w computation
-        
-        // Step 5: Compute w deterministically for consistency 
+
+        // Step 5: Compute w deterministically for consistency
         // Use C1 as the basis for w computation so decryption can reproduce the same value
         var w = [_]u8{0} ** 32;
         var w_hasher = std.crypto.hash.sha2.Sha256.init(.{});
@@ -267,22 +267,22 @@ pub const EncryptionContext = struct {
         w_hasher.update(&c1); // Use C1 to derive w
         w_hasher.update("simplified_w_value");
         w_hasher.final(&w);
-        
+
         const w_bytes = &w;
-        
+
         // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
         const kdf_len = options.kdf_len orelse message.len;
         const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
-        
+
         // Step 7: Compute C2 = M ⊕ K (XOR encryption)
         const c2 = try self.allocator.alloc(u8, message.len);
         // Note: c2 ownership will be transferred to Ciphertext
-        
+
         for (message, c2, 0..) |m_byte, *c_byte, i| {
             c_byte.* = m_byte ^ K[i % K.len];
         }
-        
+
         // Step 8: Compute C3 = H2(C1 || M || ID_B)
         var c3_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         c3_hasher.update(&c1);
@@ -290,7 +290,7 @@ pub const EncryptionContext = struct {
         c3_hasher.update(user_id);
         var c3 = [_]u8{0} ** 32;
         c3_hasher.final(&c3);
-        
+
         // Step 9: Return ciphertext C = (C1, C2, C3)
         return Ciphertext.initTakeOwnership(
             self.allocator,
@@ -300,7 +300,7 @@ pub const EncryptionContext = struct {
             options.format,
         );
     }
-    
+
     /// Decrypt ciphertext with user private key
     pub fn decrypt(
         self: EncryptionContext,
@@ -309,12 +309,12 @@ pub const EncryptionContext = struct {
         options: EncryptionOptions,
     ) ![]u8 {
         _ = options;
-        
+
         // Step 1: Verify ciphertext format
         if (ciphertext.c1[0] != 0x02 and ciphertext.c1[0] != 0x03) {
             return error.InvalidCiphertext;
         }
-        
+
         // Step 2: Derive the same w value used during encryption
         // Since we need to reproduce the same w value without the original message,
         // we use C1 as a consistent source to derive the w value directly
@@ -325,18 +325,18 @@ pub const EncryptionContext = struct {
         w_hasher.update(&ciphertext.c1); // Use C1 to derive w directly
         w_hasher.update("simplified_w_value");
         w_hasher.final(&w);
-        
+
         // Step 3: Compute K = KDF(w, klen) using the same method as encryption
         const kdf_len = ciphertext.c2.len;
         const K = try EncryptionUtils.kdf(w[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
-        
+
         // Step 4: Compute M' = C2 ⊕ K (XOR decryption)
         const plaintext = try self.allocator.alloc(u8, ciphertext.c2.len);
         for (ciphertext.c2, plaintext, 0..) |c_byte, *m_byte, i| {
             m_byte.* = c_byte ^ K[i % K.len];
         }
-        
+
         // Step 5: Compute u = H2(C1 || M' || ID_B)
         var u_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         u_hasher.update(&ciphertext.c1);
@@ -344,13 +344,13 @@ pub const EncryptionContext = struct {
         u_hasher.update(user_private_key.id);
         var u = [_]u8{0} ** 32;
         u_hasher.final(&u);
-        
+
         // Step 6: If u != C3, return error
         if (!std.mem.eql(u8, &u, &ciphertext.c3)) {
             self.allocator.free(plaintext);
             return error.DecryptionFailed;
         }
-        
+
         // Step 7: Return plaintext M'
         return plaintext;
     }
@@ -360,13 +360,13 @@ pub const EncryptionContext = struct {
 pub const KeyEncapsulation = struct {
     /// Encapsulated key
     key: []u8,
-    
+
     /// Key encapsulation data
     encapsulation: [64]u8,
-    
+
     /// Allocator for key
     allocator: std.mem.Allocator,
-    
+
     /// Initialize key encapsulation
     pub fn init(allocator: std.mem.Allocator, key: []const u8, encapsulation: [64]u8) !KeyEncapsulation {
         const key_copy = try allocator.dupe(u8, key);
@@ -376,7 +376,7 @@ pub const KeyEncapsulation = struct {
             .allocator = allocator,
         };
     }
-    
+
     /// Cleanup resources
     pub fn deinit(self: KeyEncapsulation) void {
         self.allocator.free(self.key);
@@ -386,14 +386,14 @@ pub const KeyEncapsulation = struct {
 /// SM9 key encapsulation context
 pub const KEMContext = struct {
     encryption_context: EncryptionContext,
-    
+
     /// Initialize KEM context
     pub fn init(encryption_context: EncryptionContext) KEMContext {
         return KEMContext{
             .encryption_context = encryption_context,
         };
     }
-    
+
     /// Encapsulate key for user
     pub fn encapsulate(
         self: KEMContext,
@@ -404,38 +404,38 @@ pub const KEMContext = struct {
         // 1. Generate random symmetric key K
         // 2. Encrypt K using SM9 encryption
         // 3. Return (K, encapsulation_data)
-        
+
         // Generate key deterministically to avoid leaks and provide consistent results
         const key = try self.encryption_context.allocator.alloc(u8, key_length);
-        
+
         // Use a simple deterministic key generation for testing
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(user_id);
         hasher.update("key_encapsulation");
         var hash = [_]u8{0} ** 32;
         hasher.final(&hash);
-        
+
         for (key, 0..) |*byte, i| {
             byte.* = hash[i % 32];
         }
-        
+
         // Generate deterministic encapsulation data
         var enc_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         enc_hasher.update(user_id);
         enc_hasher.update("encapsulation_data");
         var enc_hash1 = [_]u8{0} ** 32;
         enc_hasher.final(&enc_hash1);
-        
+
         var enc_hasher2 = std.crypto.hash.sha2.Sha256.init(.{});
         enc_hasher2.update(&enc_hash1);
         enc_hasher2.update("second_part");
         var enc_hash2 = [_]u8{0} ** 32;
         enc_hasher2.final(&enc_hash2);
-        
+
         var encapsulation = [_]u8{0} ** 64;
         @memcpy(encapsulation[0..32], &enc_hash1);
         @memcpy(encapsulation[32..64], &enc_hash2);
-        
+
         // Return directly without double allocation
         return KeyEncapsulation{
             .key = key,
@@ -443,7 +443,7 @@ pub const KEMContext = struct {
             .allocator = self.encryption_context.allocator,
         };
     }
-    
+
     /// Decapsulate key with user private key
     pub fn decapsulate(
         self: KEMContext,
@@ -453,34 +453,34 @@ pub const KEMContext = struct {
         // TODO: Implement SM9 key decapsulation
         // 1. Decrypt encapsulation data using SM9 decryption
         // 2. Return symmetric key K
-        
+
         // For consistent testing, recreate the same key that was generated in encapsulate
         const key = try self.encryption_context.allocator.alloc(u8, 32);
-        
+
         // Use the same deterministic key generation as encapsulate
         var hasher = std.crypto.hash.sha2.Sha256.init(.{});
         hasher.update(user_private_key.id);
         hasher.update("key_encapsulation");
         var hash = [_]u8{0} ** 32;
         hasher.final(&hash);
-        
+
         for (key, 0..) |*byte, i| {
             byte.* = hash[i % 32];
         }
-        
+
         // Verify encapsulation data matches (simple validation)
         var enc_hasher = std.crypto.hash.sha2.Sha256.init(.{});
         enc_hasher.update(user_private_key.id);
         enc_hasher.update("encapsulation_data");
         var enc_hash1 = [_]u8{0} ** 32;
         enc_hasher.final(&enc_hash1);
-        
+
         // Just check first 32 bytes for simple validation
         if (!std.mem.eql(u8, encapsulation_data[0..32], &enc_hash1)) {
             self.encryption_context.allocator.free(key);
             return error.InvalidEncapsulation;
         }
-        
+
         return key;
     }
 };
@@ -495,7 +495,7 @@ pub const EncryptionUtils = struct {
         const hash = @import("hash.zig");
         return hash.kdf(input, output_len, allocator);
     }
-    
+
     /// SM9 hash function H2 for encryption
     pub fn computeH2(c1: []const u8, message: []const u8, user_id: []const u8) [32]u8 {
         // Use a simple fixed-size buffer for H2 computation to avoid allocator issues
@@ -503,19 +503,19 @@ pub const EncryptionUtils = struct {
         hasher.update(c1);
         hasher.update(message);
         hasher.update(user_id);
-        
+
         var result: [32]u8 = undefined;
         hasher.final(&result);
         return result;
     }
-    
+
     /// Validate point on G1
     pub fn validateG1Point(point: [32]u8) bool {
         // TODO: Implement G1 point validation
         _ = point;
         return true;
     }
-    
+
     /// Validate point on G2
     pub fn validateG2Point(point: [64]u8) bool {
         // TODO: Implement G2 point validation

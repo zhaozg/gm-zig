@@ -15,7 +15,7 @@ test {
     _ = @import("test/sm9_security_test.zig");
     _ = @import("test/sm9_standard_vectors_test.zig");
     _ = @import("test/sm9_standard_compliance_test.zig"); // New comprehensive compliance tests
-    
+
     // Phase 3: Enhanced SM9 Core Operations Tests
     _ = @import("test/sm9_field_test.zig");
     _ = @import("test/sm9_random_test.zig");

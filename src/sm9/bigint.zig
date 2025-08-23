@@ -4,12 +4,12 @@ const mem = std.mem;
 /// Big Integer Modular Arithmetic for SM9
 /// Provides constant-time modular operations for 256-bit integers used in SM9 algorithm
 /// Based on GM/T 0044-2016 standard
-/// 
+///
 /// Security Features:
 /// - Constant-time operations to prevent timing attacks
 /// - Secure memory clearing for sensitive data
 /// - Protection against invalid point attacks
-/// 
+///
 /// Implementation Notes:
 /// - All operations use big-endian byte representation
 /// - Modular arithmetic operations include overflow protection
@@ -67,20 +67,20 @@ pub fn equal(a: BigInt, b: BigInt) bool {
 pub fn compare(a: BigInt, b: BigInt) i32 {
     var gt: u8 = 0; // a > b
     var lt: u8 = 0; // a < b
-    
+
     // Process from most significant to least significant byte
     var i: usize = 0;
     while (i < 32) : (i += 1) {
         // Check if a[i] > b[i] or a[i] < b[i]
         const a_gt_b = if (a[i] > b[i]) @as(u8, 1) else @as(u8, 0);
         const a_lt_b = if (a[i] < b[i]) @as(u8, 1) else @as(u8, 0);
-        
+
         // Update only if no previous difference was found
         const no_diff = @as(u8, 1) -% (gt | lt);
         gt |= a_gt_b & no_diff;
         lt |= a_lt_b & no_diff;
     }
-    
+
     // Convert to signed result
     return @as(i32, gt) - @as(i32, lt);
 }
@@ -95,7 +95,7 @@ pub fn lessThan(a: BigInt, b: BigInt) bool {
 pub fn add(a: BigInt, b: BigInt) struct { result: BigInt, carry: bool } {
     var result = [_]u8{0} ** 32;
     var carry: u16 = 0;
-    
+
     var i: i32 = 31;
     while (i >= 0) : (i -= 1) {
         const idx = @as(usize, @intCast(i));
@@ -103,7 +103,7 @@ pub fn add(a: BigInt, b: BigInt) struct { result: BigInt, carry: bool } {
         result[idx] = @as(u8, @intCast(sum & 0xFF));
         carry = sum >> 8;
     }
-    
+
     return .{ .result = result, .carry = carry != 0 };
 }
 
@@ -112,7 +112,7 @@ pub fn add(a: BigInt, b: BigInt) struct { result: BigInt, carry: bool } {
 pub fn sub(a: BigInt, b: BigInt) struct { result: BigInt, borrow: bool } {
     var result = [_]u8{0} ** 32;
     var borrow: i16 = 0;
-    
+
     var i: i32 = 31;
     while (i >= 0) : (i -= 1) {
         const idx = @as(usize, @intCast(i));
@@ -125,28 +125,28 @@ pub fn sub(a: BigInt, b: BigInt) struct { result: BigInt, borrow: bool } {
             borrow = 0;
         }
     }
-    
+
     return .{ .result = result, .borrow = borrow != 0 };
 }
 
 /// Modular addition: result = (a + b) mod m
 pub fn addMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
-    
+
     const sum = add(a, b);
-    
+
     // If no carry and sum < m, return sum directly
     if (!sum.carry and lessThan(sum.result, m)) {
         return sum.result;
     }
-    
+
     // Otherwise, compute sum mod m using subtraction
     var result = sum.result;
-    
+
     // Add iteration counter to prevent infinite loops
     var iterations: u32 = 0;
     const max_iterations: u32 = 256; // Should be enough for 256-bit numbers
-    
+
     // Simple reduction: keep subtracting m until result < m
     while (!lessThan(result, m) and iterations < max_iterations) {
         const diff = sub(result, m);
@@ -154,28 +154,28 @@ pub fn addMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         result = diff.result;
         iterations += 1;
     }
-    
+
     // If we hit max iterations, return a simple fallback
     if (iterations >= max_iterations) {
         // For a simple fallback, just return the sum result modulo 2^256
         // This shouldn't happen in practice but prevents infinite loops
         return sum.result;
     }
-    
+
     return result;
 }
 
 /// Modular subtraction: result = (a - b) mod m
 pub fn subMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
-    
+
     const diff = sub(a, b);
-    
+
     // If no borrow, return result directly
     if (!diff.borrow) {
         return diff.result;
     }
-    
+
     // If there was a borrow, add m to get positive result
     const corrected = add(diff.result, m);
     return corrected.result;
@@ -185,7 +185,7 @@ pub fn subMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn shiftLeft(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
-    
+
     var i: i32 = 31;
     while (i >= 0) : (i -= 1) {
         const idx = @as(usize, @intCast(i));
@@ -193,22 +193,22 @@ pub fn shiftLeft(a: BigInt) BigInt {
         result[idx] = (a[idx] << 1) | carry;
         carry = new_carry;
     }
-    
+
     return result;
 }
 
-/// Right shift by one bit  
+/// Right shift by one bit
 pub fn shiftRight(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
-    
+
     var i: usize = 0;
     while (i < 32) : (i += 1) {
         const new_carry = a[i] & 1;
         result[i] = (a[i] >> 1) | (carry << 7);
         carry = new_carry;
     }
-    
+
     return result;
 }
 
@@ -217,26 +217,26 @@ pub fn shiftRight(a: BigInt) BigInt {
 pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
-    
+
     var result = [_]u8{0} ** 32;
     var temp_a = a;
     const temp_b = b;
-    
+
     // Simple double-and-add multiplication
     var bit_index: usize = 0;
     while (bit_index < 256) : (bit_index += 1) {
         // Check if current bit of b is set
         const byte_index = 31 - (bit_index / 8);
         const bit_offset = @as(u3, @intCast(bit_index % 8));
-        
+
         if ((temp_b[byte_index] >> bit_offset) & 1 == 1) {
             result = try addMod(result, temp_a, m);
         }
-        
+
         // Double temp_a for next iteration
         temp_a = try addMod(temp_a, temp_a, m);
     }
-    
+
     return result;
 }
 
@@ -246,19 +246,19 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
-    
+
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    
+
     if (equal(a, one)) {
         return one;
     }
-    
+
     // Binary Extended Euclidean Algorithm
     var u = a;
     var v = m;
     var g1 = one; // g1 = 1
     var g2 = [_]u8{0} ** 32; // g2 = 0
-    
+
     // Remove factors of 2 from u
     while ((u[31] & 1) == 0) {
         u = shiftRight(u);
@@ -269,11 +269,11 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
             g1 = shiftRight(sum.result);
         }
     }
-    
+
     // Main loop
     var iterations: u32 = 0;
     const max_iterations: u32 = 512; // Upper bound for 256-bit numbers
-    
+
     while (!isZero(v) and iterations < max_iterations) {
         // Remove factors of 2 from v
         while ((v[31] & 1) == 0) {
@@ -285,43 +285,43 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
                 g2 = shiftRight(sum.result);
             }
         }
-        
+
         // Ensure u >= v
         if (lessThan(u, v)) {
             // Swap u, v and g1, g2
             const temp_u = u;
             u = v;
             v = temp_u;
-            
+
             const temp_g = g1;
             g1 = g2;
             g2 = temp_g;
         }
-        
+
         // u = u - v, g1 = g1 - g2
         const u_diff = sub(u, v);
         u = u_diff.result;
-        
+
         const g1_diff = subMod(g1, g2, m) catch blk: {
             // If subtraction fails, add m first then subtract
             const g1_sum = addMod(g1, m, m) catch return BigIntError.NotInvertible;
             break :blk subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible;
         };
         g1 = g1_diff;
-        
+
         iterations += 1;
     }
-    
+
     // Check if algorithm converged
     if (iterations >= max_iterations) {
         return BigIntError.NotInvertible;
     }
-    
+
     // u should be 1 if a is invertible
     if (!equal(u, one)) {
         return BigIntError.NotInvertible;
     }
-    
+
     return g1;
 }
 
@@ -329,42 +329,42 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn fromLittleEndian(bytes: []const u8) BigInt {
     var result = [_]u8{0} ** 32;
     const len = @min(bytes.len, 32);
-    
+
     var i: usize = 0;
     while (i < len) : (i += 1) {
         result[31 - i] = bytes[i];
     }
-    
+
     return result;
 }
 
 /// Convert BigInt (big-endian) to little-endian byte array
 pub fn toLittleEndian(a: BigInt, allocator: std.mem.Allocator) ![]u8 {
     var result = try allocator.alloc(u8, 32);
-    
+
     var i: usize = 0;
     while (i < 32) : (i += 1) {
         result[i] = a[31 - i];
     }
-    
+
     return result;
 }
 
 /// Convert hex string to BigInt
 pub fn fromHex(hex: []const u8) !BigInt {
     if (hex.len > 64) return error.InvalidLength;
-    
+
     var result = [_]u8{0} ** 32;
     const hex_bytes = (hex.len + 1) / 2; // Number of bytes this hex string represents
     const start_index = 32 - hex_bytes; // Start from the end (big-endian)
-    
+
     var i: usize = 0;
     while (i < hex.len) : (i += 2) {
         const high = try charToNibble(hex[i]);
         const low = if (i + 1 < hex.len) try charToNibble(hex[i + 1]) else 0;
         result[start_index + i / 2] = (high << 4) | low;
     }
-    
+
     return result;
 }
 
@@ -372,12 +372,12 @@ pub fn fromHex(hex: []const u8) !BigInt {
 pub fn toHex(a: BigInt, allocator: std.mem.Allocator) ![]u8 {
     const hex_chars = "0123456789abcdef";
     var result = try allocator.alloc(u8, 64);
-    
+
     for (a, 0..) |byte, i| {
         result[i * 2] = hex_chars[byte >> 4];
         result[i * 2 + 1] = hex_chars[byte & 0x0F];
     }
-    
+
     return result;
 }
 
@@ -393,7 +393,7 @@ fn charToNibble(c: u8) !u8 {
 /// Create BigInt from u64 value
 pub fn fromU64(value: u64) BigInt {
     var result = [_]u8{0} ** 32;
-    
+
     result[24] = @as(u8, @intCast((value >> 56) & 0xFF));
     result[25] = @as(u8, @intCast((value >> 48) & 0xFF));
     result[26] = @as(u8, @intCast((value >> 40) & 0xFF));
@@ -402,14 +402,14 @@ pub fn fromU64(value: u64) BigInt {
     result[29] = @as(u8, @intCast((value >> 16) & 0xFF));
     result[30] = @as(u8, @intCast((value >> 8) & 0xFF));
     result[31] = @as(u8, @intCast(value & 0xFF));
-    
+
     return result;
 }
 
 /// Convert BigInt to u64 (truncated if too large)
 pub fn toU64(a: BigInt) u64 {
     var result: u64 = 0;
-    
+
     result |= @as(u64, a[24]) << 56;
     result |= @as(u64, a[25]) << 48;
     result |= @as(u64, a[26]) << 40;
@@ -418,6 +418,6 @@ pub fn toU64(a: BigInt) u64 {
     result |= @as(u64, a[29]) << 16;
     result |= @as(u64, a[30]) << 8;
     result |= @as(u64, a[31]);
-    
+
     return result;
 }
