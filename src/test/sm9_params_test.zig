@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
+const curve = sm9.curve;
 
 test "SM9 system parameters initialization" {
     const params = sm9.params.SystemParams.init();
@@ -57,4 +58,52 @@ test "SM9 master key pair from private key" {
 
     const encrypt_keypair = try sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, private_key);
     try testing.expect(encrypt_keypair.validate(params));
+}
+
+test "SM9 master key pair fromPrivateKey correctness" {
+    const params = sm9.params.SystemParams.init();
+
+    // 随机生成合法私钥
+    var private_key = [_]u8{0} ** 32;
+    while (true) {
+        std.crypto.random.bytes(&private_key);
+        if (!sm9.params.isZero(private_key) and sm9.params.isLessThan(private_key, params.N)) break;
+    }
+
+    // 用 generate 生成密钥对
+    const sign_gen = sm9.params.SignMasterKeyPair.generate(params);
+    try testing.expectEqual(false, sm9.params.isZero(sign_gen.private_key));
+    const encrypt_gen = sm9.params.EncryptMasterKeyPair.generate(params);
+    try testing.expectEqual(false, sm9.params.isZero(encrypt_gen.private_key));
+
+    // 用 fromPrivateKey 生成密钥对
+    const sign_from = try sm9.params.SignMasterKeyPair.fromPrivateKey(params, private_key);
+    const encrypt_from = try sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, private_key);
+
+    // 公钥一致性
+    try testing.expectEqualSlices(u8, &sign_from.public_key, &curve.CurveUtils.scalarMultiplyG2(
+        try curve.G2Point.fromUncompressed(params.P2), private_key, params
+    ).compress());
+    try testing.expectEqualSlices(u8, &encrypt_from.public_key, &curve.CurveUtils.scalarMultiplyG1(
+        try curve.G1Point.fromCompressed(params.P1), private_key, params
+    ).compress());
+
+    // 验证密钥对合法
+    try testing.expect(sign_from.validate(params));
+    try testing.expect(encrypt_from.validate(params));
+}
+
+test "SM9 fromPrivateKey invalid input" {
+    const params = sm9.params.SystemParams.init();
+    const zero_key = [_]u8{0} ** 32;
+    const over_key = [_]u8{0xFF} ** 32;
+
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
+        sm9.params.SignMasterKeyPair.fromPrivateKey(params, zero_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
+        sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, zero_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
+        sm9.params.SignMasterKeyPair.fromPrivateKey(params, over_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
+        sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, over_key));
 }

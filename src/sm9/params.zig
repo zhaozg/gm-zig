@@ -1,6 +1,7 @@
 const std = @import("std");
 const crypto = std.crypto;
 const mem = std.mem;
+const curve = @import("curve.zig");
 
 /// SM9 Algorithm Parameters and Master Key Generation
 /// Based on GM/T 0044-2016 standard
@@ -124,14 +125,16 @@ pub const SignMasterKeyPair = struct {
         var private_key = [_]u8{0} ** 32;
         var public_key = [_]u8{0} ** 65;
 
-        // Simple placeholder random generation - should use proper random generation
-        // TODO: Replace with proper cryptographic random number generation
-        private_key[31] = 1; // Temporary: set to 1 to avoid zero
+        // 安全随机生成私钥
+        while (true) {
+            std.crypto.random.bytes(&private_key);
+            if (!isZero(private_key) and isLessThan(private_key, params.N)) break;
+        }
 
         // Compute public key P_pub-s = s * P2
-        // TODO: Implement elliptic curve point multiplication
-        // For now, copy P2 as placeholder
-        std.mem.copyForwards(u8, &public_key, &params.P2);
+        const base_g2 = curve.G2Point.fromUncompressed(params.P2) catch curve.G2Point.infinity();
+        const pub_g2 = curve.CurveUtils.scalarMultiplyG2(base_g2, private_key, params);
+        public_key = pub_g2.compress();
 
         return SignMasterKeyPair{
             .private_key = private_key,
@@ -147,10 +150,9 @@ pub const SignMasterKeyPair = struct {
         }
 
         // Compute public key P_pub-s = s * P2
-        var public_key = [_]u8{0} ** 65;
-        // TODO: Implement elliptic curve point multiplication
-        // For now, copy P2 as placeholder
-        std.mem.copyForwards(u8, &public_key, &params.P2);
+        const base_g2 = curve.G2Point.fromUncompressed(params.P2) catch curve.G2Point.infinity();
+        const pub_g2 = curve.CurveUtils.scalarMultiplyG2(base_g2, private_key, params);
+        const public_key = pub_g2.compress();
 
         return SignMasterKeyPair{
             .private_key = private_key,
@@ -189,14 +191,16 @@ pub const EncryptMasterKeyPair = struct {
         var private_key = [_]u8{0} ** 32;
         var public_key = [_]u8{0} ** 33;
 
-        // Simple placeholder random generation - should use proper random generation
-        // TODO: Replace with proper cryptographic random number generation
-        private_key[31] = 1; // Temporary: set to 1 to avoid zero
+        // 安全随机生成私钥
+        while (true) {
+            std.crypto.random.bytes(&private_key);
+            if (!isZero(private_key) and isLessThan(private_key, params.N)) break;
+        }
 
         // Compute public key P_pub-e = s * P1
-        // TODO: Implement elliptic curve point multiplication
-        // For now, copy P1 as placeholder
-        std.mem.copyForwards(u8, &public_key, &params.P1);
+        const base_g1 = curve.G1Point.fromCompressed(params.P1) catch curve.G1Point.infinity();
+        const pub_g1 = curve.CurveUtils.scalarMultiplyG1(base_g1, private_key, params);
+        public_key = pub_g1.compress();
 
         return EncryptMasterKeyPair{
             .private_key = private_key,
@@ -212,10 +216,9 @@ pub const EncryptMasterKeyPair = struct {
         }
 
         // Compute public key P_pub-e = s * P1
-        var public_key = [_]u8{0} ** 33;
-        // TODO: Implement elliptic curve point multiplication
-        // For now, copy P1 as placeholder
-        std.mem.copyForwards(u8, &public_key, &params.P1);
+        const base_g1 = curve.G1Point.fromCompressed(params.P1) catch curve.G1Point.infinity();
+        const pub_g1 = curve.CurveUtils.scalarMultiplyG1(base_g1, private_key, params);
+        const public_key = pub_g1.compress();
 
         return EncryptMasterKeyPair{
             .private_key = private_key,
@@ -249,7 +252,7 @@ pub const ParameterError = error{
 };
 
 /// Utility function to check if a 32-byte array is zero
-fn isZero(bytes: [32]u8) bool {
+pub fn isZero(bytes: [32]u8) bool {
     for (bytes) |byte| {
         if (byte != 0) return false;
     }
@@ -257,7 +260,7 @@ fn isZero(bytes: [32]u8) bool {
 }
 
 /// Utility function to check if a < b for 32-byte big-endian integers
-fn isLessThan(a: [32]u8, b: [32]u8) bool {
+pub fn isLessThan(a: [32]u8, b: [32]u8) bool {
     var i: usize = 0;
     while (i < 32) : (i += 1) {
         if (a[i] < b[i]) return true;
