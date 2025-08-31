@@ -1,0 +1,139 @@
+{
+  "name": "gm-zig",
+  "version": "0.1.0",
+  "system_prompt": "You are an expert Zig developer. Provide concise, accurate, and idiomatic Zig advice based on the provided context.",
+  "groups": [
+    {
+      "name": "构建与入口",
+      "system_prompt": "关注 Zig 项目的构建脚本和主入口文件。",
+      "data": ["build_zig", "main_zig", "root_zig"]
+    },
+    {
+      "name": "SM2 算法实现",
+      "system_prompt": "分析和优化 SM2 算法相关实现。",
+      "data": ["sm2_dir", "sm2_zig"]
+    },
+    {
+      "name": "SM3 算法实现",
+      "system_prompt": "分析和优化 SM3 算法相关实现。",
+      "data": ["sm3_zig"]
+    },
+    {
+      "name": "SM4 算法实现",
+      "system_prompt": "分析和优化 SM4 算法相关实现。",
+      "data": ["sm4_zig"]
+    },
+    {
+      "name": "SM9 算法实现",
+      "system_prompt": "分析和优化 SM9 算法相关实现。",
+      "data": ["sm9_dir", "sm9_zig"]
+    },
+    {
+      "name": "公共与兼容层",
+      "system_prompt": "关注通用工具和兼容性代码。",
+      "data": ["common_zig", "compat_zig"]
+    },
+    {
+      "name": "WebAssembly 支持",
+      "system_prompt": "关注 Zig 到 WebAssembly 的相关实现。",
+      "data": ["wasm_zig", "wasm_rng_zig"]
+    },
+    {
+      "name": "测试代码",
+      "system_prompt": "关注所有 Zig 测试代码。",
+      "data": ["test_dir"]
+    },
+    {
+      "name": "示例代码",
+      "system_prompt": "关注 Zig 示例代码。",
+      "data": ["examples_dir"]
+    },
+    {
+      "name": "待办任务",
+      "system_prompt": "关注项目当前的开发任务和待办事项。",
+      "data": ["todo_md"]
+    }
+  ],
+  "data": {
+    "build_zig": {
+      "type": "file",
+      "path": "build.zig",
+      "description": "Zig 项目的构建脚本。"
+    },
+    "main_zig": {
+      "type": "file",
+      "path": "src/main.zig",
+      "description": "项目主入口。"
+    },
+    "root_zig": {
+      "type": "file",
+      "path": "src/root.zig",
+      "description": "Zig 项目的根模块。"
+    },
+    "sm2_dir": {
+      "type": "file",
+      "path": "src/sm2/",
+      "description": "SM2 算法相关所有实现文件。"
+    },
+    "sm2_zig": {
+      "type": "file",
+      "path": "src/sm2.zig",
+      "description": "SM2 算法主入口文件。"
+    },
+    "sm3_zig": {
+      "type": "file",
+      "path": "src/sm3.zig",
+      "description": "SM3 算法实现。"
+    },
+    "sm4_zig": {
+      "type": "file",
+      "path": "src/sm4.zig",
+      "description": "SM4 算法实现。"
+    },
+    "sm9_dir": {
+      "type": "file",
+      "path": "src/sm9/",
+      "description": "SM9 算法相关所有实现文件。"
+    },
+    "sm9_zig": {
+      "type": "file",
+      "path": "src/sm9.zig",
+      "description": "SM9 算法主入口文件。"
+    },
+    "common_zig": {
+      "type": "file",
+      "path": "src/common.zig",
+      "description": "通用工具函数。"
+    },
+    "compat_zig": {
+      "type": "file",
+      "path": "src/compat.zig",
+      "description": "兼容性相关代码。"
+    },
+    "wasm_zig": {
+      "type": "file",
+      "path": "src/wasm.zig",
+      "description": "WebAssembly 支持主文件。"
+    },
+    "wasm_rng_zig": {
+      "type": "file",
+      "path": "src/wasmRng.zig",
+      "description": "WebAssembly 随机数支持。"
+    },
+    "test_dir": {
+      "type": "file",
+      "path": "src/test/",
+      "description": "所有 Zig 测试代码。"
+    },
+    "examples_dir": {
+      "type": "file",
+      "path": "src/examples/",
+      "description": "Zig 示例代码。"
+    },
+    "todo_md": {
+      "type": "file",
+      "path": "AGENTS.md",
+      "description": "项目的待办任务列表。"
+    }
+  }
+}
