@@ -11,6 +11,7 @@ pub const params = @import("params.zig");
 pub const key_extract = @import("key_extract.zig");
 pub const sign = @import("sign.zig");
 pub const encrypt = @import("encrypt.zig");
+pub const key_agreement = @import("key_agreement.zig");
 
 // Import new core modules
 pub const bigint = @import("bigint.zig");
@@ -43,6 +44,10 @@ pub const EncryptionContext = encrypt.EncryptionContext;
 pub const EncryptionOptions = encrypt.EncryptionOptions;
 pub const KeyEncapsulation = encrypt.KeyEncapsulation;
 pub const KEMContext = encrypt.KEMContext;
+
+pub const KeyAgreementContext = key_agreement.KeyAgreementContext;
+pub const EphemeralKeyPair = key_agreement.EphemeralKeyPair;
+pub const PartyRole = key_agreement.PartyRole;
 
 /// SM9 comprehensive context for all operations
 pub const SM9Context = struct {

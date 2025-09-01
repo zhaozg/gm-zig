@@ -21,4 +21,8 @@ test {
     _ = @import("test/sm9_random_test.zig");
     _ = @import("test/sm9_curve_test.zig");
     _ = @import("test/sm9_pairing_test.zig");
+    
+    // Enhanced Robustness Tests
+    _ = @import("test/sm9_robustness_test.zig");
+    _ = @import("test/sm9_key_agreement_test.zig");
 }

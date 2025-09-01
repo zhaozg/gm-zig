@@ -36,6 +36,7 @@ pub const mod = @import("sm9/mod.zig");
 pub const key_extract = mod.key_extract;
 pub const sign = mod.sign;
 pub const encrypt = mod.encrypt;
+pub const key_agreement = mod.key_agreement;
 pub const params = mod.params;
 
 // Import new core modules
