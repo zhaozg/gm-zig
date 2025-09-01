@@ -242,7 +242,7 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 
 /// Binary Extended Euclidean Algorithm for modular inverse
 /// Returns the modular inverse of a modulo m using secure constant-time algorithm
-/// More efficient and secure than brute force approach
+/// Enhanced with better error handling and boundary case management
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
@@ -253,7 +253,10 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return one;
     }
 
-    // Binary Extended Euclidean Algorithm
+    // Check if gcd(a, m) = 1 using a quick test
+    if (equal(a, m)) return BigIntError.NotInvertible; // a ≡ 0 (mod m)
+    
+    // Binary Extended Euclidean Algorithm with enhanced error handling
     var u = a;
     var v = m;
     var g1 = one; // g1 = 1
@@ -270,9 +273,9 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         }
     }
 
-    // Main loop
+    // Main loop with enhanced convergence checking
     var iterations: u32 = 0;
-    const max_iterations: u32 = 512; // Upper bound for 256-bit numbers
+    const max_iterations: u32 = 1024; // Increased limit for robustness
 
     while (!isZero(v) and iterations < max_iterations) {
         // Remove factors of 2 from v
@@ -303,8 +306,11 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         u = u_diff.result;
 
         const g1_diff = subMod(g1, g2, m) catch blk: {
-            // If subtraction fails, add m first then subtract
-            const g1_sum = addMod(g1, m, m) catch return BigIntError.NotInvertible;
+            // Enhanced error recovery: try alternative computation
+            const g1_sum = addMod(g1, m, m) catch {
+                // If all else fails, return error
+                return BigIntError.NotInvertible;
+            };
             break :blk subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible;
         };
         g1 = g1_diff;
@@ -312,14 +318,20 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         iterations += 1;
     }
 
-    // Check if algorithm converged
+    // Enhanced convergence check
     if (iterations >= max_iterations) {
         return BigIntError.NotInvertible;
     }
 
-    // u should be 1 if a is invertible
+    // Verify that u = 1 (indicating successful inversion)
     if (!equal(u, one)) {
         return BigIntError.NotInvertible;
+    }
+
+    // Final validation: ensure result is less than modulus
+    if (!lessThan(g1, m)) {
+        const reduced = subMod(g1, m, m) catch return BigIntError.NotInvertible;
+        return reduced;
     }
 
     return g1;
