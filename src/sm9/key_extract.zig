@@ -63,7 +63,7 @@ pub const SignUserPrivateKey = struct {
             const derived_key = curve.CurveUtils.deriveG1Key(
                 t1_inv,
                 user_id,
-                system_params.P1[1..33].*,
+                [_]u8{0} ** 32, // placeholder - function gets base point from system_params
                 system_params,
             );
 
@@ -85,7 +85,7 @@ pub const SignUserPrivateKey = struct {
         const derived_key = curve.CurveUtils.deriveG1Key(
             t1_inv,
             user_id,
-            system_params.P1[1..33].*,
+            [_]u8{0} ** 32, // placeholder - function gets base point from system_params
             system_params,
         );
 
@@ -181,7 +181,7 @@ pub const EncryptUserPrivateKey = struct {
             const derived_key = curve.CurveUtils.deriveG2Key(
                 w,
                 user_id,
-                system_params.P2[1..65].*,
+                [_]u8{0} ** 64, // placeholder - function gets base point from system_params
                 system_params,
             );
 
@@ -203,7 +203,7 @@ pub const EncryptUserPrivateKey = struct {
         const derived_key = curve.CurveUtils.deriveG2Key(
             w,
             user_id,
-            system_params.P2[1..65].*,
+            [_]u8{0} ** 64, // placeholder - function gets base point from system_params
             system_params,
         );
 
@@ -518,6 +518,7 @@ fn createDeterministicPublicKey(user_id: []const u8, hid: u8) [64]u8 {
 /// Ensures cryptographically valid G1 point generation
 fn createFallbackSignKey(user_id: []const u8, t1: [32]u8, system_params: params.SystemParams) SignUserPrivateKey {
     const curve = @import("curve.zig");
+    const bigint = @import("bigint.zig");
     
     // Create deterministic scalar by hashing user_id and t1
     var hasher = crypto.hash.sha3.Sha3_256.init(.{});
@@ -528,16 +529,24 @@ fn createFallbackSignKey(user_id: []const u8, t1: [32]u8, system_params: params.
     var fallback_scalar: [32]u8 = undefined;
     hasher.final(&fallback_scalar);
     
-    // Ensure scalar is non-zero and less than curve order
+    // Ensure scalar is non-zero and less than curve order N
     if (isZeroArray(fallback_scalar)) {
         fallback_scalar[31] = 1; // Make it non-zero
     }
     
+    // Reduce modulo curve order N to ensure valid scalar
+    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch {
+        // If reduction fails, use a safe default
+        var safe_scalar = [_]u8{0} ** 32;
+        safe_scalar[31] = 1;
+        safe_scalar
+    } else reduced_scalar;
+    
     // Use CurveUtils to derive a valid G1 key
     const derived_key = curve.CurveUtils.deriveG1Key(
-        fallback_scalar,
+        reduced_scalar,
         user_id,
-        system_params.P1[1..33].*,
+        [_]u8{0} ** 32, // placeholder - function gets base point from system_params
         system_params,
     );
     
@@ -552,6 +561,7 @@ fn createFallbackSignKey(user_id: []const u8, t1: [32]u8, system_params: params.
 /// Ensures cryptographically valid G2 point generation
 fn createFallbackEncryptKey(user_id: []const u8, t2: [32]u8, system_params: params.SystemParams) EncryptUserPrivateKey {
     const curve = @import("curve.zig");
+    const bigint = @import("bigint.zig");
     
     // Create deterministic scalar by hashing user_id and t2
     var hasher = crypto.hash.sha3.Sha3_256.init(.{});
@@ -562,16 +572,24 @@ fn createFallbackEncryptKey(user_id: []const u8, t2: [32]u8, system_params: para
     var fallback_scalar: [32]u8 = undefined;
     hasher.final(&fallback_scalar);
     
-    // Ensure scalar is non-zero and less than curve order
+    // Ensure scalar is non-zero and less than curve order N
     if (isZeroArray(fallback_scalar)) {
         fallback_scalar[31] = 1; // Make it non-zero
     }
     
+    // Reduce modulo curve order N to ensure valid scalar
+    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch {
+        // If reduction fails, use a safe default
+        var safe_scalar = [_]u8{0} ** 32;
+        safe_scalar[31] = 1;
+        safe_scalar
+    } else reduced_scalar;
+    
     // Use CurveUtils to derive a valid G2 key
     const derived_key = curve.CurveUtils.deriveG2Key(
-        fallback_scalar,
+        reduced_scalar,
         user_id,
-        system_params.P2[1..65].*,
+        [_]u8{0} ** 64, // placeholder - function gets base point from system_params
         system_params,
     );
     

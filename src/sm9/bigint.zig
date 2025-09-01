@@ -240,6 +240,27 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     return result;
 }
 
+/// Modular reduction: result = a mod m
+/// Reduces a large integer to its representative modulo m
+pub fn reduceMod(a: BigInt, m: BigInt) BigIntError!BigInt {
+    if (isZero(m)) return BigIntError.InvalidModulus;
+    
+    // If a < m, just return a
+    if (lessThan(a, m)) {
+        return a;
+    }
+    
+    // Simple iterative reduction (could be optimized with division)
+    var result = a;
+    while (!lessThan(result, m)) {
+        const diff = sub(result, m);
+        if (diff.overflow) break;
+        result = diff.result;
+    }
+    
+    return result;
+}
+
 /// Binary Extended Euclidean Algorithm for modular inverse
 /// Returns the modular inverse of a modulo m using secure constant-time algorithm
 /// Enhanced with better error handling and boundary case management
