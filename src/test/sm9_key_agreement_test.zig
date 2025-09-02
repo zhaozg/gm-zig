@@ -123,9 +123,6 @@ test "SM9 key agreement with different key lengths" {
 }
 
 test "SM9 key agreement parameter validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-
     // Test parameter validation
     try testing.expect(sm9.key_agreement.KeyAgreementUtils.validateParameters(
         "alice@test.com",

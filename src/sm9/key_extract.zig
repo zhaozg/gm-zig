@@ -368,8 +368,11 @@ pub const UserPublicKey = struct {
         const public_key_point = master_point.mul(h1_plus_one, system_params);
         
         // Convert to 64-byte format for storage (use first 64 bytes of G2 point)
-        var point_bytes = [_]u8{0} ** 64;
-        @memcpy(point_bytes[0..64], public_key_point.x[0..64]);
+        const point_bytes = blk: {
+            var bytes = [_]u8{0} ** 64;
+            @memcpy(bytes[0..64], public_key_point.x[0..64]);
+            break :blk bytes;
+        };
 
         return UserPublicKey{
             .id = user_id,
