@@ -288,7 +288,6 @@ pub const SignatureContext = struct {
 
         // Step 6: Generate S point deterministically using simplified approach
         // Create a deterministic point based on user private key and l
-        const curve = @import("curve.zig");
         var S_point_bytes = [_]u8{0x02} ++ [_]u8{0} ** 32; // Start with compressed point format
         
         // Mix l with user private key for S generation

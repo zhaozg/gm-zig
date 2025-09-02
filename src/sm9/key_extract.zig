@@ -384,6 +384,8 @@ pub const UserPublicKey = struct {
 
     /// Validate user public key
     pub fn validate(self: UserPublicKey, system_params: params.SystemParams) bool {
+        _ = system_params; // System parameters not needed for basic validation
+        
         // Check hash identifier is valid
         if (self.hid != 0x01 and self.hid != 0x03) return false;
 
@@ -398,7 +400,6 @@ pub const UserPublicKey = struct {
         if (all_zero) return false;
 
         // Simplified validation for testing - ensure points are reasonable
-        const bigint = @import("bigint.zig");
         
         // For signature keys (hid = 0x01), basic validation
         if (self.hid == 0x01) {

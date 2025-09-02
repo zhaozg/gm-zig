@@ -299,8 +299,8 @@ pub const G1Point = struct {
         return result;
     }
 
-    /// Create point from compressed format (33 bytes)
-    pub fn fromCompressed(compressed: [33]u8) !G1Point {
+    /// Create point from compressed format (33 bytes) - alternative implementation
+    pub fn fromCompressedAlt(compressed: [33]u8) !G1Point {
         if (compressed[0] == 0x00) {
             return G1Point.infinity();
         }
