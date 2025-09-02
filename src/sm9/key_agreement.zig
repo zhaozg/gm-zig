@@ -175,6 +175,11 @@ pub const KeyAgreementContext = struct {
             return KeyAgreementError.InvalidPublicKey;
         };
         
+        // Reject infinity points for ephemeral keys
+        if (peer_ephemeral_point.isInfinity()) {
+            return KeyAgreementError.InvalidPublicKey;
+        }
+        
         if (!peer_ephemeral_point.validate(self.system_params)) {
             return KeyAgreementError.InvalidPublicKey;
         }
