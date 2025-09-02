@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-/// Test key extraction robustness under edge conditions
+// Test key extraction robustness under edge conditions
 test "SM9 key extraction mathematical robustness" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();

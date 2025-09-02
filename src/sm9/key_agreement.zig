@@ -39,6 +39,7 @@ pub const EphemeralKeyPair = struct {
     
     /// Initialize ephemeral key pair
     pub fn generate(user_id: []const u8, allocator: std.mem.Allocator) !EphemeralKeyPair {
+        _ = allocator; // Parameter kept for API compatibility but not used in current implementation
         // Generate deterministic ephemeral key based on user ID and timestamp
         // In production, this should use proper cryptographic randomness
         var private_key = [_]u8{0} ** 32;
@@ -289,7 +290,6 @@ pub const KeyAgreementContext = struct {
         self: KeyAgreementContext,
         user_id: []const u8,
     ) !EphemeralKeyPair {
-        _ = self; // Context not needed for ephemeral key generation
         return EphemeralKeyPair.generate(user_id, self.allocator);
     }
 };

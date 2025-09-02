@@ -767,6 +767,7 @@ pub const CurveUtils = struct {
         base_point: [32]u8,
         curve_params: params.SystemParams,
     ) [33]u8 {
+        _ = base_point; // Parameter kept for API compatibility
         // Create base G1 point from system parameter P1 (compressed format)
         // P1 is stored as [prefix][x_coord] where prefix is 0x02
         const base_g1 = G1Point.fromCompressed(curve_params.P1) catch {
@@ -808,6 +809,7 @@ pub const CurveUtils = struct {
         base_point: [64]u8,
         curve_params: params.SystemParams,
     ) [65]u8 {
+        _ = base_point; // Parameter kept for API compatibility
         // Create base G2 point from system parameter P2 (uncompressed format)
         // P2 is stored as [prefix][x_coord][y_coord] where prefix is 0x04
         const x_coord = curve_params.P2[1..33].*;

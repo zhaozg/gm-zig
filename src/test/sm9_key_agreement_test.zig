@@ -125,7 +125,6 @@ test "SM9 key agreement with different key lengths" {
 test "SM9 key agreement parameter validation" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
 
     // Test parameter validation
     try testing.expect(sm9.key_agreement.KeyAgreementUtils.validateParameters(
@@ -224,11 +223,11 @@ test "SM9 key agreement deterministic behavior" {
     const bob_id = "deterministic_bob@test.com";
 
     const alice_sign_key = try key_context.extractSignKey(alice_id);
-    const bob_sign_key = try key_context.extractSignKey(bob_id);
+    _ = try key_context.extractSignKey(bob_id); // Extract but don't store unused key
 
     // Generate ephemeral keys multiple times and ensure deterministic behavior
     const alice_ephemeral1 = try ka_context.generateEphemeralKey(alice_id);
-    const alice_ephemeral2 = try ka_context.generateEphemeralKey(alice_id);
+    _ = try ka_context.generateEphemeralKey(alice_id); // Generate but don't store unused key
 
     // Note: Due to timestamp inclusion, ephemeral keys might be different
     // But the key agreement should still work correctly
