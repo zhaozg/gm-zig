@@ -216,11 +216,8 @@ pub const KeyAgreementContext = struct {
         hasher.update(&peer_ephemeral_public);
         hasher.update(&my_ephemeral.public_key);
         
-        // Add role-specific data for security
-        hasher.update(switch (my_role) {
-            .initiator => "SM9_KEY_AGREEMENT_INITIATOR",
-            .responder => "SM9_KEY_AGREEMENT_RESPONDER",
-        });
+        // Add protocol identifier (same for both parties to ensure identical shared key)
+        hasher.update("SM9_KEY_AGREEMENT_PROTOCOL");
         
         var shared_hash: [32]u8 = undefined;
         hasher.final(&shared_hash);
