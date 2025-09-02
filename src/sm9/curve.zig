@@ -157,21 +157,29 @@ pub const G1Point = struct {
 
         // For now, return a deterministic but simplified result
         // TODO: Implement proper elliptic curve point addition
-        const result_x = bigint.addMod(p1.x, p2.x, curve_params.q) catch blk: {
-            // Fallback: simple XOR operation to combine coordinates
-            var fallback_x = p1.x;
-            for (&fallback_x, p2.x) |*x1_byte, x2_byte| {
-                x1_byte.* ^= x2_byte;
+        const result_x = blk: {
+            if (bigint.addMod(p1.x, p2.x, curve_params.q)) |result| {
+                break :blk result;
+            } else |_| {
+                // Fallback: simple XOR operation to combine coordinates
+                var fallback_x = p1.x;
+                for (&fallback_x, p2.x) |*x1_byte, x2_byte| {
+                    x1_byte.* ^= x2_byte;
+                }
+                break :blk fallback_x;
             }
-            break :blk fallback_x;
         };
-        const result_y = bigint.addMod(p1.y, p2.y, curve_params.q) catch blk: {
-            // Fallback: simple XOR operation to combine coordinates
-            var fallback_y = p1.y;
-            for (&fallback_y, p2.y) |*y1_byte, y2_byte| {
-                y1_byte.* ^= y2_byte;
+        const result_y = blk: {
+            if (bigint.addMod(p1.y, p2.y, curve_params.q)) |result| {
+                break :blk result;
+            } else |_| {
+                // Fallback: simple XOR operation to combine coordinates
+                var fallback_y = p1.y;
+                for (&fallback_y, p2.y) |*y1_byte, y2_byte| {
+                    y1_byte.* ^= y2_byte;
+                }
+                break :blk fallback_y;
             }
-            break :blk fallback_y;
         };
 
         return G1Point.affine(result_x, result_y);

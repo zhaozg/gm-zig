@@ -108,10 +108,14 @@ pub fn modularInverseBinaryEEA(a: FieldElement, m: FieldElement) FieldError!Fiel
         const u_diff = bigint.sub(u, v);
         u = u_diff.result;
 
-        const g1_diff = bigint.subMod(g1, g2, m) catch blk: {
-            // If subtraction fails, try addition
-            const g1_sum = bigint.addMod(g1, m, m) catch return FieldError.NotInvertible;
-            break :blk bigint.subMod(g1_sum, g2, m) catch return FieldError.NotInvertible;
+        const g1_diff = blk: {
+            if (bigint.subMod(g1, g2, m)) |result| {
+                break :blk result;
+            } else |_| {
+                // If subtraction fails, try addition
+                const g1_sum = bigint.addMod(g1, m, m) catch return FieldError.NotInvertible;
+                break :blk bigint.subMod(g1_sum, g2, m) catch return FieldError.NotInvertible;
+            }
         };
         g1 = g1_diff;
 

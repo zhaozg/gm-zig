@@ -535,11 +535,15 @@ fn createFallbackSignKey(user_id: []const u8, t1: [32]u8, system_params: params.
     }
     
     // Reduce modulo curve order N to ensure valid scalar
-    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch blk: {
-        // If reduction fails, use a safe default
-        var safe_scalar = [_]u8{0} ** 32;
-        safe_scalar[31] = 1;
-        break :blk safe_scalar;
+    const reduced_scalar = blk: {
+        if (bigint.reduceMod(fallback_scalar, system_params.N)) |result| {
+            break :blk result;
+        } else |_| {
+            // If reduction fails, use a safe default
+            var safe_scalar = [_]u8{0} ** 32;
+            safe_scalar[31] = 1;
+            break :blk safe_scalar;
+        }
     };
     
     // Use CurveUtils to derive a valid G1 key
@@ -578,11 +582,15 @@ fn createFallbackEncryptKey(user_id: []const u8, t2: [32]u8, system_params: para
     }
     
     // Reduce modulo curve order N to ensure valid scalar
-    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch blk: {
-        // If reduction fails, use a safe default
-        var safe_scalar = [_]u8{0} ** 32;
-        safe_scalar[31] = 1;
-        break :blk safe_scalar;
+    const reduced_scalar = blk: {
+        if (bigint.reduceMod(fallback_scalar, system_params.N)) |result| {
+            break :blk result;
+        } else |_| {
+            // If reduction fails, use a safe default
+            var safe_scalar = [_]u8{0} ** 32;
+            safe_scalar[31] = 1;
+            break :blk safe_scalar;
+        }
     };
     
     // Use CurveUtils to derive a valid G2 key
