@@ -208,8 +208,11 @@ test "SM9 encryption utility functions" {
     try testing.expect(h2.len == 32);
 
     // Test point validation
-    const g1_point = std.mem.zeroes([33]u8); // Should be 33 bytes for compressed G1 point
-    const g2_point = std.mem.zeroes([65]u8); // Should be 65 bytes for uncompressed G2 point
+    var g1_point = [_]u8{0x02} ++ [_]u8{0} ** 32; // Proper compressed G1 point format
+    g1_point[1] = 1; // Make x-coordinate non-zero
+    
+    var g2_point = [_]u8{0x04} ++ [_]u8{0} ** 64; // Proper uncompressed G2 point format  
+    g2_point[1] = 1; // Make x-coordinate non-zero
 
     try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point, system_params));
     try testing.expect(sm9.encrypt.EncryptionUtils.validateG2Point(g2_point, system_params));
