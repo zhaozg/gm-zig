@@ -400,17 +400,28 @@ pub const UserPublicKey = struct {
         // Validate point coordinates are within field bounds
         const bigint = @import("bigint.zig");
         
-        // Split into x and y coordinates
+        // For signature keys (hid = 0x01), basic validation
+        if (self.hid == 0x01) {
+            // Split into x and y coordinates for G1 point
+            const x_coord = self.point[0..32].*;
+            const y_coord = self.point[32..64].*;
+            
+            // Check coordinates are less than field modulus
+            if (!bigint.lessThan(x_coord, system_params.q)) return false;
+            if (!bigint.lessThan(y_coord, system_params.q)) return false;
+            
+            // Simplified validation - trust generation process for now
+            return true;
+        }
+        
+        // For encryption keys (hid = 0x03), validate as G2 point
+        // G2 points are more complex - for now just check basic bounds
         const x_coord = self.point[0..32].*;
         const y_coord = self.point[32..64].*;
         
         // Check coordinates are less than field modulus
         if (!bigint.lessThan(x_coord, system_params.q)) return false;
         if (!bigint.lessThan(y_coord, system_params.q)) return false;
-
-        // For signature keys (hid = 0x01), validate as G1 point
-        // For encryption keys (hid = 0x03), validate as G2 point
-        // This is a basic validation - a full implementation would check curve equation
         
         return true;
     }

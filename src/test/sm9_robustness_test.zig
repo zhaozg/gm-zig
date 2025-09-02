@@ -141,7 +141,7 @@ test "SM9 bigint mathematical boundary conditions" {
 
     // Subtraction should handle underflow
     const diff = try sm9.bigint.subMod(a, b, modulus);
-    try testing.expect(!sm9.bigint.lessThan(diff, modulus));
+    try testing.expect(sm9.bigint.lessThan(diff, modulus));
 
     // Multiplication should not overflow
     const prod = try sm9.bigint.mulMod(a, b, modulus);
