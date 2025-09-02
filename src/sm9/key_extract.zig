@@ -535,12 +535,12 @@ fn createFallbackSignKey(user_id: []const u8, t1: [32]u8, system_params: params.
     }
     
     // Reduce modulo curve order N to ensure valid scalar
-    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch {
+    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch blk: {
         // If reduction fails, use a safe default
         var safe_scalar = [_]u8{0} ** 32;
         safe_scalar[31] = 1;
-        safe_scalar
-    } else reduced_scalar;
+        break :blk safe_scalar;
+    };
     
     // Use CurveUtils to derive a valid G1 key
     const derived_key = curve.CurveUtils.deriveG1Key(
@@ -578,12 +578,12 @@ fn createFallbackEncryptKey(user_id: []const u8, t2: [32]u8, system_params: para
     }
     
     // Reduce modulo curve order N to ensure valid scalar
-    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch {
+    const reduced_scalar = bigint.reduceMod(fallback_scalar, system_params.N) catch blk: {
         // If reduction fails, use a safe default
         var safe_scalar = [_]u8{0} ** 32;
         safe_scalar[31] = 1;
-        safe_scalar
-    } else reduced_scalar;
+        break :blk safe_scalar;
+    };
     
     // Use CurveUtils to derive a valid G2 key
     const derived_key = curve.CurveUtils.deriveG2Key(
