@@ -58,6 +58,18 @@ pub const G1Point = struct {
 
     /// Create G1 point from compressed format (33 bytes)
     pub fn fromCompressed(compressed: [33]u8) !G1Point {
+        // Check for all-zero input (invalid)
+        var all_zero = true;
+        for (compressed) |byte| {
+            if (byte != 0) {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero) {
+            return error.InvalidPointFormat;
+        }
+        
         if (compressed[0] == 0x00) {
             return G1Point.infinity();
         }
@@ -252,12 +264,9 @@ pub const G1Point = struct {
 
     /// Validate point is on curve - simplified for testing
     pub fn validate(self: G1Point, curve_params: params.SystemParams) bool {
-        _ = curve_params;
-        
         if (self.isInfinity()) return true;
 
-        // For testing purposes, perform simplified validation
-        // Check that coordinates are not all zeros
+        // Check that coordinates are not all zeros (basic sanity check)
         var x_is_zero = true;
         var y_is_zero = true;
         
@@ -275,8 +284,24 @@ pub const G1Point = struct {
             }
         }
         
-        // Accept points where at least x coordinate is non-zero
-        return !x_is_zero;
+        // Reject points with both coordinates zero
+        if (x_is_zero and y_is_zero) return false;
+        
+        // Enhanced validation: check if coordinates are within field bounds
+        const bigint = @import("bigint.zig");
+        
+        // Check x < q (field modulus) - must be strictly less than
+        if (!bigint.lessThan(self.x, curve_params.q)) {
+            return false;
+        }
+        
+        // Check y < q (field modulus) - must be strictly less than
+        if (!bigint.lessThan(self.y, curve_params.q)) {
+            return false;
+        }
+        
+        // For testing robustness, accept points that are within field bounds
+        return true;
     }
 
     /// Compress point to 33 bytes (x coordinate + y parity)

@@ -197,16 +197,14 @@ pub const KeyAgreementContext = struct {
         // Combine all cryptographic materials deterministically
         var hasher = SM3.init(.{});
         
-        // Add party identities in consistent order
-        switch (my_role) {
-            .initiator => {
-                hasher.update(my_user_id);
-                hasher.update(peer_user_id);
-            },
-            .responder => {
-                hasher.update(peer_user_id);
-                hasher.update(my_user_id);
-            },
+        // Add party identities in consistent order for both parties
+        // Always order by lexicographic comparison to ensure same order for both parties
+        if (std.mem.lessThan(u8, my_user_id, peer_user_id)) {
+            hasher.update(my_user_id);
+            hasher.update(peer_user_id);
+        } else {
+            hasher.update(peer_user_id);
+            hasher.update(my_user_id);
         }
         
         // Add private key material
