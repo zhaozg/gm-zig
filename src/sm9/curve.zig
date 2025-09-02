@@ -288,7 +288,6 @@ pub const G1Point = struct {
         if (x_is_zero and y_is_zero) return false;
         
         // Enhanced validation: check if coordinates are within field bounds
-        const bigint = @import("bigint.zig");
         
         // Check x < q (field modulus) - must be strictly less than
         if (!bigint.lessThan(self.x, curve_params.q)) {
