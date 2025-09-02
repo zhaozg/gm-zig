@@ -149,6 +149,9 @@ pub const KeyAgreementContext = struct {
         my_role: PartyRole,
         key_length: usize,
     ) ![]u8 {
+        // Dismiss unused parameter - role removed for key agreement consistency
+        _ = my_role;
+        
         // Input validation
         if (my_user_id.len == 0 or peer_user_id.len == 0) {
             return KeyAgreementError.InvalidUserId;
