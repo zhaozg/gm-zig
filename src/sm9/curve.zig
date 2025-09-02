@@ -58,7 +58,12 @@ pub const G1Point = struct {
 
     /// Create G1 point from compressed format (33 bytes)
     pub fn fromCompressed(compressed: [33]u8) !G1Point {
-        // Check for all-zero input (invalid)
+        // Handle infinity point (first byte 0x00)
+        if (compressed[0] == 0x00) {
+            return G1Point.infinity();
+        }
+        
+        // Check for invalid all-zero input (but not infinity case)
         var all_zero = true;
         for (compressed) |byte| {
             if (byte != 0) {
@@ -68,10 +73,6 @@ pub const G1Point = struct {
         }
         if (all_zero) {
             return error.InvalidPointFormat;
-        }
-        
-        if (compressed[0] == 0x00) {
-            return G1Point.infinity();
         }
 
         if (compressed[0] != 0x02 and compressed[0] != 0x03) {

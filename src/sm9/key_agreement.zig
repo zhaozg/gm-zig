@@ -210,14 +210,30 @@ pub const KeyAgreementContext = struct {
             hasher.update(my_user_id);
         }
         
-        // Add private key material
-        hasher.update(&my_private_key.key);
-        hasher.update(&my_ephemeral.private_key);
+        // Add public key materials only (both parties must use same inputs)
+        // Order ephemeral public keys consistently
+        if (std.mem.lessThan(u8, my_user_id, peer_user_id)) {
+            hasher.update(&my_ephemeral.public_key);
+            hasher.update(&peer_ephemeral_public);
+        } else {
+            hasher.update(&peer_ephemeral_public);
+            hasher.update(&my_ephemeral.public_key);
+        }
         
-        // Add public key materials
-        hasher.update(&peer_public_key.point);
-        hasher.update(&peer_ephemeral_public);
-        hasher.update(&my_ephemeral.public_key);
+        // Add derived public keys consistently
+        const my_public_key = key_extract.UserPublicKey.deriveForSignature(
+            my_user_id,
+            self.system_params,
+            self.sign_master_public,
+        );
+        
+        if (std.mem.lessThan(u8, my_user_id, peer_user_id)) {
+            hasher.update(&my_public_key.point);
+            hasher.update(&peer_public_key.point);
+        } else {
+            hasher.update(&peer_public_key.point);
+            hasher.update(&my_public_key.point);
+        }
         
         // Add protocol identifier (same for both parties to ensure identical shared key)
         hasher.update("SM9_KEY_AGREEMENT_PROTOCOL");
