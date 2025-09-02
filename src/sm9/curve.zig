@@ -88,7 +88,7 @@ pub const G1Point = struct {
         var y: [32]u8 = undefined;
         
         // Use SM3 hash to derive y from x and parity bit deterministically
-        var hasher = std.crypto.hash.sha3.Sha3_256.init(.{});
+        var hasher = SM3.init(.{});
         hasher.update(&x);
         hasher.update(&[_]u8{compressed[0]}); // Include parity information
         hasher.update("SM9_G1_Y_COORDINATE");
