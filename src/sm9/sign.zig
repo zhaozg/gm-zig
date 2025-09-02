@@ -254,25 +254,31 @@ pub const SignatureContext = struct {
         const w_bytes = &w;
 
         // Step 3: Compute h = H2(M || w, N) using processed message
-        const h = key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator) catch {
-            // Fallback to simple hash if h2Hash fails
-            var h_fallback = [_]u8{0} ** 32;
-            var h_hasher = SM3.init(.{});
-            h_hasher.update(processed_message);
-            h_hasher.update(w_bytes[0..32]);
-            h_hasher.final(&h_fallback);
-            break :blk h_fallback;
+        const h = blk: {
+            const h_result = key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator) catch {
+                // Fallback to simple hash if h2Hash fails
+                var h_fallback = [_]u8{0} ** 32;
+                var h_hasher = SM3.init(.{});
+                h_hasher.update(processed_message);
+                h_hasher.update(w_bytes[0..32]);
+                h_hasher.final(&h_fallback);
+                break :blk h_fallback;
+            };
+            break :blk h_result;
         };
 
         // Step 4: Compute l = (r - h) mod N using proper modular arithmetic
         const bigint = @import("bigint.zig");
-        const l = bigint.subMod(r, h, self.system_params.N) catch {
-            // Fallback to simpler computation if modular arithmetic fails
-            var l_simple = [_]u8{0} ** 32;
-            for (0..32) |i| {
-                l_simple[i] = r[i] ^ h[i]; // XOR as simple fallback
-            }
-            break :blk l_simple;
+        const l = blk: {
+            const l_result = bigint.subMod(r, h, self.system_params.N) catch {
+                // Fallback to simpler computation if modular arithmetic fails
+                var l_simple = [_]u8{0} ** 32;
+                for (0..32) |i| {
+                    l_simple[i] = r[i] ^ h[i]; // XOR as simple fallback
+                }
+                break :blk l_simple;
+            };
+            break :blk l_result;
         };
 
         // Step 5: Check if l = 0, if so modify r and recompute
@@ -393,14 +399,17 @@ pub const SignatureContext = struct {
         const w_bytes = &w;
 
         // Recompute h using h2Hash or fallback
-        const h_prime = key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator) catch {
-            // Fallback to simple hash if h2Hash fails
-            var h_fallback = [_]u8{0} ** 32;
-            var h_hasher = SM3.init(.{});
-            h_hasher.update(processed_message);
-            h_hasher.update(w_bytes[0..32]);
-            h_hasher.final(&h_fallback);
-            break :blk h_fallback;
+        const h_prime = blk: {
+            const h_result = key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator) catch {
+                // Fallback to simple hash if h2Hash fails
+                var h_fallback = [_]u8{0} ** 32;
+                var h_hasher = SM3.init(.{});
+                h_hasher.update(processed_message);
+                h_hasher.update(w_bytes[0..32]);
+                h_hasher.final(&h_fallback);
+                break :blk h_fallback;
+            };
+            break :blk h_result;
         };
 
         // Additional validation: ensure S point is not identity and has correct format
