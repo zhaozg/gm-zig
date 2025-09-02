@@ -29,7 +29,7 @@ test "SM9 key extraction mathematical robustness" {
 
         // Test signature key extraction
         const sign_key = key_context.extractSignKey(user_id) catch |err| {
-            std.debug.print("Sign key extraction failed for '{}': {}\n", .{ user_id, err });
+            std.debug.print("Sign key extraction failed for '{s}': {}\n", .{ user_id, err });
             continue;
         };
 
@@ -40,7 +40,7 @@ test "SM9 key extraction mathematical robustness" {
 
         // Test encryption key extraction  
         const encrypt_key = key_context.extractEncryptKey(user_id) catch |err| {
-            std.debug.print("Encrypt key extraction failed for '{}': {}\n", .{ user_id, err });
+            std.debug.print("Encrypt key extraction failed for '{s}': {}\n", .{ user_id, err });
             continue;
         };
 

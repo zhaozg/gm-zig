@@ -775,7 +775,7 @@ pub const CurveUtils = struct {
             const x_coord = curve_params.P1[1..33].*;
             var y_coord = x_coord;
             y_coord[31] = y_coord[31] ^ 1; // Make y different from x
-            return G1Point.affine(x_coord, y_coord);
+            return [_]u8{0x02} ++ x_coord;
         };
 
         // Perform scalar multiplication: scalar * P1
@@ -812,8 +812,12 @@ pub const CurveUtils = struct {
         _ = base_point; // Parameter kept for API compatibility
         // Create base G2 point from system parameter P2 (uncompressed format)
         // P2 is stored as [prefix][x_coord][y_coord] where prefix is 0x04
-        const x_coord = curve_params.P2[1..33].*;
-        const y_coord = curve_params.P2[33..65].*;
+        // For G2, coordinates are 64 bytes each, but P2 stores only 32 bytes per coordinate
+        // We need to expand them to 64 bytes for G2Point.affine
+        var x_coord = [_]u8{0} ** 64;
+        var y_coord = [_]u8{0} ** 64;
+        std.mem.copyForwards(u8, x_coord[0..32], curve_params.P2[1..33]);
+        std.mem.copyForwards(u8, y_coord[0..32], curve_params.P2[33..65]);
         const base_g2 = G2Point.affine(x_coord, y_coord);
 
         // Perform scalar multiplication: scalar * P2

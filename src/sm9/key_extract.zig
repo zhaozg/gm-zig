@@ -298,7 +298,7 @@ pub const UserPublicKey = struct {
         const h1_plus_one = bigint.addMod(h1_result, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch h1_result;
         
         // Use master public key point for computation
-        const master_point = curve.G1Point.fromCompressed(master_public_key.public_key) catch {
+        const master_point = curve.G2Point.fromUncompressed(master_public_key.public_key) catch {
             // Fallback: create a deterministic valid point
             return UserPublicKey{
                 .id = user_id,
@@ -354,8 +354,8 @@ pub const UserPublicKey = struct {
         // Public key = [H1]P_pub + P_pub = [H1+1]P_pub
         const h1_plus_one = bigint.addMod(h1_result, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch h1_result;
         
-        // Use master public key point for computation (G2 point)
-        const master_point = curve.G2Point.fromUncompressed(master_public_key.public_key) catch {
+        // Use master public key point for computation (G1 point)
+        const master_point = curve.G1Point.fromCompressed(master_public_key.public_key) catch {
             // Fallback: create a deterministic valid point
             return UserPublicKey{
                 .id = user_id,
@@ -533,7 +533,7 @@ fn createFallbackSignKey(user_id: []const u8, t1: [32]u8, system_params: params.
     hasher.final(&fallback_scalar);
     
     // Ensure scalar is non-zero and less than curve order N
-    if (isZeroArray(fallback_scalar)) {
+    if (isZeroArray(&fallback_scalar)) {
         fallback_scalar[31] = 1; // Make it non-zero
     }
     
@@ -580,7 +580,7 @@ fn createFallbackEncryptKey(user_id: []const u8, t2: [32]u8, system_params: para
     hasher.final(&fallback_scalar);
     
     // Ensure scalar is non-zero and less than curve order N
-    if (isZeroArray(fallback_scalar)) {
+    if (isZeroArray(&fallback_scalar)) {
         fallback_scalar[31] = 1; // Make it non-zero
     }
     

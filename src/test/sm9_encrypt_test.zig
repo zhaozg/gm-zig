@@ -188,6 +188,9 @@ test "SM9 encryption utility functions" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+    
+    // Initialize system parameters for tests
+    const system_params = sm9.params.SystemParams.init();
 
     // Test KDF
     const input = "test input for KDF";
@@ -205,11 +208,11 @@ test "SM9 encryption utility functions" {
     try testing.expect(h2.len == 32);
 
     // Test point validation
-    const g1_point = std.mem.zeroes([32]u8);
-    const g2_point = std.mem.zeroes([64]u8);
+    const g1_point = std.mem.zeroes([33]u8); // Should be 33 bytes for compressed G1 point
+    const g2_point = std.mem.zeroes([65]u8); // Should be 65 bytes for uncompressed G2 point
 
-    try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point));
-    try testing.expect(sm9.encrypt.EncryptionUtils.validateG2Point(g2_point));
+    try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point, system_params));
+    try testing.expect(sm9.encrypt.EncryptionUtils.validateG2Point(g2_point, system_params));
 }
 
 test "SM9 encryption with large messages" {
