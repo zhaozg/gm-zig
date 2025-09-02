@@ -56,7 +56,7 @@ test "SM9 key extraction mathematical robustness" {
     try testing.expect(successful_extractions >= 4);
 }
 
-/// Test public key derivation robustness
+// Test public key derivation robustness
 test "SM9 public key derivation robustness" {
     const system = sm9.params.SM9System.init();
 
@@ -108,7 +108,7 @@ test "SM9 public key derivation robustness" {
     }
 }
 
-/// Test mathematical boundary conditions in bigint operations
+// Test mathematical boundary conditions in bigint operations
 test "SM9 bigint mathematical boundary conditions" {
     // Test edge cases for modular inverse
     const zero = [_]u8{0} ** 32;
@@ -148,7 +148,7 @@ test "SM9 bigint mathematical boundary conditions" {
     try testing.expect(!sm9.bigint.isZero(prod));
 }
 
-/// Test signature and verification robustness
+// Test signature and verification robustness
 test "SM9 signature robustness with edge cases" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -207,7 +207,7 @@ test "SM9 signature robustness with edge cases" {
     }
 }
 
-/// Test encryption and decryption robustness
+// Test encryption and decryption robustness
 test "SM9 encryption robustness with edge cases" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -255,7 +255,7 @@ test "SM9 encryption robustness with edge cases" {
     }
 }
 
-/// Test curve operations robustness
+// Test curve operations robustness
 test "SM9 curve operations robustness" {
     const system = sm9.params.SM9System.init();
 
