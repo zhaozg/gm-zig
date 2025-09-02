@@ -254,7 +254,7 @@ pub fn reduceMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     var result = a;
     while (!lessThan(result, m)) {
         const diff = sub(result, m);
-        if (diff.overflow) break;
+        if (diff.borrow) break;
         result = diff.result;
     }
     

@@ -367,10 +367,11 @@ pub const UserPublicKey = struct {
         // Compute public key point: [H1+1] * master_public_key
         const public_key_point = master_point.mul(h1_plus_one, system_params);
         
-        // Convert to 64-byte format for storage (use first 64 bytes of G2 point)
+        // Convert to 64-byte format for storage (expand G1 32-byte coordinate to 64-byte format)
         const point_bytes = blk: {
             var bytes = [_]u8{0} ** 64;
-            @memcpy(bytes[0..64], public_key_point.x[0..64]);
+            @memcpy(bytes[0..32], public_key_point.x[0..32]);
+            // Leave bytes[32..64] as zeros for padding
             break :blk bytes;
         };
 
