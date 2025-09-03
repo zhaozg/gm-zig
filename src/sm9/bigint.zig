@@ -357,9 +357,9 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         const new_s = if (lessThan(old_s, qs)) {
             // Wrap around by adding m to old_s first
             const wrapped = add(old_s, m);
-            if (lessThan(wrapped.result, qs)) zero else sub(wrapped.result, qs).result
+            if (lessThan(wrapped.result, qs)) zero else sub(wrapped.result, qs).result;
         } else {
-            sub(old_s, qs).result
+            sub(old_s, qs).result;
         };
         old_s = s;
         s = new_s;
