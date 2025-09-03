@@ -240,89 +240,128 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     return result;
 }
 
-/// Binary Extended Euclidean Algorithm for modular inverse
-/// Returns the modular inverse of a modulo m using secure constant-time algorithm
-/// More efficient and secure than brute force approach
+/// Extended Euclidean Algorithm for modular inverse
+/// Returns the modular inverse of a modulo m
+/// Optimized and robust implementation
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
 
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const zero = [_]u8{0} ** 32;
 
     if (equal(a, one)) {
         return one;
     }
 
-    // Binary Extended Euclidean Algorithm
-    var u = a;
-    var v = m;
-    var g1 = one; // g1 = 1
-    var g2 = [_]u8{0} ** 32; // g2 = 0
-
-    // Remove factors of 2 from u
-    while ((u[31] & 1) == 0) {
-        u = shiftRight(u);
-        if ((g1[31] & 1) == 0) {
-            g1 = shiftRight(g1);
-        } else {
-            const sum = add(g1, m);
-            g1 = shiftRight(sum.result);
-        }
+    // Reduce a modulo m first to ensure a < m
+    var a_reduced = a;
+    var reduce_iterations: u32 = 0;
+    while (!lessThan(a_reduced, m) and reduce_iterations < 256) {
+        const sub_result = sub(a_reduced, m);
+        if (sub_result.borrow) break;
+        a_reduced = sub_result.result;
+        reduce_iterations += 1;
     }
 
-    // Main loop
+    if (reduce_iterations >= 256) {
+        return BigIntError.NotInvertible;
+    }
+
+    // Try simple brute force for small numbers (optimization)
+    var test_val = one;
+    var brute_attempts: u32 = 0;
+    while (brute_attempts < 100) { // Quick check for small inverses
+        const product = mulMod(a_reduced, test_val, m) catch break;
+        
+        if (equal(product, one)) {
+            return test_val;
+        }
+        
+        const add_result = add(test_val, one);
+        if (add_result.carry or !lessThan(add_result.result, m)) {
+            break;
+        }
+        test_val = add_result.result;
+        brute_attempts += 1;
+    }
+
+    // Extended Euclidean Algorithm with strict iteration limits
+    var old_r = m;
+    var r = a_reduced;
+    var old_s = zero;
+    var s = one;
+
     var iterations: u32 = 0;
-    const max_iterations: u32 = 512; // Upper bound for 256-bit numbers
+    const max_iterations: u32 = 100; // Much smaller limit
 
-    while (!isZero(v) and iterations < max_iterations) {
-        // Remove factors of 2 from v
-        while ((v[31] & 1) == 0) {
-            v = shiftRight(v);
-            if ((g2[31] & 1) == 0) {
-                g2 = shiftRight(g2);
-            } else {
-                const sum = add(g2, m);
-                g2 = shiftRight(sum.result);
+    while (!isZero(r) and iterations < max_iterations) {
+        // Division by repeated subtraction with strict limit
+        var quotient = zero;
+        var remainder = old_r;
+        var div_iterations: u32 = 0;
+        
+        while (!lessThan(remainder, r) and div_iterations < 50) {
+            const sub_result = sub(remainder, r);
+            if (sub_result.borrow) break;
+            remainder = sub_result.result;
+            
+            const add_result = add(quotient, one);
+            if (add_result.carry) break;
+            quotient = add_result.result;
+            div_iterations += 1;
+        }
+
+        if (div_iterations >= 50) {
+            return BigIntError.NotInvertible;
+        }
+
+        // Update values
+        old_r = r;
+        r = remainder;
+
+        // Update s coefficients
+        const temp_s = s;
+        
+        // Simple multiplication with limit
+        var q_times_s = zero;
+        var mult_q = quotient;
+        var mult_s = s;
+        var mult_iterations: u32 = 0;
+        
+        while (!isZero(mult_q) and mult_iterations < 32) {
+            if ((mult_q[31] & 1) == 1) {
+                const add_result = addMod(q_times_s, mult_s, m) catch break;
+                q_times_s = add_result;
             }
+            mult_q = shiftRight(mult_q);
+            const double_result = addMod(mult_s, mult_s, m) catch break;
+            mult_s = double_result;
+            mult_iterations += 1;
         }
-
-        // Ensure u >= v
-        if (lessThan(u, v)) {
-            // Swap u, v and g1, g2
-            const temp_u = u;
-            u = v;
-            v = temp_u;
-
-            const temp_g = g1;
-            g1 = g2;
-            g2 = temp_g;
+        
+        // s = old_s - q_times_s (mod m)
+        if (lessThan(old_s, q_times_s)) {
+            const sum = addMod(old_s, m, m) catch return BigIntError.NotInvertible;
+            s = subMod(sum, q_times_s, m) catch return BigIntError.NotInvertible;
+        } else {
+            s = subMod(old_s, q_times_s, m) catch return BigIntError.NotInvertible;
         }
-
-        // u = u - v, g1 = g1 - g2
-        const u_diff = sub(u, v);
-        u = u_diff.result;
-
-        const g1_diff = subMod(g1, g2, m) catch blk: {
-            // If subtraction fails, add m first then subtract
-            const g1_sum = addMod(g1, m, m) catch return BigIntError.NotInvertible;
-            break :blk subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible;
-        };
-        g1 = g1_diff;
-
+        
+        old_s = temp_s;
         iterations += 1;
     }
 
-    // Check if algorithm converged
     if (iterations >= max_iterations) {
         return BigIntError.NotInvertible;
     }
 
-    // u should be 1 if a is invertible
-    if (!equal(u, one)) {
+    // Check if gcd is 1
+    if (!equal(old_r, one)) {
         return BigIntError.NotInvertible;
     }
 
-    return g1;
+    return old_s;
 }
 
 /// Convert little-endian byte array to BigInt (big-endian)

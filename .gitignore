@@ -1,3 +1,5 @@
 /zig-out
 .zig-cache
 /node_modules
+zig-x86_64-linux-*/
+*.tar.xz
