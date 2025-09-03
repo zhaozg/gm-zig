@@ -261,105 +261,98 @@ pub fn reduceMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     return result;
 }
 
-/// Binary Extended Euclidean Algorithm for modular inverse
-/// Returns the modular inverse of a modulo m using secure constant-time algorithm
-/// Enhanced with better error handling and boundary case management
+/// Modular inverse using robust extended Euclidean algorithm
+/// Returns the modular inverse of a modulo m
+/// Based on the standard extended Euclidean algorithm with proper error handling
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
 
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
-
+    
+    // Quick check for a = 1
     if (equal(a, one)) {
         return one;
     }
 
-    // Check if gcd(a, m) = 1 using a quick test
-    if (equal(a, m)) return BigIntError.NotInvertible; // a ≡ 0 (mod m)
-    
-    // Binary Extended Euclidean Algorithm with enhanced error handling
-    var u = a;
-    var v = m;
-    var g1 = one; // g1 = 1
-    var g2 = [_]u8{0} ** 32; // g2 = 0
-
-    // Remove factors of 2 from u
-    while ((u[31] & 1) == 0) {
-        u = shiftRight(u);
-        if ((g1[31] & 1) == 0) {
-            g1 = shiftRight(g1);
-        } else {
-            const sum = add(g1, m);
-            g1 = shiftRight(sum.result);
-        }
+    // Normalize input: ensure a < m
+    var a_norm = a;
+    if (!lessThan(a, m)) {
+        a_norm = reduceMod(a, m);
     }
 
-    // Main loop with enhanced convergence checking
-    var iterations: u32 = 0;
-    const max_iterations: u32 = 1024; // Increased limit for robustness
+    // Check if a ≡ 0 (mod m) after normalization
+    if (isZero(a_norm)) {
+        return BigIntError.NotInvertible;
+    }
 
-    while (!isZero(v) and iterations < max_iterations) {
-        // Remove factors of 2 from v
-        while ((v[31] & 1) == 0) {
-            v = shiftRight(v);
-            if ((g2[31] & 1) == 0) {
-                g2 = shiftRight(g2);
-            } else {
-                const sum = add(g2, m);
-                g2 = shiftRight(sum.result);
-            }
+    // Extended Euclidean Algorithm
+    var old_r = m;
+    var r = a_norm;
+    var old_s = [_]u8{0} ** 32;
+    var s = one;
+
+    while (!isZero(r)) {
+        // Compute quotient and remainder: old_r = q * r + new_r
+        // For large numbers, we use repeated subtraction
+        var quotient = [_]u8{0} ** 32;
+        var remainder = old_r;
+        
+        while (!lessThan(remainder, r)) {
+            const diff = sub(remainder, r);
+            if (diff.borrow) break;
+            remainder = diff.result;
+            quotient = add(quotient, one).result;
         }
 
-        // Ensure u >= v
-        if (lessThan(u, v)) {
-            // Swap u, v and g1, g2
-            const temp_u = u;
-            u = v;
-            v = temp_u;
+        // Update r values: old_r, r = r, remainder
+        old_r = r;
+        r = remainder;
 
-            const temp_g = g1;
-            g1 = g2;
-            g2 = temp_g;
-        }
-
-        // u = u - v, g1 = g1 - g2
-        const u_diff = sub(u, v);
-        u = u_diff.result;
-
-        const g1_diff = blk: {
-            if (subMod(g1, g2, m)) |result| {
-                break :blk result;
-            } else |_| {
-                // Enhanced error recovery: try alternative computation
-                const g1_sum = addMod(g1, m, m) catch {
-                    // If all else fails, return error
-                    return BigIntError.NotInvertible;
-                };
-                break :blk subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible;
+        // Update s values: old_s, s = s, old_s - quotient * s
+        const temp_s = s;
+        const qs_result = mulMod(quotient, s, m) catch {
+            // If multiplication fails, use simpler approach
+            var qs = [_]u8{0} ** 32;
+            var q_temp = quotient;
+            while (!isZero(q_temp)) {
+                if ((q_temp[31] & 1) != 0) {
+                    qs = addMod(qs, s, m) catch return BigIntError.NotInvertible;
+                }
+                q_temp = shiftRight(q_temp);
+                s = addMod(s, s, m) catch return BigIntError.NotInvertible;
             }
+            break :blk qs;
+        } else blk: {
+            break :blk qs_result;
         };
-        g1 = g1_diff;
-
-        iterations += 1;
+        
+        s = subMod(old_s, qs_result, m) catch {
+            // Handle underflow by adding modulus
+            const sum = addMod(old_s, m, m) catch return BigIntError.NotInvertible;
+            break :blk subMod(sum, qs_result, m) catch return BigIntError.NotInvertible;
+        };
+        old_s = temp_s;
     }
 
-    // Enhanced convergence check
-    if (iterations >= max_iterations) {
+    // Check if gcd is 1 (old_r should be 1)
+    if (!equal(old_r, one)) {
         return BigIntError.NotInvertible;
     }
 
-    // Verify that u = 1 (indicating successful inversion)
-    if (!equal(u, one)) {
+    // Ensure result is positive (old_s might be negative)
+    var result = old_s;
+    if (!lessThan(result, m)) {
+        result = reduceMod(result, m);
+    }
+
+    // Verify the result: (a * result) mod m should equal 1
+    const verification = mulMod(a_norm, result, m) catch return BigIntError.NotInvertible;
+    if (!equal(verification, one)) {
         return BigIntError.NotInvertible;
     }
 
-    // Final validation: ensure result is less than modulus
-    if (!lessThan(g1, m)) {
-        const reduced = subMod(g1, m, m) catch return BigIntError.NotInvertible;
-        return reduced;
-    }
-
-    return g1;
+    return result;
 }
 
 /// Alias for invMod to match the naming used in curve operations
