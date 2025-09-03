@@ -345,10 +345,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         }
         
         // Update remainders: (old_r, r) := (r, old_r - q * r)
-        const qr = mulMod(q, r, m) catch {
-            // If multiplication fails, use the original remainder computation
-            temp_dividend
-        };
+        const qr = mulMod(q, r, m) catch temp_dividend;
         
         const new_r = if (lessThan(old_r, qr)) zero else sub(old_r, qr).result;
         old_r = r;

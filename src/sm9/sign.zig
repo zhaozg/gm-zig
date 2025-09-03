@@ -207,7 +207,6 @@ pub const SignatureContext = struct {
         user_private_key: key_extract.SignUserPrivateKey,
         options: SignatureOptions,
     ) !Signature {
-        _ = self; // Context not needed for current simplified signing approach
         // Step 0: Preprocess message based on hash_type option
         var processed_message: []const u8 = message;
         var message_hash: [32]u8 = undefined;
