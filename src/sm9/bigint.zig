@@ -130,6 +130,7 @@ pub fn sub(a: BigInt, b: BigInt) struct { result: BigInt, borrow: bool } {
 }
 
 /// Modular addition: result = (a + b) mod m
+/// Optimized for SM9 parameter sizes
 pub fn addMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
 
@@ -140,29 +141,8 @@ pub fn addMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         return sum.result;
     }
 
-    // Otherwise, compute sum mod m using subtraction
-    var result = sum.result;
-
-    // Add iteration counter to prevent infinite loops
-    var iterations: u32 = 0;
-    const max_iterations: u32 = 256; // Should be enough for 256-bit numbers
-
-    // Simple reduction: keep subtracting m until result < m
-    while (!lessThan(result, m) and iterations < max_iterations) {
-        const diff = sub(result, m);
-        if (diff.borrow) break; // This shouldn't happen in valid cases
-        result = diff.result;
-        iterations += 1;
-    }
-
-    // If we hit max iterations, return a simple fallback
-    if (iterations >= max_iterations) {
-        // For a simple fallback, just return the sum result modulo 2^256
-        // This shouldn't happen in practice but prevents infinite loops
-        return sum.result;
-    }
-
-    return result;
+    // For SM9, use direct modular reduction
+    return mod(sum.result, m);
 }
 
 /// Modular subtraction: result = (a - b) mod m
@@ -214,27 +194,37 @@ pub fn shiftRight(a: BigInt) BigInt {
 
 /// Modular multiplication: result = (a * b) mod m
 /// Uses simple double-and-add algorithm
+/// Modular multiplication: result = (a * b) mod m
+/// Optimized binary method for SM9 parameters
 pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
 
+    // Reduce inputs first to avoid overflow in intermediate calculations
+    const a_mod = mod(a, m) catch return BigIntError.InvalidModulus;
+    const b_mod = mod(b, m) catch return BigIntError.InvalidModulus;
+    
+    if (isZero(a_mod) or isZero(b_mod)) return [_]u8{0} ** 32;
+
     var result = [_]u8{0} ** 32;
-    var temp_a = a;
-    const temp_b = b;
-
-    // Simple double-and-add multiplication
-    var bit_index: usize = 0;
-    while (bit_index < 256) : (bit_index += 1) {
-        // Check if current bit of b is set
-        const byte_index = 31 - (bit_index / 8);
-        const bit_offset = @as(u3, @intCast(bit_index % 8));
-
-        if ((temp_b[byte_index] >> bit_offset) & 1 == 1) {
-            result = try addMod(result, temp_a, m);
+    var base = a_mod;
+    
+    // Scan through bits of b from LSB to MSB
+    var bit_pos: u32 = 0;
+    while (bit_pos < 256) : (bit_pos += 1) {
+        const byte_idx = 31 - (bit_pos / 8);
+        const bit_shift = @as(u3, @intCast(bit_pos % 8));
+        
+        // If bit is set in b, add current base to result
+        if ((b_mod[byte_idx] >> bit_shift) & 1 == 1) {
+            result = addMod(result, base, m) catch return BigIntError.InvalidModulus;
         }
-
-        // Double temp_a for next iteration
-        temp_a = try addMod(temp_a, temp_a, m);
+        
+        // Double the base for next bit position
+        base = addMod(base, base, m) catch return BigIntError.InvalidModulus;
+        
+        // Early exit if base becomes zero (optimization)
+        if (isZero(base)) break;
     }
 
     return result;
@@ -323,7 +313,7 @@ fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     var exp_copy = exp;
     
     var iterations: u32 = 0;
-    const max_iterations: u32 = 256; // One iteration per bit max
+    const max_iterations: u32 = 512; // Increased limit for SM9 parameters
     
     while (!isZero(exp_copy) and iterations < max_iterations) {
         // If exp is odd, multiply result by base_mod
@@ -331,9 +321,11 @@ fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
             result = mulMod(result, base_mod, m) catch return BigIntError.NotInvertible;
         }
         
-        // Square base_mod and halve exp
-        base_mod = mulMod(base_mod, base_mod, m) catch return BigIntError.NotInvertible;
+        // Square base_mod and halve exp (only if exp_copy is not zero after shift)
         exp_copy = shiftRight(exp_copy);
+        if (!isZero(exp_copy)) {
+            base_mod = mulMod(base_mod, base_mod, m) catch return BigIntError.NotInvertible;
+        }
         
         iterations += 1;
     }
