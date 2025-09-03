@@ -342,10 +342,19 @@ pub const SignatureContext = struct {
         // Step 3: For simplified verification, recreate the signing process
         // to check if the same signature would be generated
         
+        // Create a minimal SM9System for key extraction context
+        const minimal_system = params.SM9System{
+            .params = self.system_params,
+            .sign_master = self.sign_master_public,
+            .encrypt_master = params.EncryptMasterKeyPair{
+                .private_key = [_]u8{0} ** 32,  // Placeholder, not used for signature verification
+                .public_key = [_]u8{0x02} ++ [_]u8{0} ** 32,  // Valid compressed point format
+            },
+        };
+        
         // Get user private key by recreating the extraction process
         const key_context = key_extract.KeyExtractionContext.init(
-            self.system_params,
-            self.sign_master_public,
+            minimal_system,
             self.allocator,
         );
         
