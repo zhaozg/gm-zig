@@ -21,6 +21,16 @@ pub const HashError = error{
 pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
+    // Input validation
+    if (data.len == 0) {
+        return HashError.InvalidInput;
+    }
+    
+    // Validate that order is not zero
+    if (bigint.isZero(order)) {
+        return HashError.InvalidInput;
+    }
+
     // Step 1: Prepare input according to GM/T 0044-2016
     // Input format: data || HID || counter (4 bytes)
     var counter: u32 = 1;

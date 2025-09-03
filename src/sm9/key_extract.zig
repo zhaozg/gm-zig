@@ -42,8 +42,20 @@ pub const SignUserPrivateKey = struct {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
 
+        // Input validation
+        if (user_id.len == 0) {
+            return KeyExtractionError.InvalidUserId;
+        }
+        
+        // Validate master key
+        if (!master_key.validate(system_params)) {
+            return KeyExtractionError.InvalidMasterKey;
+        }
+
         // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
-        const h1_result = try h1Hash(user_id, 0x01, system_params.N, allocator);
+        const h1_result = h1Hash(user_id, 0x01, system_params.N, allocator) catch {
+            return KeyExtractionError.KeyGenerationFailed;
+        };
 
         // Step 2: Compute t1 = (H1 + s) mod N
         const t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
@@ -142,8 +154,20 @@ pub const EncryptUserPrivateKey = struct {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
 
+        // Input validation
+        if (user_id.len == 0) {
+            return KeyExtractionError.InvalidUserId;
+        }
+        
+        // Validate master key
+        if (!master_key.validate(system_params)) {
+            return KeyExtractionError.InvalidMasterKey;
+        }
+
         // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
-        const h1_result = try h1Hash(user_id, 0x03, system_params.N, allocator);
+        const h1_result = h1Hash(user_id, 0x03, system_params.N, allocator) catch {
+            return KeyExtractionError.KeyGenerationFailed;
+        };
 
         // Step 2: Compute t2 = (H1 + s) mod N using proper modular arithmetic
         const t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
