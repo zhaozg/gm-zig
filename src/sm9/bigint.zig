@@ -371,7 +371,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
             const wrapped = add(old_t, m);
             if (lessThan(wrapped.result, qt)) zero else sub(wrapped.result, qt).result;
         } else {
-            sub(old_t, qt).result
+            sub(old_t, qt).result;
         };
         old_t = t;
         t = new_t;
