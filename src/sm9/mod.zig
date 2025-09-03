@@ -243,7 +243,7 @@ pub const Utils = struct {
 
     /// Secure zero memory
     pub fn secureZero(bytes: []u8) void {
-        crypto.secureZero(u8, bytes);
+        crypto.utils.secureZero(u8, bytes);
     }
 
     /// Constant-time byte comparison
