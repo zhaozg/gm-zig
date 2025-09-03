@@ -157,10 +157,10 @@ test "GM/T 0044-2016 - Key extraction compliance" {
         
         // Verify deterministic behavior
         const sign_key2 = try key_context.extractSignKey(user_id);
-        try testing.expect(sign_key.point.compress().len == sign_key2.point.compress().len);
+        try testing.expect(sign_key.key.len == sign_key2.key.len);
         
         const encrypt_key2 = try key_context.extractEncryptKey(user_id);
-        try testing.expect(encrypt_key.point.compress().len == encrypt_key2.point.compress().len);
+        try testing.expect(encrypt_key.key.len == encrypt_key2.key.len);
     }
 }
 

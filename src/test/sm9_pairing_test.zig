@@ -66,13 +66,13 @@ test "SM9 Pairing Operations - Bilinearity Properties" {
     
     // Create test points for bilinearity verification
     // Use generator points from system parameters
-    const P1 = sm9.curve.G1Point.fromCompressed(system_params.P1) catch {
+    const P1 = sm9.curve.G1Point.fromCompressed(system_params.P1) catch blk: {
         // Fallback to a simple valid point
         var x = [_]u8{0} ** 32;
         x[31] = 1;
         var y = [_]u8{0} ** 32; 
         y[31] = 2;
-        return sm9.curve.G1Point.affine(x, y);
+        break :blk sm9.curve.G1Point.affine(x, y);
     };
     
     // Create G2 point
