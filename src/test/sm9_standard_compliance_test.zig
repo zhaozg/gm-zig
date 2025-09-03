@@ -313,7 +313,7 @@ test "GM/T 0044-2016 - KDF compliance and security" {
     try testing.expectEqualSlices(u8, kdf1, kdf2);
 }
 
-test "GM/T 0044-2016 - Key extraction compliance" {
+test "GM/T 0044-2016 - Key extraction format compliance" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
