@@ -8,9 +8,9 @@ test "SM9 ciphertext creation and validation" {
     const allocator = gpa.allocator();
 
     // Create valid test data for ciphertext validation
-    var c1 = [_]u8{0x02} ++ [_]u8{0x01} ** 32; // Valid compressed G1 point format
+    const c1 = [_]u8{0x02} ++ [_]u8{0x01} ** 32; // Valid compressed G1 point format
     const c2 = "test message";
-    var c3 = [_]u8{0x33} ** 32; // Non-zero MAC value
+    const c3 = [_]u8{0x33} ** 32; // Non-zero MAC value
 
     const ciphertext = try sm9.encrypt.Ciphertext.init(
         allocator,
