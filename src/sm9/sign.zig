@@ -425,7 +425,7 @@ pub const SignatureContext = struct {
                 for (0..32) |i| {
                     l_fallback[i] = r[i] ^ h_prime[i];
                 }
-                l_fallback
+                l_fallback;
             };
         }
 
