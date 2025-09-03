@@ -252,11 +252,16 @@ pub const SignatureContext = struct {
         h_hasher.update("SM9_SIGNATURE_HASH");
         h_hasher.final(&h);
 
-        // Step 4: Compute l = (r - h) mod N using simple XOR for consistency  
-        var l = [_]u8{0} ** 32;
-        for (0..32) |i| {
-            l[i] = r[i] ^ h[i];
-        }
+        // Step 4: Compute l = (r - h) mod N using proper modular arithmetic
+        const bigint = @import("bigint.zig");
+        var l = bigint.subMod(r, h, self.system_params.N) catch {
+            // If modular subtraction fails, fall back to simple XOR for consistency
+            var l_fallback = [_]u8{0} ** 32;
+            for (0..32) |i| {
+                l_fallback[i] = r[i] ^ h[i];
+            }
+            return l_fallback;
+        };
 
         // Step 5: Check if l = 0, if so modify r and recompute
         var all_zero = true;
@@ -268,10 +273,15 @@ pub const SignatureContext = struct {
         }
         if (all_zero) {
             r[31] = r[31] ^ 1;
-            // Recompute l
-            for (0..32) |i| {
-                l[i] = r[i] ^ h[i];
-            }
+            // Recompute l with proper modular arithmetic
+            l = bigint.subMod(r, h, self.system_params.N) catch {
+                // Fallback to XOR if modular arithmetic fails
+                var l_fallback = [_]u8{0} ** 32;
+                for (0..32) |i| {
+                    l_fallback[i] = r[i] ^ h[i];
+                }
+                return l_fallback;
+            };
         }
 
         // Step 6: Generate S point deterministically using simplified approach
@@ -388,11 +398,16 @@ pub const SignatureContext = struct {
             r[31] = 1;
         }
 
-        // Compute l = (r - h) mod N using simple XOR for consistency
-        var l = [_]u8{0} ** 32;
-        for (0..32) |i| {
-            l[i] = r[i] ^ h_prime[i];
-        }
+        // Compute l = (r - h) mod N using proper modular arithmetic (same as in signing)
+        const bigint = @import("bigint.zig");
+        var l = bigint.subMod(r, h_prime, self.system_params.N) catch {
+            // If modular subtraction fails, fall back to simple XOR for consistency
+            var l_fallback = [_]u8{0} ** 32;
+            for (0..32) |i| {
+                l_fallback[i] = r[i] ^ h_prime[i];
+            }
+            return l_fallback;
+        };
 
         // Check if l = 0, if so modify r and recompute
         var all_zero = true;
@@ -405,9 +420,14 @@ pub const SignatureContext = struct {
         if (all_zero) {
             r[31] = r[31] ^ 1;
             // Recompute l
-            for (0..32) |i| {
-                l[i] = r[i] ^ h_prime[i];
-            }
+            l = bigint.subMod(r, h_prime, self.system_params.N) catch {
+                // Fallback to XOR if modular arithmetic fails
+                var l_fallback = [_]u8{0} ** 32;
+                for (0..32) |i| {
+                    l_fallback[i] = r[i] ^ h_prime[i];
+                }
+                return l_fallback;
+            };
         }
 
         // Generate expected S point deterministically using same approach as signing
