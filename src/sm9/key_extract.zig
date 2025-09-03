@@ -66,7 +66,7 @@ pub const SignUserPrivateKey = struct {
 
         // Step 5: Compute ds_A = t1_inv * P1 using proper elliptic curve scalar multiplication
         const p1_generator = curve.CurveUtils.getG1Generator(system_params);
-        const private_key_point = curve.secureScalarMul(p1_generator, t1_inv, system_params);
+        const private_key_point = curve.CurveUtils.secureScalarMul(p1_generator, t1_inv, system_params);
         
         // Compress the point to get the private key
         const private_key_compressed = private_key_point.compress();
@@ -166,7 +166,7 @@ pub const EncryptUserPrivateKey = struct {
 
         // Step 5: Compute de_B = w * P2 using proper elliptic curve scalar multiplication
         const p2_generator = curve.CurveUtils.getG2Generator(system_params);
-        const private_key_point = curve.secureScalarMulG2(p2_generator, w, system_params);
+        const private_key_point = curve.CurveUtils.secureScalarMulG2(p2_generator, w, system_params);
         
         // Compress the point to get the private key
         const private_key_compressed = private_key_point.compress();
