@@ -240,128 +240,109 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     return result;
 }
 
+/// Basic modular reduction: result = a mod m
+pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
+    if (isZero(m)) return BigIntError.InvalidModulus;
+    
+    if (lessThan(a, m)) {
+        return a;
+    }
+    
+    var result = a;
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 512; // Generous limit for 256-bit numbers
+    
+    while (!lessThan(result, m) and iterations < max_iterations) {
+        const sub_result = sub(result, m);
+        if (sub_result.borrow) break;
+        result = sub_result.result;
+        iterations += 1;
+    }
+    
+    if (iterations >= max_iterations) {
+        return BigIntError.InvalidModulus;
+    }
+    
+    return result;
+}
+
 /// Extended Euclidean Algorithm for modular inverse
 /// Returns the modular inverse of a modulo m
-/// Optimized and robust implementation
+/// Uses Fermat's Little Theorem for prime moduli: a^(-1) ≡ a^(m-2) (mod m)
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
 
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const zero = [_]u8{0} ** 32;
 
     if (equal(a, one)) {
         return one;
     }
 
-    // Reduce a modulo m first to ensure a < m
-    var a_reduced = a;
-    var reduce_iterations: u32 = 0;
-    while (!lessThan(a_reduced, m) and reduce_iterations < 256) {
-        const sub_result = sub(a_reduced, m);
-        if (sub_result.borrow) break;
-        a_reduced = sub_result.result;
-        reduce_iterations += 1;
-    }
-
-    if (reduce_iterations >= 256) {
+    // Reduce a modulo m first
+    const a_reduced = mod(a, m) catch return BigIntError.NotInvertible;
+    
+    if (isZero(a_reduced)) {
         return BigIntError.NotInvertible;
     }
 
-    // Try simple brute force for small numbers (optimization)
-    var test_val = one;
-    var brute_attempts: u32 = 0;
-    while (brute_attempts < 100) { // Quick check for small inverses
-        const product = mulMod(a_reduced, test_val, m) catch break;
-        
-        if (equal(product, one)) {
-            return test_val;
-        }
-        
-        const add_result = add(test_val, one);
-        if (add_result.carry or !lessThan(add_result.result, m)) {
-            break;
-        }
-        test_val = add_result.result;
-        brute_attempts += 1;
+    // For SM9, m is the prime order N, so we can use Fermat's Little Theorem
+    // a^(-1) ≡ a^(m-2) (mod m)
+    
+    // Compute m - 2
+    const two = [_]u8{0} ** 31 ++ [_]u8{2};
+    const m_minus_2_result = sub(m, two);
+    if (m_minus_2_result.borrow) {
+        return BigIntError.NotInvertible;
     }
+    const m_minus_2 = m_minus_2_result.result;
+    
+    // Use modular exponentiation: result = a^(m-2) mod m
+    const result = modPow(a_reduced, m_minus_2, m) catch return BigIntError.NotInvertible;
+    
+    return result;
+}
 
-    // Extended Euclidean Algorithm with strict iteration limits
-    var old_r = m;
-    var r = a_reduced;
-    var old_s = zero;
-    var s = one;
-
+/// Modular exponentiation: base^exp mod m
+/// Uses binary exponentiation method
+fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
+    if (isZero(m)) return BigIntError.InvalidModulus;
+    
+    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    
+    if (isZero(exp)) {
+        return one;
+    }
+    
+    if (equal(exp, one)) {
+        return mod(base, m);
+    }
+    
+    var result = one;
+    var base_mod = mod(base, m) catch return BigIntError.NotInvertible;
+    var exp_copy = exp;
+    
     var iterations: u32 = 0;
-    const max_iterations: u32 = 100; // Much smaller limit
-
-    while (!isZero(r) and iterations < max_iterations) {
-        // Division by repeated subtraction with strict limit
-        var quotient = zero;
-        var remainder = old_r;
-        var div_iterations: u32 = 0;
-        
-        while (!lessThan(remainder, r) and div_iterations < 50) {
-            const sub_result = sub(remainder, r);
-            if (sub_result.borrow) break;
-            remainder = sub_result.result;
-            
-            const add_result = add(quotient, one);
-            if (add_result.carry) break;
-            quotient = add_result.result;
-            div_iterations += 1;
-        }
-
-        if (div_iterations >= 50) {
-            return BigIntError.NotInvertible;
-        }
-
-        // Update values
-        old_r = r;
-        r = remainder;
-
-        // Update s coefficients
-        const temp_s = s;
-        
-        // Simple multiplication with limit
-        var q_times_s = zero;
-        var mult_q = quotient;
-        var mult_s = s;
-        var mult_iterations: u32 = 0;
-        
-        while (!isZero(mult_q) and mult_iterations < 32) {
-            if ((mult_q[31] & 1) == 1) {
-                const add_result = addMod(q_times_s, mult_s, m) catch break;
-                q_times_s = add_result;
-            }
-            mult_q = shiftRight(mult_q);
-            const double_result = addMod(mult_s, mult_s, m) catch break;
-            mult_s = double_result;
-            mult_iterations += 1;
+    const max_iterations: u32 = 256; // One iteration per bit max
+    
+    while (!isZero(exp_copy) and iterations < max_iterations) {
+        // If exp is odd, multiply result by base_mod
+        if ((exp_copy[31] & 1) == 1) {
+            result = mulMod(result, base_mod, m) catch return BigIntError.NotInvertible;
         }
         
-        // s = old_s - q_times_s (mod m)
-        if (lessThan(old_s, q_times_s)) {
-            const sum = addMod(old_s, m, m) catch return BigIntError.NotInvertible;
-            s = subMod(sum, q_times_s, m) catch return BigIntError.NotInvertible;
-        } else {
-            s = subMod(old_s, q_times_s, m) catch return BigIntError.NotInvertible;
-        }
+        // Square base_mod and halve exp
+        base_mod = mulMod(base_mod, base_mod, m) catch return BigIntError.NotInvertible;
+        exp_copy = shiftRight(exp_copy);
         
-        old_s = temp_s;
         iterations += 1;
     }
-
+    
     if (iterations >= max_iterations) {
         return BigIntError.NotInvertible;
     }
-
-    // Check if gcd is 1
-    if (!equal(old_r, one)) {
-        return BigIntError.NotInvertible;
-    }
-
-    return old_s;
+    
+    return result;
 }
 
 /// Convert little-endian byte array to BigInt (big-endian)
