@@ -278,7 +278,13 @@ pub const UserPublicKey = struct {
             hasher.update(user_id);
             hasher.update(&[_]u8{0x01}); // hid
             hasher.final(&h1_fallback);
-            return h1_fallback;
+            
+            // Return proper UserPublicKey struct
+            return UserPublicKey{
+                .id = user_id,
+                .hid = 0x01,
+                .point = h1_fallback ++ [_]u8{0} ** 32,
+            };
         };
 
         // Step 2: Compute public key point using master public key
@@ -335,7 +341,13 @@ pub const UserPublicKey = struct {
             hasher.update(user_id);
             hasher.update(&[_]u8{0x03}); // hid
             hasher.final(&h1_fallback);
-            return h1_fallback;
+            
+            // Return proper UserPublicKey struct
+            return UserPublicKey{
+                .id = user_id,
+                .hid = 0x03,
+                .point = h1_fallback ++ [_]u8{0} ** 32,
+            };
         };
 
         // Step 2: Compute public key point using master public key

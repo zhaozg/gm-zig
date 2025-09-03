@@ -259,7 +259,7 @@ pub const SignatureContext = struct {
             for (0..32) |i| {
                 l_fallback[i] = r[i] ^ h[i];
             }
-            l_fallback;
+            return l_fallback;
         };
 
         // Step 5: Check if l = 0, if so modify r and recompute
@@ -279,7 +279,7 @@ pub const SignatureContext = struct {
                 for (0..32) |i| {
                     l_fallback[i] = r[i] ^ h[i];
                 }
-                l_fallback;
+                return l_fallback;
             };
         }
 
@@ -405,7 +405,7 @@ pub const SignatureContext = struct {
             for (0..32) |i| {
                 l_fallback[i] = r[i] ^ h_prime[i];
             }
-            l_fallback;
+            return l_fallback;
         };
 
         // Check if l = 0, if so modify r and recompute
@@ -425,7 +425,7 @@ pub const SignatureContext = struct {
                 for (0..32) |i| {
                     l_fallback[i] = r[i] ^ h_prime[i];
                 }
-                l_fallback;
+                return l_fallback;
             };
         }
 
