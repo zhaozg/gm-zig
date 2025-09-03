@@ -278,7 +278,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     // Normalize input: ensure a < m
     var a_norm = a;
     if (!lessThan(a, m)) {
-        a_norm = reduceMod(a, m);
+        a_norm = reduceMod(a, m) catch return BigIntError.NotInvertible;
     }
 
     // Check if a ≡ 0 (mod m) after normalization
@@ -293,8 +293,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     var s = one;
 
     while (!isZero(r)) {
-        // Compute quotient and remainder: old_r = q * r + new_r
-        // For large numbers, we use repeated subtraction
+        // Compute quotient and remainder using repeated subtraction
         var quotient = [_]u8{0} ** 32;
         var remainder = old_r;
         
@@ -311,27 +310,26 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
 
         // Update s values: old_s, s = s, old_s - quotient * s
         const temp_s = s;
-        const qs_result = mulMod(quotient, s, m) catch {
-            // If multiplication fails, use simpler approach
-            var qs = [_]u8{0} ** 32;
-            var q_temp = quotient;
-            while (!isZero(q_temp)) {
-                if ((q_temp[31] & 1) != 0) {
-                    qs = addMod(qs, s, m) catch return BigIntError.NotInvertible;
-                }
-                q_temp = shiftRight(q_temp);
-                s = addMod(s, s, m) catch return BigIntError.NotInvertible;
-            }
-            break :blk qs;
-        } else blk: {
-            break :blk qs_result;
-        };
         
-        s = subMod(old_s, qs_result, m) catch {
-            // Handle underflow by adding modulus
-            const sum = addMod(old_s, m, m) catch return BigIntError.NotInvertible;
-            break :blk subMod(sum, qs_result, m) catch return BigIntError.NotInvertible;
-        };
+        // Compute quotient * s safely
+        var qs = [_]u8{0} ** 32;
+        var q_temp = quotient;
+        var s_temp = s;
+        while (!isZero(q_temp)) {
+            if ((q_temp[31] & 1) != 0) {
+                qs = addMod(qs, s_temp, m) catch return BigIntError.NotInvertible;
+            }
+            q_temp = shiftRight(q_temp);
+            s_temp = addMod(s_temp, s_temp, m) catch return BigIntError.NotInvertible;
+        }
+        
+        // Compute old_s - qs with underflow handling
+        if (lessThan(old_s, qs)) {
+            const temp_old_s = addMod(old_s, m, m) catch return BigIntError.NotInvertible;
+            s = subMod(temp_old_s, qs, m) catch return BigIntError.NotInvertible;
+        } else {
+            s = subMod(old_s, qs, m) catch return BigIntError.NotInvertible;
+        }
         old_s = temp_s;
     }
 
@@ -340,10 +338,10 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.NotInvertible;
     }
 
-    // Ensure result is positive (old_s might be negative)
+    // Ensure result is positive and within range
     var result = old_s;
     if (!lessThan(result, m)) {
-        result = reduceMod(result, m);
+        result = reduceMod(result, m) catch return BigIntError.NotInvertible;
     }
 
     // Verify the result: (a * result) mod m should equal 1
