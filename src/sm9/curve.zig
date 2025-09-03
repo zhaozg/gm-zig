@@ -252,7 +252,7 @@ pub const G1Point = struct {
         const two_y = bigint.addMod(affine_pt.y, affine_pt.y, field_p) catch return G1Point.infinity();
         
         // Compute modular inverse of 2*y
-        const inv_two_y = bigint.modInverse(two_y, field_p) catch return G1Point.infinity();
+        const inv_two_y = bigint.invMod(two_y, field_p) catch return G1Point.infinity();
         
         // Compute slope = (3*x^2) / (2*y) mod p
         const slope = bigint.mulMod(three_x_squared, inv_two_y, field_p) catch return G1Point.infinity();
@@ -305,7 +305,7 @@ pub const G1Point = struct {
         const x_diff = bigint.subMod(p2.x, p1.x, field_p) catch return G1Point.infinity();
         
         // Compute modular inverse of (x2 - x1)
-        const inv_x_diff = bigint.modInverse(x_diff, field_p) catch return G1Point.infinity();
+        const inv_x_diff = bigint.invMod(x_diff, field_p) catch return G1Point.infinity();
         
         // Compute slope = (y2 - y1) / (x2 - x1) mod p
         const slope = bigint.mulMod(y_diff, inv_x_diff, field_p) catch return G1Point.infinity();
