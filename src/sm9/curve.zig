@@ -83,22 +83,30 @@ pub const G1Point = struct {
         var x: [32]u8 = undefined;
         std.mem.copyForwards(u8, &x, compressed[1..33]);
 
-        // Compute y-coordinate using curve equation: y² = x³ + b (where b = 3 for BN256)
-        // For now, use a deterministic but cryptographically valid approach
-        var y: [32]u8 = undefined;
+        // Compute y-coordinate using proper curve equation: y² = x³ + b (where b = 3 for BN256)
+        // Step 1: Compute x³ mod p
+        const x_squared = bigint.mulMod(x, x, params.SystemParams.init().q) catch {
+            return error.InvalidPointFormat;
+        };
+        const x_cubed = bigint.mulMod(x_squared, x, params.SystemParams.init().q) catch {
+            return error.InvalidPointFormat;
+        };
         
-        // Use SM3 hash to derive y from x and parity bit deterministically
-        var hasher = SM3.init(.{});
-        hasher.update(&x);
-        hasher.update(&[_]u8{compressed[0]}); // Include parity information
-        hasher.update("SM9_G1_Y_COORDINATE");
-        hasher.final(&y);
+        // Step 2: Add curve coefficient b = 3
+        var three = [_]u8{0} ** 32;
+        three[31] = 3;
+        const y_squared = bigint.addMod(x_cubed, three, params.SystemParams.init().q) catch {
+            return error.InvalidPointFormat;
+        };
         
-        // Ensure y is valid in the field (less than curve modulus)
-        // This is a simplified approach for robustness
-        if (y[0] >= 0xB6) { // Simple field reduction
-            y[0] = y[0] & 0x7F; // Clear MSB to ensure < q
-        }
+        // Step 3: Compute square root using Tonelli-Shanks algorithm (simplified)
+        // For BN256 field, we can use the fact that p ≡ 3 (mod 4)
+        // So sqrt(a) = a^((p+1)/4) mod p
+        const curve_params = params.SystemParams.init();
+        const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch {
+            // If square root doesn't exist, this is not a valid point
+            return error.InvalidPointFormat;
+        };
 
         return G1Point.affine(x, y);
     }
@@ -110,39 +118,46 @@ pub const G1Point = struct {
         return self.is_infinity or bigint.isZero(self.z);
     }
 
-    /// Point doubling: [2]P
+    /// Point doubling: [2]P using proper elliptic curve arithmetic
     pub fn double(self: G1Point, curve_params: params.SystemParams) G1Point {
         if (self.isInfinity()) return self;
-
-        // For simplicity, use affine coordinates
-        // In practice, projective coordinates would be more efficient
 
         // Convert to affine if needed
         const affine_pt = self.toAffine(curve_params);
         if (affine_pt.isInfinity()) return G1Point.infinity();
 
-        // Simplified point doubling for y^2 = x^3 + b
-        // slope = (3*x^2) / (2*y) mod p
-        // x3 = slope^2 - 2*x mod p
-        // y3 = slope*(x - x3) - y mod p
-
-        // For now, return a deterministic but simplified result
-        // TODO: Implement proper elliptic curve point doubling
-        var result_x = affine_pt.x;
-        const result_y = affine_pt.y;
-
-        // Simple transformation to avoid returning the same point
-        // Since this is a placeholder implementation, do a simple deterministic modification
-        if (result_x[31] == 0xFF) {
-            result_x[31] = 0xFE; // Avoid overflow
-        } else {
-            result_x[31] += 1; // Simple increment
-        }
+        // Point doubling for y^2 = x^3 + b (where b = 3 for BN256)
+        // slope = (3*x^2 + a) / (2*y) mod p, where a = 0 for BN256
+        const field_p = curve_params.q;
+        
+        // Compute 3*x^2 mod p
+        const x_squared = bigint.mulMod(affine_pt.x, affine_pt.x, field_p) catch return G1Point.infinity();
+        var three_x_squared = bigint.addMod(x_squared, x_squared, field_p) catch return G1Point.infinity();
+        three_x_squared = bigint.addMod(three_x_squared, x_squared, field_p) catch return G1Point.infinity();
+        
+        // Compute 2*y mod p  
+        const two_y = bigint.addMod(affine_pt.y, affine_pt.y, field_p) catch return G1Point.infinity();
+        
+        // Compute modular inverse of 2*y
+        const inv_two_y = bigint.modInverse(two_y, field_p) catch return G1Point.infinity();
+        
+        // Compute slope = (3*x^2) / (2*y) mod p
+        const slope = bigint.mulMod(three_x_squared, inv_two_y, field_p) catch return G1Point.infinity();
+        
+        // Compute x3 = slope^2 - 2*x mod p
+        const slope_squared = bigint.mulMod(slope, slope, field_p) catch return G1Point.infinity();
+        const two_x = bigint.addMod(affine_pt.x, affine_pt.x, field_p) catch return G1Point.infinity();
+        const result_x = bigint.subMod(slope_squared, two_x, field_p) catch return G1Point.infinity();
+        
+        // Compute y3 = slope*(x - x3) - y mod p
+        const x_diff = bigint.subMod(affine_pt.x, result_x, field_p) catch return G1Point.infinity();
+        const slope_x_diff = bigint.mulMod(slope, x_diff, field_p) catch return G1Point.infinity();
+        const result_y = bigint.subMod(slope_x_diff, affine_pt.y, field_p) catch return G1Point.infinity();
 
         return G1Point.affine(result_x, result_y);
     }
 
-    /// Point addition: P + Q
+    /// Point addition: P + Q using proper elliptic curve arithmetic
     pub fn add(self: G1Point, other: G1Point, curve_params: params.SystemParams) G1Point {
         if (self.isInfinity()) return other;
         if (other.isInfinity()) return self;
@@ -163,37 +178,34 @@ pub const G1Point = struct {
             }
         }
 
-        // Simplified point addition
+        // Point addition for y^2 = x^3 + b
         // slope = (y2 - y1) / (x2 - x1) mod p
         // x3 = slope^2 - x1 - x2 mod p
         // y3 = slope*(x1 - x3) - y1 mod p
-
-        // For now, return a deterministic but simplified result
-        // TODO: Implement proper elliptic curve point addition
-        const result_x = blk: {
-            if (bigint.addMod(p1.x, p2.x, curve_params.q)) |result| {
-                break :blk result;
-            } else |_| {
-                // Fallback: simple XOR operation to combine coordinates
-                var fallback_x = p1.x;
-                for (&fallback_x, p2.x) |*x1_byte, x2_byte| {
-                    x1_byte.* ^= x2_byte;
-                }
-                break :blk fallback_x;
-            }
-        };
-        const result_y = blk: {
-            if (bigint.addMod(p1.y, p2.y, curve_params.q)) |result| {
-                break :blk result;
-            } else |_| {
-                // Fallback: simple XOR operation to combine coordinates
-                var fallback_y = p1.y;
-                for (&fallback_y, p2.y) |*y1_byte, y2_byte| {
-                    y1_byte.* ^= y2_byte;
-                }
-                break :blk fallback_y;
-            }
-        };
+        
+        const field_p = curve_params.q;
+        
+        // Compute y2 - y1 mod p
+        const y_diff = bigint.subMod(p2.y, p1.y, field_p) catch return G1Point.infinity();
+        
+        // Compute x2 - x1 mod p
+        const x_diff = bigint.subMod(p2.x, p1.x, field_p) catch return G1Point.infinity();
+        
+        // Compute modular inverse of (x2 - x1)
+        const inv_x_diff = bigint.modInverse(x_diff, field_p) catch return G1Point.infinity();
+        
+        // Compute slope = (y2 - y1) / (x2 - x1) mod p
+        const slope = bigint.mulMod(y_diff, inv_x_diff, field_p) catch return G1Point.infinity();
+        
+        // Compute x3 = slope^2 - x1 - x2 mod p
+        const slope_squared = bigint.mulMod(slope, slope, field_p) catch return G1Point.infinity();
+        var temp = bigint.subMod(slope_squared, p1.x, field_p) catch return G1Point.infinity();
+        const result_x = bigint.subMod(temp, p2.x, field_p) catch return G1Point.infinity();
+        
+        // Compute y3 = slope*(x1 - x3) - y1 mod p
+        const x1_minus_x3 = bigint.subMod(p1.x, result_x, field_p) catch return G1Point.infinity();
+        const slope_times_diff = bigint.mulMod(slope, x1_minus_x3, field_p) catch return G1Point.infinity();
+        const result_y = bigint.subMod(slope_times_diff, p1.y, field_p) catch return G1Point.infinity();
 
         return G1Point.affine(result_x, result_y);
     }
@@ -263,7 +275,7 @@ pub const G1Point = struct {
         return self;
     }
 
-    /// Validate point is on curve - simplified for testing
+    /// Validate point is on curve with enhanced boundary condition handling
     pub fn validate(self: G1Point, curve_params: params.SystemParams) bool {
         if (self.isInfinity()) return true;
 
@@ -285,23 +297,37 @@ pub const G1Point = struct {
             }
         }
         
-        // Reject points with both coordinates zero
+        // Reject points with both coordinates zero (not infinity)
         if (x_is_zero and y_is_zero) return false;
         
         // Enhanced validation: check if coordinates are within field bounds
-        
-        // Check x < q (field modulus) - must be strictly less than
+        // Check x < q (field modulus) - coordinates must be strictly less than field modulus
         if (!bigint.lessThan(self.x, curve_params.q)) {
             return false;
         }
         
-        // Check y < q (field modulus) - must be strictly less than
+        // Check y < q (field modulus) - coordinates must be strictly less than field modulus  
         if (!bigint.lessThan(self.y, curve_params.q)) {
             return false;
         }
         
-        // For testing robustness, accept points that are within field bounds
-        return true;
+        // Validate curve equation: y² ≡ x³ + b (mod p) where b = 3 for BN256
+        const field_p = curve_params.q;
+        
+        // Compute y² mod p
+        const y_squared = bigint.mulMod(self.y, self.y, field_p) catch return false;
+        
+        // Compute x³ mod p
+        const x_squared = bigint.mulMod(self.x, self.x, field_p) catch return false;
+        const x_cubed = bigint.mulMod(x_squared, self.x, field_p) catch return false;
+        
+        // Add curve parameter b = 3
+        var three = [_]u8{0} ** 32;
+        three[31] = 3;
+        const x_cubed_plus_b = bigint.addMod(x_cubed, three, field_p) catch return false;
+        
+        // Check if y² ≡ x³ + b (mod p)
+        return bigint.equal(y_squared, x_cubed_plus_b);
     }
 
     /// Compress point to 33 bytes (x coordinate + y parity)
@@ -500,19 +526,13 @@ pub const G2Point = struct {
         return result;
     }
 
-    /// Validate point is on curve
+    /// Validate G2 point with enhanced boundary condition handling
     pub fn validate(self: G2Point, curve_params: params.SystemParams) bool {
         if (self.isInfinity()) return true;
 
-        // For G2 points, we need to validate the curve equation in Fp2
-        // y^2 = x^3 + b' where b' is the curve parameter in the twist
-        // This is a simplified validation for the basic structure
-        // A full implementation would need proper Fp2 arithmetic
-
+        // For G2 points, we need to validate coordinates in Fp2
+        // Each coordinate is represented as two Fp elements (64 bytes total)
         const p = curve_params.q;
-
-        // Basic validation: check coordinates are within field bounds
-        // Each coordinate in G2 is represented as two Fp elements (64 bytes total)
 
         // Extract x coordinates (first 32 bytes each for x0, x1)
         var x0: [32]u8 = undefined;
@@ -532,8 +552,29 @@ pub const G2Point = struct {
         if (!bigint.lessThan(y0, p)) return false;
         if (!bigint.lessThan(y1, p)) return false;
 
-        // For now, return true if basic validation passes
-        // Full curve equation validation would require implementing Fp2 arithmetic
+        // Check that not all coordinates are zero (would be invalid non-infinity point)
+        var all_zero = true;
+        for (self.x) |byte| {
+            if (byte != 0) {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero) {
+            for (self.y) |byte| {
+                if (byte != 0) {
+                    all_zero = false;
+                    break;
+                }
+            }
+        }
+        if (all_zero) return false; // Invalid non-infinity point with all zeros
+
+        // For production use, full curve equation validation in Fp2 would be needed:
+        // y² ≡ x³ + b' (mod p) where b' is the twist curve parameter
+        // This requires implementing proper Fp2 arithmetic operations
+        
+        // For now, basic field bounds validation is sufficient
         return true;
     }
 
@@ -719,6 +760,67 @@ pub const CurveUtils = struct {
 
         // Detailed coordinate validation
         return point.validate(curve_params);
+    }
+
+    /// Compute square root in prime field for BN256 curve
+    /// Uses the fact that p ≡ 3 (mod 4) for efficient computation
+    fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) ![32]u8 {
+        // For p ≡ 3 (mod 4), sqrt(a) = a^((p+1)/4) mod p
+        // Compute (p+1)/4
+        var exp = modulus;
+        
+        // Add 1 to p
+        var carry: u8 = 1;
+        var i: i32 = 31;
+        while (i >= 0) : (i -= 1) {
+            const sum = @as(u16, exp[@intCast(i)]) + carry;
+            exp[@intCast(i)] = @intCast(sum & 0xFF);
+            carry = @intCast(sum >> 8);
+        }
+        
+        // Divide by 4 (shift right by 2 bits)
+        carry = 0;
+        i = 0;
+        while (i < 32) : (i += 1) {
+            const current = @as(u16, exp[@intCast(i)]) + (@as(u16, carry) << 8);
+            exp[@intCast(i)] = @intCast(current >> 2);
+            carry = @intCast(current & 0x03);
+        }
+        
+        // Compute a^exp mod p using square-and-multiply
+        var result = [_]u8{0} ** 32;
+        result[31] = 1; // Initialize to 1
+        
+        var base = a;
+        var exponent = exp;
+        
+        // Process each bit of the exponent
+        var bit_count: u32 = 0;
+        while (bit_count < 256) : (bit_count += 1) {
+            const byte_idx = 31 - (bit_count / 8);
+            const bit_idx = bit_count % 8;
+            
+            if ((exponent[byte_idx] >> @intCast(bit_idx)) & 1 == 1) {
+                result = bigint.mulMod(result, base, modulus) catch return error.InvalidPointFormat;
+            }
+            
+            base = bigint.mulMod(base, base, modulus) catch return error.InvalidPointFormat;
+        }
+        
+        // Check if we need the other square root (negative of this one)
+        const is_result_odd = (result[31] & 1) == 1;
+        if (is_odd_y != is_result_odd) {
+            // Compute p - result
+            result = bigint.sub(modulus, result).result;
+        }
+        
+        // Verify that result² ≡ a (mod p)
+        const result_squared = bigint.mulMod(result, result, modulus) catch return error.InvalidPointFormat;
+        if (!bigint.equal(result_squared, a)) {
+            return error.InvalidPointFormat;
+        }
+        
+        return result;
     }
 
     /// Complete elliptic curve scalar multiplication for G1

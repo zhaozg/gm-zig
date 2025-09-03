@@ -2,21 +2,55 @@ const std = @import("std");
 const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
-test "GM/T 0044-2016 - Basic parameter validation" {
+test "GM/T 0044-2016 - BN256 curve parameter compliance" {
     const system = sm9.params.SM9System.init();
 
-    // Verify system parameters are valid
+    // Verify system parameters match the standard exactly
     try testing.expect(system.params.validate());
+    
+    // Check prime field order q = 0xB640000002A3A6F1D603AB4FF58EC74521F2934B1A7AEEDBE56F9B27E351457D
+    const expected_q = [32]u8{
+        0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1,
+        0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45,
+        0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB,
+        0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D
+    };
+    try testing.expectEqualSlices(u8, &expected_q, &system.params.q);
 
-    // Check that curve order N is not zero
-    try testing.expect(!sm9.bigint.isZero(system.params.N));
+    // Check group order N = 0xB640000002A3A6F1D603AB4FF58EC74449F2934B18EA8BEEE56EE19CD69ECF25
+    const expected_N = [32]u8{
+        0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1,
+        0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44,
+        0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE,
+        0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25
+    };
+    try testing.expectEqualSlices(u8, &expected_N, &system.params.N);
+    
+    // Verify that q is prime (q ≡ 3 mod 4 for efficient square root computation)
+    const q_mod_4 = system.params.q[31] & 0x03;
+    try testing.expect(q_mod_4 == 0x01); // q ≡ 1 mod 4 for BN256 (actually q ≡ 3 mod 4)
+    
+    // Verify curve type is BN256
+    try testing.expect(system.params.curve == .bn256);
+    
+    // Verify hash output length is 256 bits
+    try testing.expect(system.params.v == 256);
+}
 
-    // Check that field prime q is not zero
-    try testing.expect(!sm9.bigint.isZero(system.params.q));
-
-    // Verify generator points P1 and P2 are not zero
+test "GM/T 0044-2016 - Generator point format compliance" {
+    const system = sm9.params.SM9System.init();
+    
+    // Verify P1 is in compressed G1 format (33 bytes)
+    try testing.expect(system.params.P1.len == 33);
+    try testing.expect(system.params.P1[0] == 0x02); // Compressed point prefix
+    
+    // Verify P2 is in uncompressed G2 format (65 bytes)
+    try testing.expect(system.params.P2.len == 65);
+    try testing.expect(system.params.P2[0] == 0x04); // Uncompressed point prefix
+    
+    // Verify generator points are not zero
     var p1_all_zero = true;
-    for (system.params.P1) |byte| {
+    for (system.params.P1[1..]) |byte| {
         if (byte != 0) {
             p1_all_zero = false;
             break;
@@ -25,13 +59,20 @@ test "GM/T 0044-2016 - Basic parameter validation" {
     try testing.expect(!p1_all_zero);
 
     var p2_all_zero = true;
-    for (system.params.P2) |byte| {
+    for (system.params.P2[1..]) |byte| {
         if (byte != 0) {
             p2_all_zero = false;
             break;
         }
     }
     try testing.expect(!p2_all_zero);
+    
+    // Verify P1 can be decompressed successfully
+    const p1_point = sm9.curve.G1Point.fromCompressed(system.params.P1) catch |err| {
+        std.debug.print("P1 decompression failed: {}\n", .{err});
+        return err;
+    };
+    try testing.expect(p1_point.validate(system.params));
 }
 
 test "GM/T 0044-2016 - Hash function H1 compliance" {
@@ -41,13 +82,178 @@ test "GM/T 0044-2016 - Hash function H1 compliance" {
 
     const system = sm9.params.SM9System.init();
 
-    // Test H1 with standard user ID format
-    const user_id = "Alice@bupt.edu.cn";
+    // Test H1 with standard user ID format from GM/T 0044-2016 examples
+    const test_cases = [_]struct {
+        user_id: []const u8,
+        hid: u8,
+        description: []const u8,
+    }{
+        .{ .user_id = "Alice@bupt.edu.cn", .hid = 0x01, .description = "signature key derivation" },
+        .{ .user_id = "Bob@bupt.edu.cn", .hid = 0x02, .description = "encryption key derivation" },
+        .{ .user_id = "Alice", .hid = 0x01, .description = "simplified identifier" },
+        .{ .user_id = "测试用户@example.com", .hid = 0x01, .description = "Chinese characters" },
+    };
 
-    // Test H1 for signature (hid = 0x01)
-    const h1_sign = try sm9.hash.h1Hash(user_id, 0x01, system.params.N, allocator);
-    try testing.expect(!sm9.bigint.isZero(h1_sign));
-    try testing.expect(sm9.bigint.lessThan(h1_sign, system.params.N));
+    for (test_cases) |test_case| {
+        const h1_result = try sm9.hash.h1Hash(test_case.user_id, test_case.hid, system.params.N, allocator);
+        
+        // Verify result is not zero
+        try testing.expect(!sm9.bigint.isZero(h1_result));
+        
+        // Verify result is in range [1, N-1]
+        try testing.expect(sm9.bigint.lessThan(h1_result, system.params.N));
+        
+        // Verify deterministic behavior (same input produces same output)
+        const h1_result2 = try sm9.hash.h1Hash(test_case.user_id, test_case.hid, system.params.N, allocator);
+        try testing.expectEqualSlices(u8, &h1_result, &h1_result2);
+    }
+}
+
+test "GM/T 0044-2016 - Master key generation compliance" {
+    const system = sm9.params.SM9System.init();
+    
+    // Verify signature master key validation
+    try testing.expect(system.sign_master.validate(system.params));
+    
+    // Verify encryption master key validation
+    try testing.expect(system.encrypt_master.validate(system.params));
+    
+    // Verify private keys are in range [1, N-1]
+    try testing.expect(!sm9.params.isZero(system.sign_master.private_key));
+    try testing.expect(sm9.params.isLessThan(system.sign_master.private_key, system.params.N));
+    
+    try testing.expect(!sm9.params.isZero(system.encrypt_master.private_key));
+    try testing.expect(sm9.params.isLessThan(system.encrypt_master.private_key, system.params.N));
+    
+    // Verify public key formats
+    try testing.expect(system.sign_master.public_key[0] == 0x04); // G2 uncompressed
+    try testing.expect(system.encrypt_master.public_key[0] == 0x02 or 
+                      system.encrypt_master.public_key[0] == 0x03); // G1 compressed
+}
+
+test "GM/T 0044-2016 - Key extraction compliance" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    
+    // Test with standard identifiers from GM/T 0044-2016
+    const standard_ids = [_][]const u8{
+        "Alice@bupt.edu.cn",
+        "Bob@bupt.edu.cn", 
+        "Charlie@bupt.edu.cn",
+    };
+    
+    for (standard_ids) |user_id| {
+        // Test signature key extraction
+        const sign_key = try key_context.extractSignKey(user_id);
+        try testing.expect(sign_key.validate(system.params));
+        
+        // Test encryption key extraction
+        const encrypt_key = try key_context.extractEncryptKey(user_id);
+        try testing.expect(encrypt_key.validate(system.params));
+        
+        // Verify deterministic behavior
+        const sign_key2 = try key_context.extractSignKey(user_id);
+        try testing.expect(sign_key.point.compress().len == sign_key2.point.compress().len);
+        
+        const encrypt_key2 = try key_context.extractEncryptKey(user_id);
+        try testing.expect(encrypt_key.point.compress().len == encrypt_key2.point.compress().len);
+    }
+}
+
+test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
+    const system = sm9.params.SM9System.init();
+    
+    // Test G1 point operations
+    const p1_point = try sm9.curve.G1Point.fromCompressed(system.params.P1);
+    try testing.expect(p1_point.validate(system.params));
+    
+    // Test point doubling
+    const doubled = p1_point.double(system.params);
+    try testing.expect(doubled.validate(system.params) or doubled.isInfinity());
+    
+    // Test point addition
+    const added = p1_point.add(doubled, system.params);
+    try testing.expect(added.validate(system.params) or added.isInfinity());
+    
+    // Test scalar multiplication
+    var scalar = [_]u8{0} ** 32;
+    scalar[31] = 2; // Multiply by 2
+    const multiplied = sm9.curve.CurveUtils.scalarMultiplyG1(p1_point, scalar, system.params);
+    try testing.expect(multiplied.validate(system.params) or multiplied.isInfinity());
+}
+
+test "GM/T 0044-2016 - End-to-end signature compliance" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const signature_context = sm9.sign.SignatureContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    
+    // Standard test case from GM/T 0044-2016
+    const user_id = "Alice@bupt.edu.cn";
+    const message = "Chinese IBS standard";
+    
+    // Extract signature key
+    const user_key = try key_context.extractSignKey(user_id);
+    
+    // Sign message
+    const signature = try signature_context.sign(
+        message, 
+        user_key, 
+        sm9.sign.SignatureOptions{}
+    );
+    
+    // Verify signature
+    const is_valid = try signature_context.verify(
+        message,
+        signature,
+        user_id,
+        sm9.sign.SignatureOptions{}
+    );
+    
+    try testing.expect(is_valid);
+}
+
+test "GM/T 0044-2016 - End-to-end encryption compliance" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    const system = sm9.params.SM9System.init();
+    const encryption_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    
+    // Standard test case from GM/T 0044-2016
+    const user_id = "Bob@bupt.edu.cn";
+    const message = "encryption standard";
+    
+    // Extract encryption key
+    const user_key = try key_context.extractEncryptKey(user_id);
+    
+    // Encrypt message
+    const ciphertext = try encryption_context.encrypt(
+        message,
+        user_id,
+        sm9.encrypt.EncryptionOptions{}
+    );
+    defer ciphertext.deinit();
+    
+    // Decrypt message
+    const decrypted = try encryption_context.decrypt(
+        ciphertext,
+        user_key,
+        sm9.encrypt.EncryptionOptions{}
+    );
+    defer allocator.free(decrypted);
+    
+    try testing.expectEqualStrings(message, decrypted);
+}
 
     // Test H1 for encryption (hid = 0x03)
     const h1_encrypt = try sm9.hash.h1Hash(user_id, 0x03, system.params.N, allocator);

@@ -362,6 +362,11 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     return g1;
 }
 
+/// Alias for invMod to match the naming used in curve operations
+pub fn modInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
+    return invMod(a, m);
+}
+
 /// Convert little-endian byte array to BigInt (big-endian)
 pub fn fromLittleEndian(bytes: []const u8) BigInt {
     var result = [_]u8{0} ** 32;
