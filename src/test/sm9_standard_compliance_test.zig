@@ -255,19 +255,6 @@ test "GM/T 0044-2016 - End-to-end encryption compliance" {
     try testing.expectEqualStrings(message, decrypted);
 }
 
-    // Test H1 for encryption (hid = 0x03)
-    const h1_encrypt = try sm9.hash.h1Hash(user_id, 0x03, system.params.N, allocator);
-    try testing.expect(!sm9.bigint.isZero(h1_encrypt));
-    try testing.expect(sm9.bigint.lessThan(h1_encrypt, system.params.N));
-
-    // Verify H1 produces different results for different HIDs
-    try testing.expect(!sm9.bigint.equal(h1_sign, h1_encrypt));
-
-    // Test determinism: same inputs produce same outputs
-    const h1_sign_repeat = try sm9.hash.h1Hash(user_id, 0x01, system.params.N, allocator);
-    try testing.expect(sm9.bigint.equal(h1_sign, h1_sign_repeat));
-}
-
 test "GM/T 0044-2016 - Hash function H2 compliance" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();

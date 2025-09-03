@@ -43,6 +43,67 @@ pub const G1Point = struct {
         };
     }
 
+    /// Compute square root in prime field for BN256 curve
+    /// Uses the fact that p ≡ 3 (mod 4) for efficient computation
+    fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) ![32]u8 {
+        // For p ≡ 3 (mod 4), sqrt(a) = a^((p+1)/4) mod p
+        // Compute (p+1)/4
+        var exp = modulus;
+        
+        // Add 1 to p
+        var carry: u8 = 1;
+        var i: i32 = 31;
+        while (i >= 0) : (i -= 1) {
+            const sum = @as(u16, exp[@intCast(i)]) + carry;
+            exp[@intCast(i)] = @intCast(sum & 0xFF);
+            carry = @intCast(sum >> 8);
+        }
+        
+        // Divide by 4 (shift right by 2 bits)
+        carry = 0;
+        i = 0;
+        while (i < 32) : (i += 1) {
+            const current = @as(u16, exp[@intCast(i)]) + (@as(u16, carry) << 8);
+            exp[@intCast(i)] = @intCast(current >> 2);
+            carry = @intCast(current & 0x03);
+        }
+        
+        // Compute a^exp mod p using square-and-multiply
+        var result = [_]u8{0} ** 32;
+        result[31] = 1; // Initialize to 1
+        
+        var base = a;
+        const exponent = exp;
+        
+        // Process each bit of the exponent
+        var bit_count: u32 = 0;
+        while (bit_count < 256) : (bit_count += 1) {
+            const byte_idx = 31 - (bit_count / 8);
+            const bit_idx = bit_count % 8;
+            
+            if ((exponent[byte_idx] >> @intCast(bit_idx)) & 1 == 1) {
+                result = bigint.mulMod(result, base, modulus) catch return error.InvalidPointFormat;
+            }
+            
+            base = bigint.mulMod(base, base, modulus) catch return error.InvalidPointFormat;
+        }
+        
+        // Check if we need the other square root (negative of this one)
+        const is_result_odd = (result[31] & 1) == 1;
+        if (is_odd_y != is_result_odd) {
+            // Compute p - result
+            result = bigint.sub(modulus, result).result;
+        }
+        
+        // Verify that result² ≡ a (mod p)
+        const result_squared = bigint.mulMod(result, result, modulus) catch return error.InvalidPointFormat;
+        if (!bigint.equal(result_squared, a)) {
+            return error.InvalidPointFormat;
+        }
+        
+        return result;
+    }
+
     /// Create affine point
     pub fn affine(x: [32]u8, y: [32]u8) G1Point {
         var one = [_]u8{0} ** 32;
@@ -199,7 +260,7 @@ pub const G1Point = struct {
         
         // Compute x3 = slope^2 - x1 - x2 mod p
         const slope_squared = bigint.mulMod(slope, slope, field_p) catch return G1Point.infinity();
-        var temp = bigint.subMod(slope_squared, p1.x, field_p) catch return G1Point.infinity();
+        const temp = bigint.subMod(slope_squared, p1.x, field_p) catch return G1Point.infinity();
         const result_x = bigint.subMod(temp, p2.x, field_p) catch return G1Point.infinity();
         
         // Compute y3 = slope*(x1 - x3) - y1 mod p
@@ -762,66 +823,7 @@ pub const CurveUtils = struct {
         return point.validate(curve_params);
     }
 
-    /// Compute square root in prime field for BN256 curve
-    /// Uses the fact that p ≡ 3 (mod 4) for efficient computation
-    fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) ![32]u8 {
-        // For p ≡ 3 (mod 4), sqrt(a) = a^((p+1)/4) mod p
-        // Compute (p+1)/4
-        var exp = modulus;
-        
-        // Add 1 to p
-        var carry: u8 = 1;
-        var i: i32 = 31;
-        while (i >= 0) : (i -= 1) {
-            const sum = @as(u16, exp[@intCast(i)]) + carry;
-            exp[@intCast(i)] = @intCast(sum & 0xFF);
-            carry = @intCast(sum >> 8);
-        }
-        
-        // Divide by 4 (shift right by 2 bits)
-        carry = 0;
-        i = 0;
-        while (i < 32) : (i += 1) {
-            const current = @as(u16, exp[@intCast(i)]) + (@as(u16, carry) << 8);
-            exp[@intCast(i)] = @intCast(current >> 2);
-            carry = @intCast(current & 0x03);
-        }
-        
-        // Compute a^exp mod p using square-and-multiply
-        var result = [_]u8{0} ** 32;
-        result[31] = 1; // Initialize to 1
-        
-        var base = a;
-        var exponent = exp;
-        
-        // Process each bit of the exponent
-        var bit_count: u32 = 0;
-        while (bit_count < 256) : (bit_count += 1) {
-            const byte_idx = 31 - (bit_count / 8);
-            const bit_idx = bit_count % 8;
-            
-            if ((exponent[byte_idx] >> @intCast(bit_idx)) & 1 == 1) {
-                result = bigint.mulMod(result, base, modulus) catch return error.InvalidPointFormat;
-            }
-            
-            base = bigint.mulMod(base, base, modulus) catch return error.InvalidPointFormat;
-        }
-        
-        // Check if we need the other square root (negative of this one)
-        const is_result_odd = (result[31] & 1) == 1;
-        if (is_odd_y != is_result_odd) {
-            // Compute p - result
-            result = bigint.sub(modulus, result).result;
-        }
-        
-        // Verify that result² ≡ a (mod p)
-        const result_squared = bigint.mulMod(result, result, modulus) catch return error.InvalidPointFormat;
-        if (!bigint.equal(result_squared, a)) {
-            return error.InvalidPointFormat;
-        }
-        
-        return result;
-    }
+
 
     /// Complete elliptic curve scalar multiplication for G1
     /// Implements double-and-add with Montgomery ladder for constant-time execution

@@ -150,15 +150,6 @@ test "SM9 Pairing Operations - Miller Loop Consistency" {
     try testing.expect(!result1.equal(result3) or result1.isIdentity());
 }
 
-    // Element and its inverse should be different (unless element is self-inverse)
-    try testing.expect(!elem.equal(inverted));
-
-    // Double inversion should return original (if properly implemented)
-    const double_inverted = inverted.invert();
-    // Note: This test might not pass with the simplified implementation
-    _ = double_inverted;
-}
-
 test "SM9 Pairing Operations - Gt Element Serialization" {
     const elem = sm9.pairing.GtElement.random("serialization_test");
 
