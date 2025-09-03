@@ -52,46 +52,28 @@ pub const SignUserPrivateKey = struct {
 
         // Step 3: Check if t1 is zero (cannot compute inverse)
         if (bigint.isZero(t1)) {
-            // This is extremely rare but possible, use deterministic fallback
-            var fallback_t1 = t1;
-            fallback_t1[31] = fallback_t1[31] ^ 1; // Modify least significant bit
-            const t1_inv = bigint.invMod(fallback_t1, system_params.N) catch {
-                return KeyExtractionError.KeyGenerationFailed;
-            };
-
-            // Step 4: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
-            const derived_key = curve.CurveUtils.deriveG1Key(
-                t1_inv,
-                user_id,
-                [_]u8{0} ** 32, // placeholder - function gets base point from system_params
-                system_params,
-            );
-
-            return SignUserPrivateKey{
-                .id = user_id,
-                .key = derived_key,
-                .hid = 0x01, // Signature hash identifier
-            };
+            // According to GM/T 0044-2016, if t1 ≡ 0 (mod N), the master key should be regenerated
+            // For now, we return an error to maintain mathematical correctness
+            return KeyExtractionError.KeyGenerationFailed;
         }
 
         // Step 4: Compute t1_inv = t1^(-1) mod N using proper modular inverse
         const t1_inv = bigint.invMod(t1, system_params.N) catch {
-            // Enhanced fallback: create a valid G1 private key using deterministic approach
-            // This ensures key extraction always succeeds while maintaining cryptographic validity
-            return createFallbackSignKey(user_id, t1, system_params);
+            // Modular inverse failed - this should not happen if t1 ≠ 0 and gcd(t1, N) = 1
+            // If this occurs, it indicates a problem with the input parameters
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
-        // Step 5: Compute ds_A = t1_inv * P1 using enhanced elliptic curve scalar multiplication
-        const derived_key = curve.CurveUtils.deriveG1Key(
-            t1_inv,
-            user_id,
-            [_]u8{0} ** 32, // placeholder - function gets base point from system_params
-            system_params,
-        );
+        // Step 5: Compute ds_A = t1_inv * P1 using proper elliptic curve scalar multiplication
+        const p1_generator = curve.getG1Generator(system_params);
+        const private_key_point = curve.secureScalarMul(p1_generator, t1_inv, system_params);
+        
+        // Compress the point to get the private key
+        const private_key_compressed = private_key_point.compress();
 
         return SignUserPrivateKey{
             .id = user_id,
-            .key = derived_key,
+            .key = private_key_compressed,
             .hid = 0x01, // Signature hash identifier
         };
     }
@@ -170,47 +152,30 @@ pub const EncryptUserPrivateKey = struct {
 
         // Step 3: Check if t2 = 0 (cannot compute inverse)
         if (bigint.isZero(t2)) {
-            // This is extremely rare but possible, use deterministic fallback
-            var fallback_t2 = t2;
-            fallback_t2[31] = fallback_t2[31] ^ 1; // Modify least significant bit
-            const w = bigint.invMod(fallback_t2, system_params.N) catch {
-                return KeyExtractionError.KeyGenerationFailed;
-            };
-
-            // Step 4: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
-            const derived_key = curve.CurveUtils.deriveG2Key(
-                w,
-                user_id,
-                [_]u8{0} ** 64, // placeholder - function gets base point from system_params
-                system_params,
-            );
-
-            return EncryptUserPrivateKey{
-                .id = user_id,
-                .key = derived_key,
-                .hid = 0x03, // Encryption hash identifier
-            };
+            // According to GM/T 0044-2016, if t2 ≡ 0 (mod N), the master key should be regenerated
+            // For now, we return an error to maintain mathematical correctness
+            return KeyExtractionError.KeyGenerationFailed;
         }
 
         // Step 4: Compute w = t2^(-1) mod N using proper modular inverse
         const w = bigint.invMod(t2, system_params.N) catch {
-            // Enhanced fallback: create a valid G2 private key using deterministic approach
-            // This ensures key extraction always succeeds while maintaining cryptographic validity
-            return createFallbackEncryptKey(user_id, t2, system_params);
+            // Modular inverse failed - this should not happen if t2 ≠ 0 and gcd(t2, N) = 1
+            // If this occurs, it indicates a problem with the input parameters
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
-        // Step 5: Compute de_B = w * P2 using enhanced elliptic curve scalar multiplication
-        const derived_key = curve.CurveUtils.deriveG2Key(
-            w,
-            user_id,
-            [_]u8{0} ** 64, // placeholder - function gets base point from system_params
-            system_params,
-        );
+        // Step 5: Compute de_B = w * P2 using proper elliptic curve scalar multiplication
+        const p2_generator = curve.getG2Generator(system_params);
+        const private_key_point = curve.secureScalarMulG2(p2_generator, w, system_params);
+        
+        // Compress the point to get the private key
+        const private_key_compressed = private_key_point.compress();
 
         return EncryptUserPrivateKey{
             .id = user_id,
-            .key = derived_key,
+            .key = private_key_compressed,
             .hid = 0x03, // Encryption hash identifier
+        };
         };
     }
 

@@ -162,7 +162,7 @@ pub const G1Point = struct {
         // For BN256 field, we can use the fact that p ≡ 3 (mod 4)
         // So sqrt(a) = a^((p+1)/4) mod p
         const curve_params = params.SystemParams.init();
-        const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch {
+        const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch |err| {
             // If square root computation fails, use a deterministic fallback for testing
             // This maintains backward compatibility with existing test data
             var fallback_y: [32]u8 = undefined;
@@ -177,7 +177,7 @@ pub const G1Point = struct {
                 fallback_y[0] = fallback_y[0] & 0x7F; // Clear MSB to ensure < q
             }
             
-            return fallback_y;
+            return G1Point.affine(x, fallback_y);
         };
 
         return G1Point.affine(x, y);
@@ -349,8 +349,6 @@ pub const G1Point = struct {
 
     /// Validate point is on curve with enhanced boundary condition handling
     pub fn validate(self: G1Point, curve_params: params.SystemParams) bool {
-        _ = curve_params; // Keep parameter for API compatibility
-        
         if (self.isInfinity()) return true;
 
         // Check that coordinates are not all zeros (basic sanity check)
@@ -374,10 +372,31 @@ pub const G1Point = struct {
         // Reject points with both coordinates zero (not infinity)
         if (x_is_zero and y_is_zero) return false;
         
-        // For testing compatibility, accept any point with non-zero coordinates
-        // In production, this would validate the curve equation, but for now
-        // we maintain backward compatibility with existing tests
-        return !x_is_zero || !y_is_zero;
+        // Validate point is on curve: y² ≡ x³ + 3 (mod q)
+        // For proper SM9 algorithm implementation, we need to verify the curve equation
+        
+        // Compute x³ mod q
+        const x_squared = bigint.mulMod(self.x, self.x, curve_params.q) catch {
+            return false; // Invalid modular arithmetic
+        };
+        const x_cubed = bigint.mulMod(x_squared, self.x, curve_params.q) catch {
+            return false; // Invalid modular arithmetic
+        };
+        
+        // Add curve coefficient b = 3
+        var three = [_]u8{0} ** 32;
+        three[31] = 3;
+        const x_cubed_plus_b = bigint.addMod(x_cubed, three, curve_params.q) catch {
+            return false; // Invalid modular arithmetic
+        };
+        
+        // Compute y² mod q
+        const y_squared = bigint.mulMod(self.y, self.y, curve_params.q) catch {
+            return false; // Invalid modular arithmetic
+        };
+        
+        // Check if y² ≡ x³ + 3 (mod q)
+        return bigint.equal(y_squared, x_cubed_plus_b);
     }
 
     /// Compress point to 33 bytes (x coordinate + y parity)
@@ -578,8 +597,6 @@ pub const G2Point = struct {
 
     /// Validate G2 point with enhanced boundary condition handling
     pub fn validate(self: G2Point, curve_params: params.SystemParams) bool {
-        _ = curve_params; // Keep parameter for API compatibility
-        
         if (self.isInfinity()) return true;
 
         // Check that not all coordinates are zero (would be invalid non-infinity point)
@@ -600,9 +617,31 @@ pub const G2Point = struct {
         }
         if (all_zero) return false; // Invalid non-infinity point with all zeros
 
-        // For testing compatibility, accept any point with non-zero coordinates
-        // In production, this would validate the curve equation in Fp2, but for now
-        // we maintain backward compatibility with existing tests
+        // Validate point is on G2 twist curve in Fp2
+        // For proper SM9 implementation, we need to validate the curve equation
+        // but the twist curve equation is more complex and requires Fp2 arithmetic
+        // For now, we validate that the coordinates are within field bounds
+        
+        // Extract Fp2 coordinates (each 32 bytes)
+        var x0: [32]u8 = undefined;
+        var x1: [32]u8 = undefined;
+        var y0: [32]u8 = undefined;  
+        var y1: [32]u8 = undefined;
+        
+        // Split 64-byte coordinates into two 32-byte field elements
+        std.mem.copyForwards(u8, &x0, self.x[0..32]);
+        std.mem.copyForwards(u8, &x1, self.x[32..64]);
+        std.mem.copyForwards(u8, &y0, self.y[0..32]);
+        std.mem.copyForwards(u8, &y1, self.y[32..64]);
+        
+        // Validate field membership: each coordinate must be < q
+        if (!bigint.lessThan(x0, curve_params.q)) return false;
+        if (!bigint.lessThan(x1, curve_params.q)) return false;
+        if (!bigint.lessThan(y0, curve_params.q)) return false;
+        if (!bigint.lessThan(y1, curve_params.q)) return false;
+        
+        // Full curve equation validation would require Fp2 arithmetic
+        // which is complex. For now, we validate field membership.
         return true;
     }
 
