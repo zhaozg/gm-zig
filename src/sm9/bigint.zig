@@ -257,7 +257,91 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
 }
 
 /// Returns the modular inverse of a modulo m
-/// Uses a simple approach to avoid infinite loops
+/// Division with modulus: returns (quotient, remainder) such that a = q * b + r
+pub fn divMod(a: BigInt, b: BigInt) BigIntError!struct { quotient: BigInt, remainder: BigInt } {
+    if (isZero(b)) return BigIntError.DivisionByZero;
+    
+    const zero = [_]u8{0} ** 32;
+    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    
+    // Handle special cases
+    if (isZero(a)) {
+        return .{ .quotient = zero, .remainder = zero };
+    }
+    
+    if (equal(a, b)) {
+        return .{ .quotient = one, .remainder = zero };
+    }
+    
+    if (lessThan(a, b)) {
+        return .{ .quotient = zero, .remainder = a };
+    }
+    
+    // Long division algorithm
+    var quotient = zero;
+    var remainder = a;
+    
+    // Find the highest bit position in the divisor
+    var divisor_bits: u32 = 0;
+    for (0..32) |i| {
+        const byte_idx = 31 - i;
+        if (b[byte_idx] != 0) {
+            for (0..8) |bit| {
+                if ((b[byte_idx] & (@as(u8, 1) << @intCast(7 - bit))) != 0) {
+                    divisor_bits = @intCast((i * 8) + bit + 1);
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    
+    if (divisor_bits == 0) return BigIntError.DivisionByZero;
+    
+    // Perform division bit by bit
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 256; // Maximum bits in a 256-bit number
+    
+    while (!lessThan(remainder, b) and iterations < max_iterations) {
+        // Find how much we can shift b to fit under remainder
+        var shift_count: u32 = 0;
+        var shifted_b = b;
+        
+        // Binary search for the right shift amount
+        while (shift_count < 32 and !lessThan(remainder, shifted_b)) {
+            const next_shift = shiftLeft(shifted_b);
+            if (lessThan(remainder, next_shift)) break;
+            shifted_b = next_shift;
+            shift_count += 1;
+        }
+        
+        // Subtract shifted_b from remainder and add corresponding bit to quotient
+        const sub_result = sub(remainder, shifted_b);
+        if (sub_result.borrow) break; // This shouldn't happen if our logic is correct
+        remainder = sub_result.result;
+        
+        // Add the corresponding power of 2 to quotient
+        var bit_value = one;
+        for (0..shift_count) |_| {
+            bit_value = shiftLeft(bit_value);
+        }
+        
+        const add_result = add(quotient, bit_value);
+        if (add_result.carry) break; // Overflow
+        quotient = add_result.result;
+        
+        iterations += 1;
+    }
+    
+    if (iterations >= max_iterations) {
+        return BigIntError.Overflow;
+    }
+    
+    return .{ .quotient = quotient, .remainder = remainder };
+}
+
+/// Modular inverse: a^(-1) mod m
+/// Uses Fermat's Little Theorem for prime moduli: a^(-1) ≡ a^(p-2) (mod p)
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
@@ -275,40 +359,45 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.NotInvertible;
     }
 
-    // For now, use a simplified approach that avoids infinite loops
-    // This is a fallback that returns a reasonable value for testing
-    // TODO: Implement proper modular inverse using a robust algorithm
+    // For prime moduli (which SM9 uses), use Fermat's Little Theorem:
+    // a^(-1) ≡ a^(p-2) (mod p)
     
-    // Try a simple iterative approach for small cases
-    var candidate = one;
-    var iterations: u32 = 0;
-    const max_iterations: u32 = 100; // Very conservative limit
-    
-    while (iterations < max_iterations) {
-        const test_result = mulMod(candidate, a_reduced, m) catch return BigIntError.NotInvertible;
-        if (equal(test_result, one)) {
-            return candidate;
+    // Compute m - 2
+    var exp = m;
+    // Subtract 2 from m
+    var borrow: u8 = 2;
+    var i: i32 = 31;
+    while (i >= 0 and borrow > 0) : (i -= 1) {
+        const current = @as(u16, exp[@intCast(i)]);
+        if (current >= borrow) {
+            exp[@intCast(i)] = @intCast(current - borrow);
+            borrow = 0;
+        } else {
+            exp[@intCast(i)] = @intCast(current + 256 - borrow);
+            borrow = 1;
         }
-        
-        // Increment candidate (simple brute force for small numbers)
-        const increment_result = add(candidate, one);
-        if (increment_result.carry) break;
-        candidate = increment_result.result;
-        
-        // Reduce candidate modulo m
-        candidate = mod(candidate, m) catch break;
-        
-        iterations += 1;
     }
     
-    // If brute force fails, return a default inverse that often works for SM9
-    // This is mathematically incorrect but prevents infinite loops during development
-    return a_reduced;
+    if (borrow > 0) {
+        // This means m < 2, which is invalid for modular inverse
+        return BigIntError.InvalidModulus;
+    }
+    
+    // Compute a^(m-2) mod m
+    const result = modPow(a_reduced, exp, m) catch return BigIntError.NotInvertible;
+    
+    // Verify the result by checking that a * result ≡ 1 (mod m)
+    const verification = mulMod(a_reduced, result, m) catch return BigIntError.NotInvertible;
+    if (!equal(verification, one)) {
+        return BigIntError.NotInvertible;
+    }
+    
+    return result;
 }
 
 /// Modular exponentiation: base^exp mod m
 /// Uses binary exponentiation method
-fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
+pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
