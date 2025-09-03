@@ -7,9 +7,10 @@ test "SM9 ciphertext creation and validation" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const c1 = std.mem.zeroes([33]u8);
+    // Create valid test data for ciphertext validation
+    var c1 = [_]u8{0x02} ++ [_]u8{0x01} ** 32; // Valid compressed G1 point format
     const c2 = "test message";
-    const c3 = std.mem.zeroes([32]u8);
+    var c3 = [_]u8{0x33} ** 32; // Non-zero MAC value
 
     const ciphertext = try sm9.encrypt.Ciphertext.init(
         allocator,
