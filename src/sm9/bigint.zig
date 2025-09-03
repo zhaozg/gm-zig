@@ -263,12 +263,13 @@ pub fn reduceMod(a: BigInt, m: BigInt) BigIntError!BigInt {
 
 /// Modular inverse using robust extended Euclidean algorithm
 /// Returns the modular inverse of a modulo m
-/// Based on the standard extended Euclidean algorithm with proper error handling
+/// Uses the classic extended Euclidean algorithm for maximum reliability
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
 
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const zero = [_]u8{0} ** 32;
     
     // Quick check for a = 1
     if (equal(a, one)) {
@@ -286,89 +287,119 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.NotInvertible;
     }
 
-    // Use binary GCD algorithm to avoid expensive division operations
-    var u = a_norm;
-    var v = m;
-    var x1 = one;
-    var x2 = [_]u8{0} ** 32;
+    // Extended Euclidean Algorithm
+    // We maintain: gcd(a, m) = u1*a + v1*m = old_r
+    var old_r = m;      // remainders
+    var r = a_norm;
+    var old_s = zero;   // coefficients of a
+    var s = one;
+    var old_t = one;    // coefficients of m  
+    var t = zero;
     
     var iterations: u32 = 0;
-    const max_iterations = 512; // Reasonable limit for 256-bit numbers
+    const max_iterations = 1024; // Conservative limit for 256-bit numbers
     
-    while (!equal(u, one) and !isZero(u) and iterations < max_iterations) {
+    while (!isZero(r) and iterations < max_iterations) {
         iterations += 1;
         
-        // Make u odd
-        while ((u[31] & 1) == 0) { // u is even
-            u = shiftRight(u);
-            if ((x1[31] & 1) == 0) { // x1 is even
-                x1 = shiftRight(x1);
-            } else {
-                // x1 = (x1 + m) / 2
-                const sum = add(x1, m);
-                x1 = shiftRight(sum.result);
-            }
+        // Compute quotient: q = old_r div r using repeated subtraction with optimization
+        var q = zero;
+        var temp_dividend = old_r;
+        var subtraction_count: u32 = 0;
+        const max_subtractions = 256; // Prevent excessive iteration
+        
+        // Optimized division by repeated subtraction with early termination
+        while (!lessThan(temp_dividend, r) and subtraction_count < max_subtractions) {
+            const diff = sub(temp_dividend, r);
+            if (diff.borrow) break;
+            temp_dividend = diff.result;
+            q = add(q, one).result;
+            subtraction_count += 1;
         }
         
-        // Make v odd
-        while ((v[31] & 1) == 0) { // v is even
-            v = shiftRight(v);
-            if ((x2[31] & 1) == 0) { // x2 is even
-                x2 = shiftRight(x2);
-            } else {
-                // x2 = (x2 + m) / 2
-                const sum = add(x2, m);
-                x2 = shiftRight(sum.result);
+        // If we hit the subtraction limit, try a more efficient approach
+        if (subtraction_count >= max_subtractions) {
+            // For very large quotients, use a binary search approach
+            var binary_q = zero;
+            var test_multiple = r;
+            
+            // Find the largest power of 2 where r * 2^k <= old_r
+            while (!lessThan(old_r, test_multiple)) {
+                const doubled = shiftLeft(test_multiple);
+                // Check for overflow
+                if (lessThan(doubled, test_multiple)) break;
+                test_multiple = doubled;
+                binary_q = shiftLeft(binary_q);
+                binary_q[31] |= 1; // Set LSB
             }
-        }
-        
-        // Subtract smaller from larger
-        if (!lessThan(u, v)) {
-            const diff_u = sub(u, v);
-            if (!diff_u.borrow) {
-                u = diff_u.result;
-                // x1 = x1 - x2 (mod m)
-                if (lessThan(x1, x2)) {
-                    const temp = add(x1, m);
-                    const diff_x = sub(temp.result, x2);
-                    if (!diff_x.borrow) x1 = diff_x.result;
-                } else {
-                    const diff_x = sub(x1, x2);
-                    if (!diff_x.borrow) x1 = diff_x.result;
+            
+            // Now binary_q * r is close to old_r, use this as starting point
+            if (!isZero(binary_q)) {
+                q = binary_q;
+                temp_dividend = old_r;
+                const multiple = mulMod(q, r, m) catch old_r;
+                if (!lessThan(old_r, multiple)) {
+                    temp_dividend = sub(old_r, multiple).result;
                 }
             }
+        }
+        
+        // Update remainders: (old_r, r) := (r, old_r - q * r)
+        const qr = mulMod(q, r, m) catch {
+            // If multiplication fails, use the original remainder computation
+            temp_dividend
+        };
+        
+        const new_r = if (lessThan(old_r, qr)) zero else sub(old_r, qr).result;
+        old_r = r;
+        r = new_r;
+        
+        // Update coefficients
+        // (old_s, s) := (s, old_s - q * s)
+        const qs = mulMod(q, s, m) catch s;
+        const new_s = if (lessThan(old_s, qs)) {
+            // Wrap around by adding m to old_s first
+            const wrapped = add(old_s, m);
+            if (lessThan(wrapped.result, qs)) zero else sub(wrapped.result, qs).result
         } else {
-            const diff_v = sub(v, u);
-            if (!diff_v.borrow) {
-                v = diff_v.result;
-                // x2 = x2 - x1 (mod m)
-                if (lessThan(x2, x1)) {
-                    const temp = add(x2, m);
-                    const diff_x = sub(temp.result, x1);
-                    if (!diff_x.borrow) x2 = diff_x.result;
-                } else {
-                    const diff_x = sub(x2, x1);
-                    if (!diff_x.borrow) x2 = diff_x.result;
-                }
-            }
-        }
+            sub(old_s, qs).result
+        };
+        old_s = s;
+        s = new_s;
+        
+        // (old_t, t) := (t, old_t - q * t)  
+        const qt = mulMod(q, t, m) catch t;
+        const new_t = if (lessThan(old_t, qt)) {
+            // Wrap around by adding m to old_t first
+            const wrapped = add(old_t, m);
+            if (lessThan(wrapped.result, qt)) zero else sub(wrapped.result, qt).result
+        } else {
+            sub(old_t, qt).result
+        };
+        old_t = t;
+        t = new_t;
     }
     
-    // Check for timeout or failure
+    // Check for timeout
     if (iterations >= max_iterations) {
         return BigIntError.NotInvertible;
     }
     
-    if (!equal(u, one)) {
+    // Check if gcd(a, m) = 1
+    if (!equal(old_r, one)) {
         return BigIntError.NotInvertible;
     }
-
-    // Ensure result is in the correct range
-    var result = x1;
-    if (!lessThan(result, m)) {
-        result = reduceMod(result, m) catch return BigIntError.NotInvertible;
+    
+    // The modular inverse is old_s (coefficient of a)
+    var result = old_s;
+    
+    // Ensure result is positive and in range [0, m)
+    while (!lessThan(result, m)) {
+        const diff = sub(result, m);
+        if (diff.borrow) break;
+        result = diff.result;
     }
-
+    
     // Verify the result: (a * result) mod m should equal 1
     const verification = mulMod(a_norm, result, m) catch return BigIntError.NotInvertible;
     if (!equal(verification, one)) {

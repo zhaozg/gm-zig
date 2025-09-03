@@ -47,16 +47,88 @@ pub const G1Point = struct {
     /// Uses the fact that p ≡ 3 (mod 4) for efficient computation
     fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) ![32]u8 {
         // For p ≡ 3 (mod 4), sqrt(a) = a^((p+1)/4) mod p
-        // Compute (p+1)/4
+        
+        // First check if a is a quadratic residue using Legendre symbol: a^((p-1)/2) mod p
+        // If result is 1, then a has a square root; if -1, then it doesn't
+        var legendre_exp = modulus;
+        
+        // Compute (p-1)/2 by subtracting 1 from p and then dividing by 2
+        var borrow: u8 = 1;
+        var i: i32 = 31;
+        while (i >= 0) : (i -= 1) {
+            const diff = @as(i16, legendre_exp[@intCast(i)]) - @as(i16, borrow);
+            if (diff < 0) {
+                legendre_exp[@intCast(i)] = @intCast(diff + 256);
+                borrow = 1;
+            } else {
+                legendre_exp[@intCast(i)] = @intCast(diff);
+                borrow = 0;
+            }
+        }
+        
+        // Divide by 2 (shift right by 1 bit)
+        var carry: u8 = 0;
+        i = 0;
+        while (i < 32) : (i += 1) {
+            const current = @as(u16, legendre_exp[@intCast(i)]) + (@as(u16, carry) << 8);
+            legendre_exp[@intCast(i)] = @intCast(current >> 1);
+            carry = @intCast(current & 0x01);
+        }
+        
+        // Compute a^((p-1)/2) mod p
+        var legendre_result = [_]u8{0} ** 32;
+        legendre_result[31] = 1; // Initialize to 1
+        
+        var base_legendre = a;
+        
+        // Process each bit of the exponent
+        var bit_count: u32 = 0;
+        while (bit_count < 256) : (bit_count += 1) {
+            const byte_idx = 31 - (bit_count / 8);
+            const bit_idx = bit_count % 8;
+            
+            if ((legendre_exp[byte_idx] >> @intCast(bit_idx)) & 1 == 1) {
+                legendre_result = bigint.mulMod(legendre_result, base_legendre, modulus) catch return error.InvalidPointFormat;
+            }
+            
+            base_legendre = bigint.mulMod(base_legendre, base_legendre, modulus) catch return error.InvalidPointFormat;
+        }
+        
+        // Check if legendre_result is 1 (quadratic residue) or p-1 (non-residue)
+        var minus_one = modulus;
+        var borrow2: u8 = 1;
+        i = 31;
+        while (i >= 0) : (i -= 1) {
+            const diff = @as(i16, minus_one[@intCast(i)]) - @as(i16, borrow2);
+            if (diff < 0) {
+                minus_one[@intCast(i)] = @intCast(diff + 256);
+                borrow2 = 1;
+            } else {
+                minus_one[@intCast(i)] = @intCast(diff);
+                borrow2 = 0;
+            }
+        }
+        
+        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        if (!bigint.equal(legendre_result, one) and !bigint.equal(legendre_result, minus_one)) {
+            return error.InvalidPointFormat;
+        }
+        
+        if (bigint.equal(legendre_result, minus_one)) {
+            // Not a quadratic residue
+            return error.InvalidPointFormat;
+        }
+        
+        // Now compute the actual square root: a^((p+1)/4) mod p
         var exp = modulus;
         
         // Add 1 to p
-        var carry: u8 = 1;
-        var i: i32 = 31;
+        var carry_add: u8 = 1;
+        i = 31;
         while (i >= 0) : (i -= 1) {
-            const sum = @as(u16, exp[@intCast(i)]) + carry;
+            const sum = @as(u16, exp[@intCast(i)]) + carry_add;
             exp[@intCast(i)] = @intCast(sum & 0xFF);
-            carry = @intCast(sum >> 8);
+            carry_add = @intCast(sum >> 8);
         }
         
         // Divide by 4 (shift right by 2 bits)
@@ -76,7 +148,7 @@ pub const G1Point = struct {
         const exponent = exp;
         
         // Process each bit of the exponent
-        var bit_count: u32 = 0;
+        bit_count = 0;
         while (bit_count < 256) : (bit_count += 1) {
             const byte_idx = 31 - (bit_count / 8);
             const bit_idx = bit_count % 8;
@@ -95,9 +167,11 @@ pub const G1Point = struct {
             result = bigint.sub(modulus, result).result;
         }
         
-        // For testing compatibility, skip the strict verification
-        // In production, this would verify that result² ≡ a (mod p)
-        // but for now we're more lenient to maintain backward compatibility
+        // Verify that result² ≡ a (mod p)
+        const verification = bigint.mulMod(result, result, modulus) catch return error.InvalidPointFormat;
+        if (!bigint.equal(verification, a)) {
+            return error.InvalidPointFormat;
+        }
         
         return result;
     }
@@ -158,26 +232,11 @@ pub const G1Point = struct {
             return error.InvalidPointFormat;
         };
         
-        // Step 3: Compute square root using Tonelli-Shanks algorithm (simplified)
-        // For BN256 field, we can use the fact that p ≡ 3 (mod 4)
-        // So sqrt(a) = a^((p+1)/4) mod p
+        // Step 3: Compute square root using Tonelli-Shanks algorithm
+        // For BN256 field where p ≡ 3 (mod 4), sqrt(a) = a^((p+1)/4) mod p
         const curve_params = params.SystemParams.init();
         const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch {
-            // If square root computation fails, use a deterministic fallback for testing
-            // This maintains backward compatibility with existing test data
-            var fallback_y: [32]u8 = undefined;
-            var hasher = SM3.init(.{});
-            hasher.update(&x);
-            hasher.update(&[_]u8{compressed[0]}); // Include parity information
-            hasher.update("SM9_G1_Y_FALLBACK");
-            hasher.final(&fallback_y);
-            
-            // Ensure y is valid in the field (less than curve modulus)
-            if (fallback_y[0] >= 0xB6) {
-                fallback_y[0] = fallback_y[0] & 0x7F; // Clear MSB to ensure < q
-            }
-            
-            return G1Point.affine(x, fallback_y);
+            return error.InvalidPointFormat;
         };
 
         return G1Point.affine(x, y);
