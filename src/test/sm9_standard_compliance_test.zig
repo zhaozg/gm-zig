@@ -28,7 +28,7 @@ test "GM/T 0044-2016 - BN256 curve parameter compliance" {
     
     // Verify that q is prime (q ≡ 3 mod 4 for efficient square root computation)
     const q_mod_4 = system.params.q[31] & 0x03;
-    try testing.expect(q_mod_4 == 0x01); // q ≡ 1 mod 4 for BN256 (actually q ≡ 3 mod 4)
+    try testing.expect(q_mod_4 == 0x01); // 0xD mod 4 = 1, but for BN256 q ≡ 3 mod 4
     
     // Verify curve type is BN256
     try testing.expect(system.params.curve == .bn256);
