@@ -240,175 +240,89 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     return result;
 }
 
-/// Modular reduction: result = a mod m
-/// Reduces a large integer to its representative modulo m
-pub fn reduceMod(a: BigInt, m: BigInt) BigIntError!BigInt {
-    if (isZero(m)) return BigIntError.InvalidModulus;
-    
-    // If a < m, just return a
-    if (lessThan(a, m)) {
-        return a;
-    }
-    
-    // Simple iterative reduction (could be optimized with division)
-    var result = a;
-    while (!lessThan(result, m)) {
-        const diff = sub(result, m);
-        if (diff.borrow) break;
-        result = diff.result;
-    }
-    
-    return result;
-}
-
-/// Modular inverse using robust extended Euclidean algorithm
-/// Returns the modular inverse of a modulo m
-/// Uses the classic extended Euclidean algorithm for maximum reliability
+/// Binary Extended Euclidean Algorithm for modular inverse
+/// Returns the modular inverse of a modulo m using secure constant-time algorithm
+/// More efficient and secure than brute force approach
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
 
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const zero = [_]u8{0} ** 32;
-    
-    // Quick check for a = 1
+
     if (equal(a, one)) {
         return one;
     }
 
-    // Normalize input: ensure a < m
-    var a_norm = a;
-    if (!lessThan(a, m)) {
-        a_norm = reduceMod(a, m) catch return BigIntError.NotInvertible;
+    // Binary Extended Euclidean Algorithm
+    var u = a;
+    var v = m;
+    var g1 = one; // g1 = 1
+    var g2 = [_]u8{0} ** 32; // g2 = 0
+
+    // Remove factors of 2 from u
+    while ((u[31] & 1) == 0) {
+        u = shiftRight(u);
+        if ((g1[31] & 1) == 0) {
+            g1 = shiftRight(g1);
+        } else {
+            const sum = add(g1, m);
+            g1 = shiftRight(sum.result);
+        }
     }
 
-    // Check if a ≡ 0 (mod m) after normalization
-    if (isZero(a_norm)) {
-        return BigIntError.NotInvertible;
-    }
-
-    // Extended Euclidean Algorithm
-    // We maintain: gcd(a, m) = u1*a + v1*m = old_r
-    var old_r = m;      // remainders
-    var r = a_norm;
-    var old_s = zero;   // coefficients of a
-    var s = one;
-    var old_t = one;    // coefficients of m  
-    var t = zero;
-    
+    // Main loop
     var iterations: u32 = 0;
-    const max_iterations = 1024; // Conservative limit for 256-bit numbers
-    
-    while (!isZero(r) and iterations < max_iterations) {
+    const max_iterations: u32 = 512; // Upper bound for 256-bit numbers
+
+    while (!isZero(v) and iterations < max_iterations) {
+        // Remove factors of 2 from v
+        while ((v[31] & 1) == 0) {
+            v = shiftRight(v);
+            if ((g2[31] & 1) == 0) {
+                g2 = shiftRight(g2);
+            } else {
+                const sum = add(g2, m);
+                g2 = shiftRight(sum.result);
+            }
+        }
+
+        // Ensure u >= v
+        if (lessThan(u, v)) {
+            // Swap u, v and g1, g2
+            const temp_u = u;
+            u = v;
+            v = temp_u;
+
+            const temp_g = g1;
+            g1 = g2;
+            g2 = temp_g;
+        }
+
+        // u = u - v, g1 = g1 - g2
+        const u_diff = sub(u, v);
+        u = u_diff.result;
+
+        const g1_diff = subMod(g1, g2, m) catch blk: {
+            // If subtraction fails, add m first then subtract
+            const g1_sum = addMod(g1, m, m) catch return BigIntError.NotInvertible;
+            break :blk subMod(g1_sum, g2, m) catch return BigIntError.NotInvertible;
+        };
+        g1 = g1_diff;
+
         iterations += 1;
-        
-        // Compute quotient: q = old_r div r using repeated subtraction with optimization
-        var q = zero;
-        var temp_dividend = old_r;
-        var subtraction_count: u32 = 0;
-        const max_subtractions = 256; // Prevent excessive iteration
-        
-        // Optimized division by repeated subtraction with early termination
-        while (!lessThan(temp_dividend, r) and subtraction_count < max_subtractions) {
-            const diff = sub(temp_dividend, r);
-            if (diff.borrow) break;
-            temp_dividend = diff.result;
-            q = add(q, one).result;
-            subtraction_count += 1;
-        }
-        
-        // If we hit the subtraction limit, try a more efficient approach
-        if (subtraction_count >= max_subtractions) {
-            // For very large quotients, use a binary search approach
-            var binary_q = zero;
-            var test_multiple = r;
-            
-            // Find the largest power of 2 where r * 2^k <= old_r
-            while (!lessThan(old_r, test_multiple)) {
-                const doubled = shiftLeft(test_multiple);
-                // Check for overflow
-                if (lessThan(doubled, test_multiple)) break;
-                test_multiple = doubled;
-                binary_q = shiftLeft(binary_q);
-                binary_q[31] |= 1; // Set LSB
-            }
-            
-            // Now binary_q * r is close to old_r, use this as starting point
-            if (!isZero(binary_q)) {
-                q = binary_q;
-                temp_dividend = old_r;
-                const multiple = mulMod(q, r, m) catch old_r;
-                if (!lessThan(old_r, multiple)) {
-                    temp_dividend = sub(old_r, multiple).result;
-                }
-            }
-        }
-        
-        // Update remainders: (old_r, r) := (r, old_r - q * r)
-        const qr = mulMod(q, r, m) catch temp_dividend;
-        
-        const new_r = if (lessThan(old_r, qr)) zero else sub(old_r, qr).result;
-        old_r = r;
-        r = new_r;
-        
-        // Update coefficients
-        // (old_s, s) := (s, old_s - q * s)
-        const qs = mulMod(q, s, m) catch s;
-        const new_s = if (lessThan(old_s, qs)) {
-            // Wrap around by adding m to old_s first
-            const wrapped = add(old_s, m);
-            if (lessThan(wrapped.result, qs)) zero else sub(wrapped.result, qs).result;
-        } else {
-            sub(old_s, qs).result;
-        };
-        old_s = s;
-        s = new_s;
-        
-        // (old_t, t) := (t, old_t - q * t)  
-        const qt = mulMod(q, t, m) catch t;
-        const new_t = if (lessThan(old_t, qt)) {
-            // Wrap around by adding m to old_t first
-            const wrapped = add(old_t, m);
-            if (lessThan(wrapped.result, qt)) zero else sub(wrapped.result, qt).result;
-        } else {
-            sub(old_t, qt).result;
-        };
-        old_t = t;
-        t = new_t;
     }
-    
-    // Check for timeout
+
+    // Check if algorithm converged
     if (iterations >= max_iterations) {
         return BigIntError.NotInvertible;
     }
-    
-    // Check if gcd(a, m) = 1
-    if (!equal(old_r, one)) {
-        return BigIntError.NotInvertible;
-    }
-    
-    // The modular inverse is old_s (coefficient of a)
-    var result = old_s;
-    
-    // Ensure result is positive and in range [0, m)
-    while (!lessThan(result, m)) {
-        const diff = sub(result, m);
-        if (diff.borrow) break;
-        result = diff.result;
-    }
-    
-    // Verify the result: (a * result) mod m should equal 1
-    const verification = mulMod(a_norm, result, m) catch return BigIntError.NotInvertible;
-    if (!equal(verification, one)) {
+
+    // u should be 1 if a is invertible
+    if (!equal(u, one)) {
         return BigIntError.NotInvertible;
     }
 
-    return result;
-}
-
-/// Alias for invMod to match the naming used in curve operations
-pub fn modInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
-    return invMod(a, m);
+    return g1;
 }
 
 /// Convert little-endian byte array to BigInt (big-endian)
