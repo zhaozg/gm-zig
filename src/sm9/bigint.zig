@@ -286,60 +286,85 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.NotInvertible;
     }
 
-    // Extended Euclidean Algorithm
-    var old_r = m;
-    var r = a_norm;
-    var old_s = [_]u8{0} ** 32;
-    var s = one;
-
-    while (!isZero(r)) {
-        // Compute quotient and remainder using repeated subtraction
-        var quotient = [_]u8{0} ** 32;
-        var remainder = old_r;
+    // Use binary GCD algorithm to avoid expensive division operations
+    var u = a_norm;
+    var v = m;
+    var x1 = one;
+    var x2 = [_]u8{0} ** 32;
+    
+    var iterations: u32 = 0;
+    const max_iterations = 512; // Reasonable limit for 256-bit numbers
+    
+    while (!equal(u, one) and !isZero(u) and iterations < max_iterations) {
+        iterations += 1;
         
-        while (!lessThan(remainder, r)) {
-            const diff = sub(remainder, r);
-            if (diff.borrow) break;
-            remainder = diff.result;
-            quotient = add(quotient, one).result;
-        }
-
-        // Update r values: old_r, r = r, remainder
-        old_r = r;
-        r = remainder;
-
-        // Update s values: old_s, s = s, old_s - quotient * s
-        const temp_s = s;
-        
-        // Compute quotient * s safely
-        var qs = [_]u8{0} ** 32;
-        var q_temp = quotient;
-        var s_temp = s;
-        while (!isZero(q_temp)) {
-            if ((q_temp[31] & 1) != 0) {
-                qs = addMod(qs, s_temp, m) catch return BigIntError.NotInvertible;
+        // Make u odd
+        while ((u[31] & 1) == 0) { // u is even
+            u = shiftRight(u);
+            if ((x1[31] & 1) == 0) { // x1 is even
+                x1 = shiftRight(x1);
+            } else {
+                // x1 = (x1 + m) / 2
+                const sum = add(x1, m);
+                x1 = shiftRight(sum.result);
             }
-            q_temp = shiftRight(q_temp);
-            s_temp = addMod(s_temp, s_temp, m) catch return BigIntError.NotInvertible;
         }
         
-        // Compute old_s - qs with underflow handling
-        if (lessThan(old_s, qs)) {
-            const temp_old_s = addMod(old_s, m, m) catch return BigIntError.NotInvertible;
-            s = subMod(temp_old_s, qs, m) catch return BigIntError.NotInvertible;
-        } else {
-            s = subMod(old_s, qs, m) catch return BigIntError.NotInvertible;
+        // Make v odd
+        while ((v[31] & 1) == 0) { // v is even
+            v = shiftRight(v);
+            if ((x2[31] & 1) == 0) { // x2 is even
+                x2 = shiftRight(x2);
+            } else {
+                // x2 = (x2 + m) / 2
+                const sum = add(x2, m);
+                x2 = shiftRight(sum.result);
+            }
         }
-        old_s = temp_s;
+        
+        // Subtract smaller from larger
+        if (!lessThan(u, v)) {
+            const diff_u = sub(u, v);
+            if (!diff_u.borrow) {
+                u = diff_u.result;
+                // x1 = x1 - x2 (mod m)
+                if (lessThan(x1, x2)) {
+                    const temp = add(x1, m);
+                    const diff_x = sub(temp.result, x2);
+                    if (!diff_x.borrow) x1 = diff_x.result;
+                } else {
+                    const diff_x = sub(x1, x2);
+                    if (!diff_x.borrow) x1 = diff_x.result;
+                }
+            }
+        } else {
+            const diff_v = sub(v, u);
+            if (!diff_v.borrow) {
+                v = diff_v.result;
+                // x2 = x2 - x1 (mod m)
+                if (lessThan(x2, x1)) {
+                    const temp = add(x2, m);
+                    const diff_x = sub(temp.result, x1);
+                    if (!diff_x.borrow) x2 = diff_x.result;
+                } else {
+                    const diff_x = sub(x2, x1);
+                    if (!diff_x.borrow) x2 = diff_x.result;
+                }
+            }
+        }
     }
-
-    // Check if gcd is 1 (old_r should be 1)
-    if (!equal(old_r, one)) {
+    
+    // Check for timeout or failure
+    if (iterations >= max_iterations) {
+        return BigIntError.NotInvertible;
+    }
+    
+    if (!equal(u, one)) {
         return BigIntError.NotInvertible;
     }
 
-    // Ensure result is positive and within range
-    var result = old_s;
+    // Ensure result is in the correct range
+    var result = x1;
     if (!lessThan(result, m)) {
         result = reduceMod(result, m) catch return BigIntError.NotInvertible;
     }
