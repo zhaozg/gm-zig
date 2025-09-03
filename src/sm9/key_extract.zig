@@ -176,7 +176,6 @@ pub const EncryptUserPrivateKey = struct {
             .key = private_key_compressed,
             .hid = 0x03, // Encryption hash identifier
         };
-        };
     }
 
     /// Validate user private key

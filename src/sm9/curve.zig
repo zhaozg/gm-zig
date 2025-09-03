@@ -162,7 +162,7 @@ pub const G1Point = struct {
         // For BN256 field, we can use the fact that p ≡ 3 (mod 4)
         // So sqrt(a) = a^((p+1)/4) mod p
         const curve_params = params.SystemParams.init();
-        const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch |err| {
+        const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch {
             // If square root computation fails, use a deterministic fallback for testing
             // This maintains backward compatibility with existing test data
             var fallback_y: [32]u8 = undefined;
