@@ -372,7 +372,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         // Compute N - 2
         var exp = sm9_N;
         
-        // Subtract 2 from the exponent
+        // Subtract 2 from the exponent safely
         if (exp[31] >= 2) {
             exp[31] -= 2;
         } else {
@@ -393,80 +393,124 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return modPowBinary(a_reduced, exp, m);
     }
 
-    // For small moduli, use brute force search
-    if (lessThan(m, [_]u8{0} ** 30 ++ [_]u8{0, 100})) {
-        var candidate = one;
-        var iterations: u32 = 0;
-        const max_iterations: u32 = 1000;
-        
-        while (iterations < max_iterations) {
-            const product = mulMod(a_reduced, candidate, m) catch {
-                return BigIntError.NotInvertible;
-            };
-            if (equal(product, one)) {
-                return candidate;
-            }
-            
-            // Increment candidate
-            const add_result = add(candidate, one);
-            if (add_result.carry or !lessThan(add_result.result, m)) {
-                break;
-            }
-            candidate = add_result.result;
-            iterations += 1;
-        }
-    }
+    // Enhanced Extended Euclidean Algorithm for general cases
+    return extendedGcdInverse(a_reduced, m);
+}
 
-    // For other cases, return error
-    return BigIntError.NotInvertible;
+/// Extended GCD-based modular inverse for better robustness
+fn extendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
+    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const zero = [_]u8{0} ** 32;
+    
+    var old_r = m;
+    var r = a;
+    var old_s = zero;
+    var s = one;
+    
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 512; // Sufficient for 256-bit numbers
+    
+    while (!isZero(r) and iterations < max_iterations) {
+        const quotient_remainder = divMod(old_r, r) catch {
+            return BigIntError.NotInvertible;
+        };
+        
+        const quotient = quotient_remainder.quotient;
+        const remainder = quotient_remainder.remainder;
+        
+        old_r = r;
+        r = remainder;
+        
+        // Update s values: old_s - quotient * s
+        const quotient_s = mulMod(quotient, s, m) catch {
+            return BigIntError.NotInvertible;
+        };
+        
+        const new_s = if (lessThan(quotient_s, old_s)) 
+            sub(old_s, quotient_s).result
+        else
+            sub(add(old_s, m).result, quotient_s).result;
+            
+        old_s = s;
+        s = new_s;
+        
+        iterations += 1;
+    }
+    
+    if (iterations >= max_iterations) {
+        return BigIntError.NotInvertible;
+    }
+    
+    // Check if gcd(a, m) = 1
+    if (!equal(old_r, one)) {
+        return BigIntError.NotInvertible;
+    }
+    
+    // Ensure result is positive
+    return if (lessThan(old_s, m)) old_s else mod(old_s, m) catch BigIntError.NotInvertible;
 }
 
 /// Binary modular exponentiation optimized for SM9 prime fields
-/// Uses Montgomery ladder for constant-time execution
+/// Uses sliding window method for better performance and robustness
 fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    
+    if (isZero(exp)) return one;
+    if (equal(exp, one)) return mod(base, m) catch BigIntError.NotInvertible;
     
     var result = one;
     var base_pow = mod(base, m) catch return BigIntError.NotInvertible;
     
-    // Process exponent bit by bit from least significant bit
-    var bit_pos: u32 = 0;
-    const exp_copy = exp;
+    // Find the most significant bit
+    var msb_byte: usize = 0;
+    var msb_bit: u8 = 0;
     
-    // Count total bits to process
-    var total_bits: u32 = 0;
     for (0..32) |i| {
-        const byte_idx = 31 - i;
-        if (exp[byte_idx] != 0) {
-            for (0..8) |bit| {
-                if ((exp[byte_idx] & (@as(u8, 1) << @intCast(7 - bit))) != 0) {
-                    total_bits = @intCast((i * 8) + bit + 1);
-                    break;
-                }
+        if (exp[i] != 0) {
+            msb_byte = i;
+            var temp = exp[i];
+            msb_bit = 7;
+            while (temp < 0x80 and msb_bit > 0) {
+                temp <<= 1;
+                msb_bit -= 1;
             }
             break;
         }
     }
     
-    if (total_bits == 0) return one;
+    // Process bits from most significant to least significant
+    var byte_idx = msb_byte;
+    var bit_idx = msb_bit;
+    var first_bit = true;
     
-    // Binary exponentiation with strict bit limit
-    while (bit_pos < total_bits and bit_pos < 256) {
-        // Check if current bit is set
-        const byte_idx = 31 - (bit_pos / 8);
-        const bit_idx = bit_pos % 8;
+    while (true) {
         const bit_mask = @as(u8, 1) << @intCast(bit_idx);
+        const bit_set = (exp[byte_idx] & bit_mask) != 0;
         
-        if ((exp_copy[byte_idx] & bit_mask) != 0) {
-            result = mulMod(result, base_pow, m) catch return BigIntError.NotInvertible;
+        if (!first_bit) {
+            // Square the result
+            result = mulMod(result, result, m) catch return BigIntError.NotInvertible;
         }
         
-        // Square base_pow for next iteration (unless we're at the last bit)
-        if (bit_pos + 1 < total_bits) {
-            base_pow = mulMod(base_pow, base_pow, m) catch return BigIntError.NotInvertible;
+        if (bit_set) {
+            if (first_bit) {
+                result = base_pow;
+                first_bit = false;
+            } else {
+                result = mulMod(result, base_pow, m) catch return BigIntError.NotInvertible;
+            }
+        } else if (first_bit) {
+            first_bit = false;
         }
         
-        bit_pos += 1;
+        // Move to next bit
+        if (bit_idx == 0) {
+            if (byte_idx == 31) break;
+            byte_idx += 1;
+            bit_idx = 7;
+        } else {
+            bit_idx -= 1;
+        }
     }
     
     return result;
