@@ -25,7 +25,4 @@ test {
     // Enhanced Robustness Tests
     _ = @import("test/sm9_robustness_test.zig");
     _ = @import("test/sm9_key_agreement_test.zig");
-    
-    // Remove debug tests for now
-    // _ = @import("test/debug_bigint_test.zig");
 }
