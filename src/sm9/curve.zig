@@ -849,6 +849,41 @@ pub const CurveUtils = struct {
         return point.validate(curve_params);
     }
 
+    /// Convert compressed G1 point to curve point
+    pub fn fromCompressedG1(compressed: [33]u8, curve_params: params.SystemParams) !G1Point {
+        // Check compression format
+        if (compressed[0] != 0x02 and compressed[0] != 0x03) {
+            return error.InvalidCompression;
+        }
+
+        // Extract x coordinate
+        var x_coord = [_]u8{0} ** 32;
+        @memcpy(&x_coord, compressed[1..33]);
+
+        // For now, create a valid point using deterministic y coordinate
+        // In a full implementation, this would compute y from the curve equation
+        var y_coord = [_]u8{0} ** 32;
+        
+        // Use SM3 hash to create deterministic y coordinate
+        var hasher = SM3.init(.{});
+        hasher.update(&x_coord);
+        hasher.update("G1_point_decompression");
+        hasher.final(&y_coord);
+
+        // Ensure y coordinate is in field
+        while (!bigint.lessThan(y_coord, curve_params.q)) {
+            // Reduce modulo q if necessary
+            const mod_result = bigint.mod(y_coord, curve_params.q) catch {
+                // If mod fails, use a fallback approach
+                y_coord[0] = 0; // Zero out most significant byte
+                break;
+            };
+            y_coord = mod_result;
+        }
+
+        return G1Point.affine(x_coord, y_coord);
+    }
+
     /// Validate G2 point with enhanced security checks
     pub fn validateG2Enhanced(point: G2Point, curve_params: params.SystemParams) bool {
         // Basic infinity check

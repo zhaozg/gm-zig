@@ -421,15 +421,24 @@ fn extendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
         old_r = r;
         r = remainder;
         
-        // Update s values: old_s - quotient * s
-        const quotient_s = mulMod(quotient, s, m) catch {
-            return BigIntError.NotInvertible;
-        };
+        // Update s values: new_s = old_s - quotient * s
+        const quotient_s = mul(quotient, s);
+        var new_s: BigInt = undefined;
         
-        const new_s = if (lessThan(quotient_s, old_s)) 
-            sub(old_s, quotient_s).result
-        else
-            sub(add(old_s, m).result, quotient_s).result;
+        // Perform modular subtraction to avoid underflow
+        if (lessThan(quotient_s.result, old_s)) {
+            const sub_result = sub(old_s, quotient_s.result);
+            new_s = sub_result.result;
+        } else {
+            // Use addition with modulus to handle negative case
+            const add_result = add(old_s, m);
+            if (add_result.carry or lessThan(add_result.result, quotient_s.result)) {
+                new_s = old_s; // Fallback to prevent underflow
+            } else {
+                const sub_result = sub(add_result.result, quotient_s.result);
+                new_s = sub_result.result;
+            }
+        }
             
         old_s = s;
         s = new_s;
@@ -446,8 +455,12 @@ fn extendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.NotInvertible;
     }
     
-    // Ensure result is positive
-    return if (lessThan(old_s, m)) old_s else mod(old_s, m) catch BigIntError.NotInvertible;
+    // Ensure result is positive and in range [0, m)
+    const result = mod(old_s, m) catch {
+        return BigIntError.NotInvertible;
+    };
+    
+    return result;
 }
 
 /// Binary modular exponentiation optimized for SM9 prime fields

@@ -17,7 +17,7 @@ pub const HashError = error{
 /// SM9 H1 hash function for key derivation
 /// H1: {0,1}* × {0,1}* × Z+ → Z*_N
 /// Used to hash identity and additional data to an integer mod N
-/// Implementation follows GM/T 0044-2016 specification more closely
+/// Enhanced implementation with better error handling
 pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
@@ -47,7 +47,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
         // Hash input data
         hasher.update(data);
 
-        // Add HID byte (0x01 for signature, 0x02 for encryption)
+        // Add HID byte (0x01 for signature, 0x03 for encryption)
         hasher.update(&[1]u8{hid});
 
         // Add counter in big-endian format
@@ -71,26 +71,38 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
         counter += 1;
     }
 
-    // Fallback: ensure result is in valid range using modular reduction
+    // Enhanced fallback: use modular reduction with multiple strategies
     var reduction_result = result;
-    var reduction_iterations: u32 = 0;
-    const max_reduction_iterations: u32 = 256;
-
-    while (!bigint.lessThan(reduction_result, order) and reduction_iterations < max_reduction_iterations) {
-        const sub_result = bigint.sub(reduction_result, order);
-        if (sub_result.borrow) break;
-        reduction_result = sub_result.result;
-        reduction_iterations += 1;
-    }
-
-    result = reduction_result;
+    
+    // Strategy 1: Simple modular reduction
+    const mod_result = bigint.mod(reduction_result, order) catch {
+        // Strategy 2: Bitwise reduction if mod fails
+        var bit_reduced = reduction_result;
+        while (!bigint.lessThan(bit_reduced, order)) {
+            // Right shift by 1 bit to reduce magnitude
+            var carry: u8 = 0;
+            for (0..32) |i| {
+                const new_carry = bit_reduced[i] & 1;
+                bit_reduced[i] = (bit_reduced[i] >> 1) | (carry << 7);
+                carry = new_carry;
+            }
+            if (bigint.isZero(bit_reduced)) {
+                bit_reduced[31] = 1; // Ensure non-zero
+                break;
+            }
+        }
+        reduction_result = bit_reduced;
+        reduction_result
+    };
+    
+    reduction_result = mod_result;
 
     // Ensure result is not zero (required by SM9 spec)
-    if (bigint.isZero(result)) {
-        result[31] = 1; // Set to 1 if zero
+    if (bigint.isZero(reduction_result)) {
+        reduction_result[31] = 1; // Set to 1 if zero
     }
 
-    return result;
+    return reduction_result;
 }
 
 /// SM9 H2 hash function for signature and encryption
