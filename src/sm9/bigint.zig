@@ -149,15 +149,29 @@ pub fn addMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn subMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
 
-    const diff = sub(a, b);
+    // Reduce operands modulo m first for safety
+    const a_reduced = mod(a, m) catch a;
+    const b_reduced = mod(b, m) catch b;
 
-    // If no borrow, return result directly
+    const diff = sub(a_reduced, b_reduced);
+
+    // If no borrow, return result modulo m
     if (!diff.borrow) {
-        return diff.result;
+        return mod(diff.result, m) catch diff.result;
     }
 
     // If there was a borrow, add m to get positive result
     const corrected = add(diff.result, m);
+    if (corrected.carry) {
+        // Handle overflow by using modular arithmetic
+        return mod(diff.result, m) catch {
+            // Last resort: use simple addition
+            const temp = add(a_reduced, m);
+            if (temp.carry) return BigIntError.Overflow;
+            const result = sub(temp.result, b_reduced);
+            return result.result;
+        };
+    }
     return corrected.result;
 }
 
