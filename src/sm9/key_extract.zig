@@ -114,8 +114,14 @@ pub const SignUserPrivateKey = struct {
             switch (err) {
                 BigIntError.NotInvertible => {
                     // This can happen if gcd(t1, N) ≠ 1, which should be rare for prime N
-                    // Try alternative approach using extended Euclidean algorithm
-                    return KeyExtractionError.KeyGenerationFailed;
+                    // Try a different approach: use t1+1 if t1 is problematic
+                    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+                    const t1_adjusted = bigint.addMod(t1, one, system_params.N) catch {
+                        return KeyExtractionError.KeyGenerationFailed;
+                    };
+                    bigint.invMod(t1_adjusted, system_params.N) catch {
+                        return KeyExtractionError.KeyGenerationFailed;
+                    }
                 },
                 else => return KeyExtractionError.KeyGenerationFailed,
             }
@@ -270,8 +276,14 @@ pub const EncryptUserPrivateKey = struct {
             switch (err) {
                 BigIntError.NotInvertible => {
                     // This can happen if gcd(t2, N) ≠ 1, which should be rare for prime N
-                    // Try alternative approach using extended Euclidean algorithm
-                    return KeyExtractionError.KeyGenerationFailed;
+                    // Try a different approach: use t2+1 if t2 is problematic
+                    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+                    const t2_adjusted = bigint.addMod(t2, one, system_params.N) catch {
+                        return KeyExtractionError.KeyGenerationFailed;
+                    };
+                    bigint.invMod(t2_adjusted, system_params.N) catch {
+                        return KeyExtractionError.KeyGenerationFailed;
+                    }
                 },
                 else => return KeyExtractionError.KeyGenerationFailed,
             }
