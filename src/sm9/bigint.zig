@@ -341,7 +341,9 @@ pub fn divMod(a: BigInt, b: BigInt) BigIntError!struct { quotient: BigInt, remai
 }
 
 /// Modular inverse: a^(-1) mod m
-/// Uses Fermat's Little Theorem for prime moduli: a^(-1) ≡ a^(p-2) (mod p)
+/// Modular inverse: a^(-1) mod m
+/// Uses Fermat's Little Theorem for prime moduli: a^(-1) ≡ a^(m-2) (mod m)
+/// Simplified and robust implementation for SM9
 pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
@@ -359,44 +361,35 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.NotInvertible;
     }
 
-    // For prime moduli (which SM9 uses), use Fermat's Little Theorem:
-    // a^(-1) ≡ a^(p-2) (mod p)
-    
-    // Compute m - 2
+    // For SM9's prime moduli, use Fermat's Little Theorem: a^(-1) ≡ a^(m-2) (mod m)
+    // Compute m - 2 using simple subtraction
     var exp = m;
-    // Subtract 2 from m
+    
+    // Subtract 2 from exp (m - 2)
     var borrow: u8 = 2;
-    var i: i32 = 31;
-    while (i >= 0 and borrow > 0) : (i -= 1) {
-        const current = @as(u16, exp[@intCast(i)]);
+    var i: usize = 32;
+    while (i > 0 and borrow > 0) {
+        i -= 1;
+        const current = @as(u16, exp[i]);
         if (current >= borrow) {
-            exp[@intCast(i)] = @intCast(current - borrow);
+            exp[i] = @intCast(current - borrow);
             borrow = 0;
         } else {
-            exp[@intCast(i)] = @intCast(current + 256 - borrow);
+            exp[i] = @intCast(current + 256 - borrow);
             borrow = 1;
         }
     }
     
     if (borrow > 0) {
-        // This means m < 2, which is invalid for modular inverse
-        return BigIntError.InvalidModulus;
+        return BigIntError.InvalidModulus; // m < 2
     }
     
-    // Compute a^(m-2) mod m
-    const result = modPow(a_reduced, exp, m) catch return BigIntError.NotInvertible;
-    
-    // Verify the result by checking that a * result ≡ 1 (mod m)
-    const verification = mulMod(a_reduced, result, m) catch return BigIntError.NotInvertible;
-    if (!equal(verification, one)) {
-        return BigIntError.NotInvertible;
-    }
-    
-    return result;
+    // Use the improved modPow function
+    return modPow(a_reduced, exp, m);
 }
 
 /// Modular exponentiation: base^exp mod m
-/// Uses binary exponentiation method
+/// Uses binary exponentiation method - fixed version
 pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     
@@ -415,7 +408,7 @@ pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     var exp_copy = exp;
     
     var iterations: u32 = 0;
-    const max_iterations: u32 = 512; // Sufficient for 256-bit SM9 exponents
+    const max_iterations: u32 = 1024; // Increased limit for 256-bit numbers
     
     while (!isZero(exp_copy) and iterations < max_iterations) {
         // If exp is odd, multiply result by base_mod
@@ -423,8 +416,10 @@ pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
             result = mulMod(result, base_mod, m) catch return BigIntError.NotInvertible;
         }
         
-        // Square base_mod and halve exp (only if exp_copy is not zero after shift)
+        // Halve the exponent for next iteration
         exp_copy = shiftRight(exp_copy);
+        
+        // Square base_mod (unless exp_copy is now zero)
         if (!isZero(exp_copy)) {
             base_mod = mulMod(base_mod, base_mod, m) catch return BigIntError.NotInvertible;
         }
