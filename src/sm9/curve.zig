@@ -887,8 +887,9 @@ pub const CurveUtils = struct {
         hasher.update("G1_point_decompression");
         hasher.final(&y_coord);
 
-        // Ensure y coordinate is in field
-        while (!bigint.lessThan(y_coord, curve_params.q)) {
+        // Ensure y coordinate is in field (with safety limit)
+        var reduction_attempts: u32 = 0;
+        while (!bigint.lessThan(y_coord, curve_params.q) and reduction_attempts < 10) : (reduction_attempts += 1) {
             // Reduce modulo q if necessary
             const mod_result = bigint.mod(y_coord, curve_params.q) catch {
                 // If mod fails, use a fallback approach

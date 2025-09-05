@@ -391,18 +391,15 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
             exp[31] -= 2;
         } else {
             exp[31] = @as(u8, @intCast(@as(u16, exp[31]) + 256 - 2));
-            var i: usize = 30;
-            while (true) {
-                if (exp[i] > 0) {
-                    exp[i] -= 1;
+            var i: i32 = 30; // Use signed integer to prevent underflow issues
+            while (i >= 0) {
+                if (exp[@intCast(i)] > 0) {
+                    exp[@intCast(i)] -= 1;
                     break;
                 } else {
-                    exp[i] = 255;
+                    exp[@intCast(i)] = 255;
                 }
-                if (i == 0) break;
                 i -= 1;
-                // Additional safety - prevent infinite loop in rare edge cases
-                if (i > 31) break; // This should never happen but protects against underflow
             }
         }
         
