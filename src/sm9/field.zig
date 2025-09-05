@@ -136,32 +136,14 @@ pub fn modularInverseBinaryEEA(a: FieldElement, m: FieldElement) FieldError!Fiel
     return g1;
 }
 
-/// Optimized modular exponentiation using Montgomery ladder
+/// Optimized modular exponentiation using bigint modPow
 /// Computes base^exp mod m in constant time
 pub fn modularExponentiation(base: FieldElement, exp: FieldElement, m: FieldElement) FieldError!FieldElement {
-    if (bigint.isZero(m)) return FieldError.InvalidModulus;
-    if (bigint.isZero(exp)) {
-        return [_]u8{0} ** 31 ++ [_]u8{1}; // Return 1
-    }
-
-    var result = [_]u8{0} ** 31 ++ [_]u8{1}; // result = 1
-    var base_power = base;
-    var exponent = exp;
-
-    // Binary exponentiation
-    var bit_index: usize = 0;
-    while (bit_index < 256 and !bigint.isZero(exponent)) : (bit_index += 1) {
-        // Check if current bit is set
-        if ((exponent[31] & 1) == 1) {
-            result = try bigint.mulMod(result, base_power, m);
-        }
-
-        // Square the base and shift exponent
-        base_power = try bigint.mulMod(base_power, base_power, m);
-        exponent = bigint.shiftRight(exponent);
-    }
-
-    return result;
+    return bigint.modPow(base, exp, m) catch |err| switch (err) {
+        bigint.BigIntError.InvalidModulus => FieldError.InvalidModulus,
+        bigint.BigIntError.NotInvertible => FieldError.NotInvertible,
+        else => FieldError.InvalidElement,
+    };
 }
 
 /// Fp2 addition: (a1 + b1*i) + (a2 + b2*i) = (a1+a2) + (b1+b2)*i
@@ -206,7 +188,7 @@ pub fn fp2Inv(x: Fp2Element, m: FieldElement) FieldError!Fp2Element {
     const norm = try bigint.addMod(a_squared, b_squared, m);
 
     // Invert the norm
-    const norm_inv = try modularInverseBinaryEEA(norm, m);
+    const norm_inv = try bigint.invMod(norm, m);
 
     // Compute conjugate and multiply by norm inverse
     const real_part = try bigint.mulMod(x.a, norm_inv, m);
