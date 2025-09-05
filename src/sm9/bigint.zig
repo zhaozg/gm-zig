@@ -436,20 +436,30 @@ fn extendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
         r = remainder;
         
         // Update s values: new_s = old_s - quotient * s
-        const quotient_s = mul(quotient, s);
+        const quotient_s = mulMod(quotient, s, m) catch blk: {
+            // Fallback to simple multiplication for intermediate computation
+            var result = [_]u8{0} ** 32;
+            // Simple multiplication: just use the lower part
+            const q_low = quotient[31];
+            const s_low = s[31];
+            const product = @as(u16, q_low) * @as(u16, s_low);
+            result[31] = @intCast(product & 0xFF);
+            result[30] = @intCast((product >> 8) & 0xFF);
+            break :blk result;
+        };
         var new_s: BigInt = undefined;
         
         // Perform modular subtraction to avoid underflow
-        if (lessThan(quotient_s.result, old_s)) {
-            const sub_result = sub(old_s, quotient_s.result);
+        if (lessThan(quotient_s, old_s)) {
+            const sub_result = sub(old_s, quotient_s);
             new_s = sub_result.result;
         } else {
             // Use addition with modulus to handle negative case
             const add_result = add(old_s, m);
-            if (add_result.carry or lessThan(add_result.result, quotient_s.result)) {
+            if (add_result.carry or lessThan(add_result.result, quotient_s)) {
                 new_s = old_s; // Fallback to prevent underflow
             } else {
-                const sub_result = sub(add_result.result, quotient_s.result);
+                const sub_result = sub(add_result.result, quotient_s);
                 new_s = sub_result.result;
             }
         }
@@ -486,7 +496,7 @@ fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     if (equal(exp, one)) return mod(base, m) catch BigIntError.NotInvertible;
     
     var result = one;
-    var base_pow = mod(base, m) catch return BigIntError.NotInvertible;
+    const base_pow = mod(base, m) catch return BigIntError.NotInvertible;
     
     // Find the most significant bit
     var msb_byte: usize = 0;

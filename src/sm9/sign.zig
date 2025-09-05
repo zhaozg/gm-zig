@@ -261,14 +261,14 @@ pub const SignatureContext = struct {
 
         // Step 4: Compute l = (r - h) mod N using proper modular arithmetic
         const bigint = @import("bigint.zig");
-        var l = bigint.subMod(r, h, self.system_params.N) catch {
+        var l = bigint.subMod(r, h, self.system_params.N) catch blk: {
             // If subtraction fails, try additive approach: l = (r + N - h) mod N
             const n_minus_h = bigint.subMod(self.system_params.N, h, self.system_params.N) catch {
                 return error.HashComputationFailed;
             };
-            bigint.addMod(r, n_minus_h, self.system_params.N) catch {
+            break :blk bigint.addMod(r, n_minus_h, self.system_params.N) catch {
                 return error.HashComputationFailed;
-            }
+            };
         };
 
         // Step 5: Enhanced handling for l = 0 case
@@ -276,13 +276,13 @@ pub const SignatureContext = struct {
         while (bigint.isZero(l) and retry_count < 3) {
             // For deterministic operation, modify r slightly and recompute
             r[31] = r[31] ^ (@as(u8, 1) << @intCast(retry_count));
-            l = bigint.subMod(r, h, self.system_params.N) catch {
+            l = bigint.subMod(r, h, self.system_params.N) catch blk: {
                 const n_minus_h = bigint.subMod(self.system_params.N, h, self.system_params.N) catch {
                     return error.HashComputationFailed;
                 };
-                bigint.addMod(r, n_minus_h, self.system_params.N) catch {
+                break :blk bigint.addMod(r, n_minus_h, self.system_params.N) catch {
                     return error.HashComputationFailed;
-                }
+                };
             };
             retry_count += 1;
         }

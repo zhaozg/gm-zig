@@ -75,7 +75,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     var reduction_result = result;
     
     // Strategy 1: Simple modular reduction
-    const mod_result = bigint.mod(reduction_result, order) catch {
+    const mod_result = bigint.mod(reduction_result, order) catch blk: {
         // Strategy 2: Bitwise reduction if mod fails
         var bit_reduced = reduction_result;
         while (!bigint.lessThan(bit_reduced, order)) {
@@ -91,8 +91,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
                 break;
             }
         }
-        reduction_result = bit_reduced;
-        reduction_result
+        break :blk bit_reduced;
     };
     
     reduction_result = mod_result;
