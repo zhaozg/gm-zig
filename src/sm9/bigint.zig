@@ -520,7 +520,11 @@ fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     var bit_idx = msb_bit;
     var first_bit = true;
     
-    while (true) {
+    // Safety counter to prevent infinite loops
+    var iteration_count: u32 = 0;
+    const max_iterations: u32 = 256; // 32 bytes * 8 bits = 256 max possible iterations
+    
+    while (iteration_count < max_iterations) {
         const bit_mask = @as(u8, 1) << @intCast(bit_idx);
         const bit_set = (exp[byte_idx] & bit_mask) != 0;
         
@@ -540,14 +544,16 @@ fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
             first_bit = false;
         }
         
-        // Move to next bit
+        // Move to next bit (going from MSB to LSB)
         if (bit_idx == 0) {
-            if (byte_idx == 31) break;
+            if (byte_idx >= 31) break; // We've processed all bytes
             byte_idx += 1;
             bit_idx = 7;
         } else {
             bit_idx -= 1;
         }
+        
+        iteration_count += 1;
     }
     
     return result;

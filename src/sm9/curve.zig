@@ -233,7 +233,10 @@ pub const G1Point = struct {
 
         // Process scalar bit by bit (little-endian)
         var byte_index: usize = 31;
-        while (true) {
+        var safety_counter: u32 = 0;
+        const max_iterations: u32 = 32; // Maximum 32 bytes to process
+        
+        while (safety_counter < max_iterations) {
             const byte = scalar[byte_index];
             var bit_mask: u8 = 1;
 
@@ -246,6 +249,7 @@ pub const G1Point = struct {
 
             if (byte_index == 0) break;
             byte_index -= 1;
+            safety_counter += 1;
         }
 
         return result;
@@ -620,7 +624,10 @@ pub const G2Point = struct {
 
         // Process scalar bit by bit (little-endian)
         var byte_index: usize = 31;
-        while (true) {
+        var safety_counter: u32 = 0;
+        const max_iterations: u32 = 32; // Maximum 32 bytes to process
+        
+        while (safety_counter < max_iterations) {
             const byte = scalar[byte_index];
             var bit_mask: u8 = 1;
 
@@ -633,6 +640,7 @@ pub const G2Point = struct {
 
             if (byte_index == 0) break;
             byte_index -= 1;
+            safety_counter += 1;
         }
 
         return result;
