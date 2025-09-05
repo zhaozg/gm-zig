@@ -497,65 +497,33 @@ fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(exp)) return one;
     if (equal(exp, one)) return mod(base, m) catch BigIntError.NotInvertible;
     
+    // Simple square-and-multiply algorithm with strict iteration limit
     var result = one;
-    const base_pow = mod(base, m) catch return BigIntError.NotInvertible;
+    var base_pow = mod(base, m) catch return BigIntError.NotInvertible;
+    var exp_copy = exp;
     
-    // Find the most significant bit
-    var msb_byte: usize = 0;
-    var msb_bit: u8 = 0;
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 256; // Maximum possible bits in 32 bytes
     
-    for (0..32) |i| {
-        if (exp[i] != 0) {
-            msb_byte = i;
-            var temp = exp[i];
-            msb_bit = 7;
-            while (temp < 0x80 and msb_bit > 0) {
-                temp <<= 1;
-                msb_bit -= 1;
-            }
-            break;
-        }
-    }
-    
-    // Process bits from most significant to least significant
-    var byte_idx = msb_byte;
-    var bit_idx = msb_bit;
-    var first_bit = true;
-    
-    // Safety counter to prevent infinite loops
-    var iteration_count: u32 = 0;
-    const max_iterations: u32 = 256; // 32 bytes * 8 bits = 256 max possible iterations
-    
-    while (iteration_count < max_iterations) {
-        const bit_mask = @as(u8, 1) << @intCast(bit_idx);
-        const bit_set = (exp[byte_idx] & bit_mask) != 0;
-        
-        if (!first_bit) {
-            // Square the result
-            result = mulMod(result, result, m) catch return BigIntError.NotInvertible;
+    // Process from least significant bit to most significant bit
+    while (!isZero(exp_copy) and iterations < max_iterations) {
+        // Check if the least significant bit is set
+        if ((exp_copy[31] & 1) != 0) {
+            result = mulMod(result, base_pow, m) catch return BigIntError.NotInvertible;
         }
         
-        if (bit_set) {
-            if (first_bit) {
-                result = base_pow;
-                first_bit = false;
-            } else {
-                result = mulMod(result, base_pow, m) catch return BigIntError.NotInvertible;
-            }
-        } else if (first_bit) {
-            first_bit = false;
+        // Square the base
+        base_pow = mulMod(base_pow, base_pow, m) catch return BigIntError.NotInvertible;
+        
+        // Right shift exp_copy by 1 bit
+        var carry: u8 = 0;
+        for (0..32) |i| {
+            const new_carry = exp_copy[i] & 1;
+            exp_copy[i] = (exp_copy[i] >> 1) | (carry << 7);
+            carry = new_carry;
         }
         
-        // Move to next bit (going from MSB to LSB)
-        if (bit_idx == 0) {
-            if (byte_idx >= 31) break; // We've processed all bytes
-            byte_idx += 1;
-            bit_idx = 7;
-        } else {
-            bit_idx -= 1;
-        }
-        
-        iteration_count += 1;
+        iterations += 1;
     }
     
     return result;
