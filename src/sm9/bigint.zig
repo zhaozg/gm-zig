@@ -401,6 +401,8 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
                 }
                 if (i == 0) break;
                 i -= 1;
+                // Additional safety - prevent infinite loop in rare edge cases
+                if (i > 31) break; // This should never happen but protects against underflow
             }
         }
         
