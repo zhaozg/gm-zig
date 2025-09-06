@@ -7,9 +7,10 @@ test "SM9 ciphertext creation and validation" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const c1 = std.mem.zeroes([33]u8);
+    // Create valid test data for ciphertext validation
+    const c1 = [_]u8{0x02} ++ [_]u8{0x01} ** 32; // Valid compressed G1 point format
     const c2 = "test message";
-    const c3 = std.mem.zeroes([32]u8);
+    const c3 = [_]u8{0x33} ** 32; // Non-zero MAC value
 
     const ciphertext = try sm9.encrypt.Ciphertext.init(
         allocator,
@@ -188,6 +189,9 @@ test "SM9 encryption utility functions" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+    
+    // Initialize system parameters for tests
+    const system_params = sm9.params.SystemParams.init();
 
     // Test KDF
     const input = "test input for KDF";
@@ -205,11 +209,14 @@ test "SM9 encryption utility functions" {
     try testing.expect(h2.len == 32);
 
     // Test point validation
-    const g1_point = std.mem.zeroes([32]u8);
-    const g2_point = std.mem.zeroes([64]u8);
+    var g1_point = [_]u8{0x02} ++ [_]u8{0} ** 32; // Proper compressed G1 point format
+    g1_point[1] = 1; // Make x-coordinate non-zero
+    
+    var g2_point = [_]u8{0x04} ++ [_]u8{0} ** 64; // Proper uncompressed G2 point format  
+    g2_point[1] = 1; // Make x-coordinate non-zero
 
-    try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point));
-    try testing.expect(sm9.encrypt.EncryptionUtils.validateG2Point(g2_point));
+    try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point, system_params));
+    try testing.expect(sm9.encrypt.EncryptionUtils.validateG2Point(g2_point, system_params));
 }
 
 test "SM9 encryption with large messages" {

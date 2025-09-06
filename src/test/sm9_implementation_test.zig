@@ -271,13 +271,17 @@ test "SM9 Phase 4 - Enhanced mathematical correctness" {
     const small_a = sm9.bigint.fromU64(3); // 3 is small and coprime with most large primes
 
     // Skip modular inverse test if not coprime (use fallback logic instead)
-    const inv_result = sm9.bigint.invMod(small_a, m) catch blk: {
-        // If inverse fails, try a different value
-        const alt_a = sm9.bigint.fromU64(7);
-        break :blk sm9.bigint.invMod(alt_a, m) catch {
-            // Use a deterministic fallback that always works
-            break :blk sm9.bigint.fromU64(1);
-        };
+    const inv_result = blk: {
+        if (sm9.bigint.invMod(small_a, m)) |result| {
+            break :blk result;
+        } else |_| {
+            // If inverse fails, try a different value
+            const alt_a = sm9.bigint.fromU64(7);
+            break :blk sm9.bigint.invMod(alt_a, m) catch {
+                // Use a deterministic fallback that always works
+                break :blk sm9.bigint.fromU64(1);
+            };
+        }
     };
 
     // Verify results are valid

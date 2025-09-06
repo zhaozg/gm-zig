@@ -63,11 +63,17 @@ test "SM9 master key pair from private key" {
 test "SM9 master key pair fromPrivateKey correctness" {
     const params = sm9.params.SystemParams.init();
 
-    // 随机生成合法私钥
+    // 随机生成合法私钥 (限制重试次数防止无限循环)
     var private_key = [_]u8{0} ** 32;
-    while (true) {
+    var attempts: u32 = 0;
+    while (attempts < 100) : (attempts += 1) {
         std.crypto.random.bytes(&private_key);
         if (!sm9.params.isZero(private_key) and sm9.params.isLessThan(private_key, params.N)) break;
+    }
+    // 如果100次尝试都失败，使用确定性的合法私钥
+    if (attempts >= 100) {
+        private_key = [_]u8{0} ** 32;
+        private_key[31] = 1; // 使用最小的非零值
     }
 
     // 用 generate 生成密钥对
