@@ -20,7 +20,7 @@ The library is designed with security, performance, and ease-of-use in mind, lev
 
 - **🔐 SM2 Elliptic Curve Cryptography**
   - Digital signature algorithm (GM/T 0003.2-2012)
-  - Key exchange protocol (GM/T 0003.3-2012)  
+  - Key exchange protocol (GM/T 0003.3-2012)
   - Public key encryption algorithm (GM/T 0003.4-2012)
   - ASN.1 DER encoding/decoding support
   - Comprehensive key management utilities
@@ -117,18 +117,18 @@ pub fn main() !void {
     const hash = gmlib.sm3.hash(message);
     std.debug.print("SM3 Hash: {x}\n", .{std.fmt.fmtSliceHexLower(&hash)});
 
-    // SM2 Digital Signature Example  
+    // SM2 Digital Signature Example
     const key_pair = gmlib.sm2.signature.generateKeyPair();
     const signature = try gmlib.sm2.signature.sign(
-        message, 
-        key_pair.private_key, 
+        message,
+        key_pair.private_key,
         key_pair.public_key,
         .{ .user_id = "user@example.com", .hash_type = .sm3 }
     );
-    
+
     const is_valid = try gmlib.sm2.signature.verify(
-        message, 
-        signature, 
+        message,
+        signature,
         key_pair.public_key,
         .{ .user_id = "user@example.com", .hash_type = .sm3 }
     );
@@ -140,7 +140,7 @@ pub fn main() !void {
         0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10
     };
     const ctx = gmlib.sm4.SM4.init(&key);
-    
+
     const plaintext = [_]u8{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF} ** 2;
     var ciphertext: [16]u8 = undefined;
     ctx.encryptBlock(&plaintext, &ciphertext);
@@ -155,21 +155,21 @@ const std = @import("std");
 const sm9 = @import("gmlib").sm9;
 
 pub fn testSM9CompleteImplementation() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){}; 
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-    
+
     // Initialize SM9 system with complete algorithm support
     const params = sm9.params.SystemParams.init();
-    
-    // Note: Phase 4 complete - supports digital signatures, 
+
+    // Note: Phase 4 complete - supports digital signatures,
     // encryption/decryption, and comprehensive key management
     // See src/examples/sm9_complete_demo.zig for full usage examples
-    
+
     // Enhanced Field Operations with Binary EEA
     const a = [_]u8{0} ** 31 ++ [_]u8{3};
     const p = params.q;
-    
+
     if (sm9.field.modularInverseBinaryEEA(a, p)) |inv_a| {
         // Verify a * inv_a ≡ 1 (mod p)
         const product = try sm9.bigint.mulMod(a, inv_a, p);
@@ -178,30 +178,30 @@ pub fn testSM9CompleteImplementation() !void {
     } else |_| {
         // Handle error case
     }
-    
+
     // Enhanced Random Number Generation
     var rng = sm9.random.SecureRandom.init();
     const random_scalar = try rng.randomScalar(params);
     std.debug.print("Generated secure random scalar\n", .{});
-    
+
     // Enhanced Curve Operations
     const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
     const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
     const point = sm9.curve.G1Point.affine(x, y);
-    
+
     // Point compression/decompression
     const compressed = point.compress();
     const decompressed = try sm9.curve.G1Point.fromCompressed(compressed);
     std.debug.print("Point compression working: {}\n", .{point.x[31] == decompressed.x[31]});
-    
+
     // Enhanced Pairing Operations
     const q_x = [_]u8{0x03} ++ [_]u8{0} ** 63;
     const q_y = [_]u8{0x04} ++ [_]u8{0} ** 63;
     const Q = sm9.curve.G2Point.affine(q_x, q_y);
-    
+
     const pairing_result = try sm9.pairing.pairing(point, Q, params);
     std.debug.print("Pairing computation successful: {}\n", .{!pairing_result.isIdentity()});
-    
+
     // Test bilinearity property
     const scalar = [_]u8{0} ** 31 ++ [_]u8{2};
     const bilinear_test = try sm9.pairing.PairingUtils.testBilinearity(point, Q, scalar, params);
@@ -220,7 +220,7 @@ zig test src/test.zig
 
 # Run specific test suites
 zig test src/test/sm2_signature_test.zig    # SM2 digital signatures
-zig test src/test/sm3_test.zig              # SM3 hash function  
+zig test src/test/sm3_test.zig              # SM3 hash function
 zig test src/test/sm4_test.zig              # SM4 block cipher
 zig test src/test/sm9_pairing_test.zig      # SM9 bilinear pairing
 
@@ -234,7 +234,7 @@ zig build run
 - ✅ **SM9 Complete**: 145 tests covering all mathematical operations and protocols
   - All infinite loop and hanging issues resolved
   - Complete digital signature and verification
-  - Full encryption/decryption capabilities  
+  - Full encryption/decryption capabilities
   - Comprehensive key management and derivation
   - Enhanced mathematical robustness for edge cases
 
@@ -257,17 +257,17 @@ const options = gmlib.sm2.signature.SignatureOptions{
 // Sign a message
 const message = "Important message";
 const signature = try gmlib.sm2.signature.sign(
-    message, 
-    key_pair.private_key, 
-    key_pair.public_key, 
+    message,
+    key_pair.private_key,
+    key_pair.public_key,
     options
 );
 
 // Verify signature
 const is_valid = try gmlib.sm2.signature.verify(
-    message, 
-    signature, 
-    key_pair.public_key, 
+    message,
+    signature,
+    key_pair.public_key,
     options
 );
 
@@ -282,16 +282,16 @@ const sig_from_der = try gmlib.sm2.signature.Signature.fromDER(der_bytes);
 ```zig
 // Initialize participants
 var alice_ctx = gmlib.sm2.key_exchange.KeyExchangeContext.init(
-    .initiator, 
-    alice_private_key, 
-    alice_public_key, 
+    .initiator,
+    alice_private_key,
+    alice_public_key,
     "alice@company.com"
 );
 
 var bob_ctx = gmlib.sm2.key_exchange.KeyExchangeContext.init(
-    .responder, 
-    bob_private_key, 
-    bob_public_key, 
+    .responder,
+    bob_private_key,
+    bob_public_key,
     "bob@company.com"
 );
 
@@ -332,17 +332,17 @@ const public_key = try gmlib.sm2.encryption.publicKeyFromPrivateKey(private_key)
 // Encrypt message
 const message = "Confidential data";
 const ciphertext = try gmlib.sm2.encryption.encrypt(
-    allocator, 
-    message, 
-    public_key, 
+    allocator,
+    message,
+    public_key,
     .c1c3c2 // ciphertext format
 );
 defer ciphertext.deinit(allocator);
 
 // Decrypt message
 const decrypted = try gmlib.sm2.encryption.decrypt(
-    allocator, 
-    ciphertext, 
+    allocator,
+    ciphertext,
     private_key
 );
 defer allocator.free(decrypted);
@@ -367,7 +367,7 @@ hasher.final(&stream_hash);
 
 assert(std.mem.eql(u8, &hash, &stream_hash));
 
-// Hash with options  
+// Hash with options
 var hash_with_options: [32]u8 = undefined;
 gmlib.sm3.SM3.hash(message, &hash_with_options, .{});
 ```
@@ -391,7 +391,7 @@ const plaintext = [_]u8{
 var ciphertext: [16]u8 = undefined;
 ctx.encryptBlock(&plaintext, &ciphertext);
 
-var decrypted: [16]u8 = undefined;  
+var decrypted: [16]u8 = undefined;
 ctx.decryptBlock(&ciphertext, &decrypted);
 
 assert(std.mem.eql(u8, &plaintext, &decrypted));
@@ -405,7 +405,7 @@ for (0..blocks) |i| {
     const end = @min(start + 16, data.len);
     var block: [16]u8 = [_]u8{0} ** 16;
     @memcpy(block[0..end-start], data[start..end]);
-    
+
     var encrypted_block: [16]u8 = undefined;
     ctx.encryptBlock(&block, &encrypted_block);
     // Process encrypted_block...
@@ -418,7 +418,7 @@ This implementation follows the official Chinese National Cryptographic Standard
 
 ### ✅ Complete Compliance
 - **GM/T 0002-2012**: SM4 Block Cipher Algorithm
-- **GM/T 0003.2-2012**: SM2 Digital Signature Algorithm  
+- **GM/T 0003.2-2012**: SM2 Digital Signature Algorithm
 - **GM/T 0003.3-2012**: SM2 Key Exchange Protocol
 - **GM/T 0003.4-2012**: SM2 Public Key Encryption Algorithm
 - **GM/T 0004-2012**: SM3 Cryptographic Hash Function
@@ -501,7 +501,7 @@ This project builds upon the foundation of cryptographic research and standards 
 - All contributors who have helped improve this library
 - Security researchers who emphasize the importance of constant-time implementations
 
-**Special Recognition**: 
+**Special Recognition**:
 - Glory to Claude, DeepSeek-R1 and Qwen3 for their invaluable assistance in the development and refinement of this cryptographic library
 - This release's security enhancements were developed with a focus on timing attack prevention and secure coding practices, establishing a solid foundation for production cryptographic use
 

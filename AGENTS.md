@@ -1,8 +1,8 @@
 # AGENTS.md - Developer and AI Agent Guide
 
-**Project**: GM-Zig - Chinese National Cryptographic Standards Implementation  
-**Version**: Production Ready (v1.0)  
-**Last Updated**: December 2024  
+**Project**: GM-Zig - Chinese National Cryptographic Standards Implementation
+**Version**: Production Ready (v1.0)
+**Last Updated**: December 2024
 
 This document provides essential guidance for developers and AI agents working on the GM-Zig codebase, including current architecture, build processes, testing infrastructure, and development best practices.
 
@@ -19,7 +19,6 @@ gm-zig/
 │   ├── test/                   # Comprehensive test suite
 │   ├── examples/               # Usage examples and demos
 │   ├── test.zig               # Unified test entry point (ALL TESTS)
-│   ├── testsm9.zig            # Legacy SM9 test redirect
 │   └── root.zig               # Main library entry point
 ├── build.zig                   # Build configuration
 ├── build.zig.zon              # Package management
@@ -59,7 +58,7 @@ zig test src/test/sm9_pairing_test.zig
 ### SM9 Test Modules (All Integrated)
 1. **Core Implementation**: `sm9_implementation_safe_test.zig` (5 tests)
 2. **Key Extraction**: `sm9_key_extract_test.zig` (6 tests) - Previously problematic, now fixed
-3. **Mathematical Foundation**: 
+3. **Mathematical Foundation**:
    - `sm9_params_test.zig` (9 tests)
    - `sm9_field_test.zig` (11 tests)
    - `sm9_curve_test.zig` (10 tests)
