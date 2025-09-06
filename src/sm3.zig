@@ -3,6 +3,7 @@ const testing = std.testing;
 const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
+const compat = @import("compat.zig");
 
 const builtin = @import("builtin");
 
@@ -181,7 +182,7 @@ pub const SM3 = struct {
     }
 
     pub const Error = error{};
-    pub const Writer = std.io.GenericWriter(*Self, Error, write);
+    pub const Writer = compat.Writer(*Self, Error, write);
 
     fn write(self: *Self, bytes: []const u8) Error!usize {
         self.update(bytes);
