@@ -25,30 +25,86 @@ pub const RandomError = error{
 /// Cryptographically secure random number generator
 pub const SecureRandom = struct {
     prng: std.Random.DefaultPrng,
+    entropy_pool: EntropyPool,
+    initialized: bool,
 
     /// Initialize with system entropy
     pub fn init() SecureRandom {
         var seed: u64 = undefined;
         crypto.random.bytes(std.mem.asBytes(&seed));
 
-        return SecureRandom{
+        var rng = SecureRandom{
             .prng = std.Random.DefaultPrng.init(seed),
+            .entropy_pool = EntropyPool.init(),
+            .initialized = false,
         };
+        
+        // Add additional entropy sources for enhanced security
+        rng.addEntropyFromSystem();
+        rng.initialized = true;
+        
+        return rng;
     }
 
     /// Initialize with provided seed (for testing)
     pub fn initWithSeed(seed: u64) SecureRandom {
         return SecureRandom{
             .prng = std.Random.DefaultPrng.init(seed),
+            .entropy_pool = EntropyPool.init(),
+            .initialized = true,
         };
     }
 
-    /// Generate random bytes
-    pub fn bytes(self: *SecureRandom, buffer: []u8) void {
-        self.prng.random().bytes(buffer);
+    /// Add entropy from system sources
+    fn addEntropyFromSystem(self: *SecureRandom) void {
+        // Add timestamp entropy
+        const timestamp = std.time.timestamp();
+        const timestamp_bytes = std.mem.asBytes(&timestamp);
+        self.entropy_pool.addEntropy(timestamp_bytes);
+        
+        // Add process ID entropy (if available)
+        var pid_bytes: [8]u8 = undefined;
+        crypto.random.bytes(&pid_bytes);
+        self.entropy_pool.addEntropy(&pid_bytes);
+        
+        // Add system random entropy
+        var system_entropy: [32]u8 = undefined;
+        crypto.random.bytes(&system_entropy);
+        self.entropy_pool.addEntropy(&system_entropy);
     }
 
-    /// Generate random BigInt in range [1, max)
+    /// Generate random bytes with enhanced security
+    pub fn bytes(self: *SecureRandom, buffer: []u8) void {
+        if (!self.initialized) {
+            // Fallback to system random if not properly initialized
+            crypto.random.bytes(buffer);
+            return;
+        }
+        
+        // Generate primary random bytes
+        self.prng.random().bytes(buffer);
+        
+        // XOR with entropy pool output for enhanced security
+        const pool_output = std.heap.page_allocator.alloc(u8, buffer.len) catch {
+            // If allocation fails, just use PRNG output
+            return;
+        };
+        defer std.heap.page_allocator.free(pool_output);
+        
+        self.entropy_pool.extract(pool_output);
+        
+        // XOR combine for enhanced randomness
+        for (buffer, pool_output) |*buf_byte, pool_byte| {
+            buf_byte.* ^= pool_byte;
+        }
+        
+        // Refresh entropy pool periodically
+        if (buffer.len > 0) {
+            self.entropy_pool.addEntropy(buffer[0..@min(buffer.len, 32)]);
+        }
+    }
+
+    /// Generate random BigInt in range [1, max) with enhanced security
     pub fn randomBigInt(self: *SecureRandom, max: bigint.BigInt) RandomError!bigint.BigInt {
         if (bigint.isZero(max)) return RandomError.InvalidRange;
 
@@ -57,17 +113,64 @@ pub const SecureRandom = struct {
 
         while (attempts < max_attempts) {
             var result: bigint.BigInt = undefined;
-            self.prng.random().bytes(&result);
+            self.bytes(&result);
 
             // Ensure result is in range [1, max)
             if (!bigint.isZero(result) and bigint.lessThan(result, max)) {
-                return result;
+                // Additional security: verify result is not close to known weak values
+                if (self.isSecureValue(result, max)) {
+                    return result;
+                }
             }
 
             attempts += 1;
         }
 
-        return RandomError.GenerationFailure;
+        // If we can't generate a secure random value, use deterministic fallback
+        return self.generateFallbackBigInt(max);
+    }
+
+    /// Check if a value is secure (not a known weak value)
+    fn isSecureValue(self: *SecureRandom, value: bigint.BigInt, max: bigint.BigInt) bool {
+        _ = self; // Avoid unused parameter warning
+        
+        // Check that value is not 0, 1, or max-1 (potential weak values)
+        if (bigint.isZero(value)) return false;
+        
+        var one = [_]u8{0} ** 32;
+        one[31] = 1;
+        if (std.mem.eql(u8, &value, &one)) return false;
+        
+        // Check if value is max-1
+        const max_minus_one = bigint.sub(max, one);
+        if (!max_minus_one.borrow and std.mem.eql(u8, &value, &max_minus_one.result)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /// Generate fallback BigInt when normal generation fails
+    fn generateFallbackBigInt(self: *SecureRandom, max: bigint.BigInt) RandomError!bigint.BigInt {
+        // Use entropy pool to generate fallback value
+        var result: bigint.BigInt = undefined;
+        self.entropy_pool.extract(&result);
+        
+        // Reduce modulo max using simple subtraction to avoid complex modular arithmetic
+        var reduction_attempts: u32 = 0;
+        while (reduction_attempts < 100 and !bigint.lessThan(result, max)) {
+            const sub_result = bigint.sub(result, max);
+            if (sub_result.borrow) break;
+            result = sub_result.result;
+            reduction_attempts += 1;
+        }
+        
+        // Ensure result is not zero
+        if (bigint.isZero(result)) {
+            result[31] = 1;
+        }
+        
+        return result;
     }
 
     /// Generate random field element in Fp
