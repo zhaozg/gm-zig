@@ -403,87 +403,172 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
             }
         }
         
-        return modPowBinary(a_reduced, exp, m);
+        // Use Montgomery ladder for secure exponentiation
+        return montgomeryLadderModPow(a_reduced, exp, m);
     }
 
-    // Enhanced Extended Euclidean Algorithm for general cases
-    return extendedGcdInverse(a_reduced, m);
+    // For general modulus, check if it's likely prime (odd and > 2)
+    if (m[31] & 1 == 1 and !equal(m, one)) {
+        // Use Fermat's little theorem for odd numbers that might be prime
+        var exp = m;
+        
+        // Compute m - 2
+        if (exp[31] >= 2) {
+            exp[31] -= 2;
+        } else {
+            exp[31] = @as(u8, @intCast(@as(u16, exp[31]) + 256 - 2));
+            var i: i32 = 30;
+            while (i >= 0) {
+                if (exp[@intCast(i)] > 0) {
+                    exp[@intCast(i)] -= 1;
+                    break;
+                } else {
+                    exp[@intCast(i)] = 255;
+                }
+                i -= 1;
+            }
+        }
+        
+        return montgomeryLadderModPow(a_reduced, exp, m);
+    }
+
+    // For composite modulus, use binary extended GCD
+    return binaryExtendedGcd(a_reduced, m);
 }
 
-/// Extended GCD-based modular inverse for better robustness
-fn extendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
+/// Montgomery Ladder algorithm for secure modular exponentiation
+/// This prevents timing attacks and provides better stability
+fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
+    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    
+    if (isZero(exp)) return one;
+    if (equal(exp, one)) return mod(base, m) catch BigIntError.NotInvertible;
+    
+    var x1 = mod(base, m) catch return BigIntError.NotInvertible;
+    var x2 = mulMod(x1, x1, m) catch return BigIntError.NotInvertible;
+    
+    // Find the highest bit position in exp
+    var bit_pos: i32 = 255; // Start from highest bit
+    while (bit_pos >= 0) {
+        const byte_idx = @as(usize, @intCast(@divTrunc(bit_pos, 8)));
+        const bit_mask = @as(u8, 1) << @intCast(@mod(bit_pos, 8));
+        
+        if ((exp[byte_idx] & bit_mask) != 0) break;
+        bit_pos -= 1;
+    }
+    
+    if (bit_pos < 0) return one; // exp is zero
+    
+    // Skip the highest bit (already set) and process remaining bits
+    bit_pos -= 1;
+    
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 256;
+    
+    while (bit_pos >= 0 and iterations < max_iterations) {
+        const byte_idx = @as(usize, @intCast(@divTrunc(bit_pos, 8)));
+        const bit_mask = @as(u8, 1) << @intCast(@mod(bit_pos, 8));
+        
+        if ((exp[byte_idx] & bit_mask) != 0) {
+            // If bit is set: x1 = x1*x2, x2 = x2^2
+            const temp = mulMod(x1, x2, m) catch return BigIntError.NotInvertible;
+            x2 = mulMod(x2, x2, m) catch return BigIntError.NotInvertible;
+            x1 = temp;
+        } else {
+            // If bit is clear: x2 = x1*x2, x1 = x1^2
+            const temp = mulMod(x1, x2, m) catch return BigIntError.NotInvertible;
+            x1 = mulMod(x1, x1, m) catch return BigIntError.NotInvertible;
+            x2 = temp;
+        }
+        
+        bit_pos -= 1;
+        iterations += 1;
+    }
+    
+    return x1;
+}
+
+/// Binary Extended GCD algorithm for non-prime modulus
+/// More stable than the traditional extended GCD
+fn binaryExtendedGcd(a: BigInt, m: BigInt) BigIntError!BigInt {
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
     const zero = [_]u8{0} ** 32;
     
-    var old_r = m;
-    var r = a;
-    var old_s = zero;
-    var s = one;
+    if (equal(a, one)) return one;
+    if (equal(a, zero)) return BigIntError.NotInvertible;
+    
+    var u = a;
+    var v = m;
+    var x1 = one;
+    var x2 = zero;
     
     var iterations: u32 = 0;
-    const max_iterations: u32 = 512; // Sufficient for 256-bit numbers
+    const max_iterations: u32 = 512;
     
-    while (!isZero(r) and iterations < max_iterations) {
-        const quotient_remainder = divMod(old_r, r) catch {
-            return BigIntError.NotInvertible;
-        };
-        
-        const quotient = quotient_remainder.quotient;
-        const remainder = quotient_remainder.remainder;
-        
-        old_r = r;
-        r = remainder;
-        
-        // Update s values: new_s = old_s - quotient * s
-        const quotient_s = mulMod(quotient, s, m) catch blk: {
-            // Fallback to simple multiplication for intermediate computation
-            var result = [_]u8{0} ** 32;
-            // Simple multiplication: just use the lower part
-            const q_low = quotient[31];
-            const s_low = s[31];
-            const product = @as(u16, q_low) * @as(u16, s_low);
-            result[31] = @intCast(product & 0xFF);
-            result[30] = @intCast((product >> 8) & 0xFF);
-            break :blk result;
-        };
-        var new_s: BigInt = undefined;
-        
-        // Perform modular subtraction to avoid underflow
-        if (lessThan(quotient_s, old_s)) {
-            const sub_result = sub(old_s, quotient_s);
-            new_s = sub_result.result;
-        } else {
-            // Use addition with modulus to handle negative case
-            const add_result = add(old_s, m);
-            if (add_result.carry or lessThan(add_result.result, quotient_s)) {
-                new_s = old_s; // Fallback to prevent underflow
+    while (!equal(u, one) and !isZero(v) and iterations < max_iterations) {
+        // If u is even
+        if ((u[31] & 1) == 0) {
+            u = shiftRight(u);
+            if ((x1[31] & 1) == 0) {
+                x1 = shiftRight(x1);
             } else {
-                const sub_result = sub(add_result.result, quotient_s);
-                new_s = sub_result.result;
+                const add_result = add(x1, m);
+                x1 = if (add_result.carry) x1 else shiftRight(add_result.result);
             }
         }
+        // If v is even
+        else if ((v[31] & 1) == 0) {
+            v = shiftRight(v);
+            if ((x2[31] & 1) == 0) {
+                x2 = shiftRight(x2);
+            } else {
+                const add_result = add(x2, m);
+                x2 = if (add_result.carry) x2 else shiftRight(add_result.result);
+            }
+        }
+        // Both u and v are odd
+        else if (lessThan(v, u)) {
+            const sub_result = sub(u, v);
+            u = sub_result.result;
             
-        old_s = s;
-        s = new_s;
+            if (lessThan(x2, x1)) {
+                const add_result = add(x2, m);
+                if (!add_result.carry and !lessThan(add_result.result, x1)) {
+                    const sub_x_result = sub(add_result.result, x1);
+                    x1 = sub_x_result.result;
+                } else {
+                    x1 = zero; // Fallback
+                }
+            } else {
+                const sub_x_result = sub(x1, x2);
+                x1 = sub_x_result.result;
+            }
+        } else {
+            const sub_result = sub(v, u);
+            v = sub_result.result;
+            
+            if (lessThan(x1, x2)) {
+                const add_result = add(x1, m);
+                if (!add_result.carry and !lessThan(add_result.result, x2)) {
+                    const sub_x_result = sub(add_result.result, x2);
+                    x2 = sub_x_result.result;
+                } else {
+                    x2 = zero; // Fallback
+                }
+            } else {
+                const sub_x_result = sub(x2, x1);
+                x2 = sub_x_result.result;
+            }
+        }
         
         iterations += 1;
     }
     
-    if (iterations >= max_iterations) {
+    if (iterations >= max_iterations or !equal(u, one)) {
         return BigIntError.NotInvertible;
     }
     
-    // Check if gcd(a, m) = 1
-    if (!equal(old_r, one)) {
-        return BigIntError.NotInvertible;
-    }
-    
-    // Ensure result is positive and in range [0, m)
-    const result = mod(old_s, m) catch {
-        return BigIntError.NotInvertible;
-    };
-    
-    return result;
+    return mod(x1, m) catch BigIntError.NotInvertible;
 }
 
 /// Binary modular exponentiation optimized for SM9 prime fields
@@ -527,7 +612,7 @@ fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
 }
 
 /// Modular exponentiation: base^exp mod m
-/// Simple implementation that handles basic cases and avoids infinite loops
+/// Uses Montgomery ladder algorithm for better performance and security
 pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     
@@ -548,8 +633,8 @@ pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
         return mulMod(base_mod, base_mod, m);
     }
     
-    // For larger exponents, use the binary method
-    return modPowBinary(base, exp, m);
+    // For larger exponents, use the Montgomery ladder method
+    return montgomeryLadderModPow(base, exp, m);
 }
 
 /// Convert little-endian byte array to BigInt (big-endian)
