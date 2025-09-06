@@ -54,10 +54,22 @@ pub const GtElement = struct {
         return result;
     }
 
-    /// Exponentiate Gt element
+    /// Exponentiate Gt element with enhanced boundary condition handling
     pub fn pow(self: GtElement, exponent: [32]u8) GtElement {
         if (bigint.isZero(exponent)) {
             return GtElement.identity();
+        }
+
+        // Handle edge case where exponent is 1
+        var exp_is_one = true;
+        for (exponent[0..31]) |byte| {
+            if (byte != 0) {
+                exp_is_one = false;
+                break;
+            }
+        }
+        if (exp_is_one and exponent[31] == 1) {
+            return self;
         }
 
         var result = GtElement.identity();

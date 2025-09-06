@@ -393,7 +393,7 @@ pub const BatchSignature = struct {
             .context = context,
             .allocator = allocator,
             .signatures = if (isZig015OrNewer)
-                .empty
+                Signatures{}
             else
                 Signatures.init(allocator),
         };
