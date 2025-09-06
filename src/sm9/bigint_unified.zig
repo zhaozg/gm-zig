@@ -359,3 +359,21 @@ pub fn defaultAddMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn defaultInvMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     return invMod(a, m, default_config);
 }
+
+// Compatibility functions for existing bigint_safe.zig interface
+// These provide drop-in replacements for the original safe functions
+
+/// Safe modular multiplication - compatibility wrapper for bigint_safe.zig
+pub fn safeMulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
+    return mulMod(a, b, m, SafeConfig{ .enable_safe_mode = true });
+}
+
+/// Safe modular addition - compatibility wrapper for bigint_safe.zig  
+pub fn safeAddMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
+    return addMod(a, b, m, SafeConfig{ .enable_safe_mode = true });
+}
+
+/// Safe modular inverse - compatibility wrapper for bigint_safe.zig
+pub fn safeInvMod(a: BigInt, m: BigInt) BigIntError!BigInt {
+    return invMod(a, m, SafeConfig{ .enable_safe_mode = true });
+}
