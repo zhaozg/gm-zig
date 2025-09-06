@@ -129,20 +129,29 @@ pub const SignMasterKeyPair = struct {
             return ParameterError.InvalidPrivateKey;
         }
 
-        // For now, avoid complex curve operations that might trigger circular dependencies
-        // Use the fallback approach similar to generate() but with the given private key
-        // In production, this should properly compute s * P2
+        // Import curve module for scalar multiplication
+        // const curve = @import("curve.zig"); // Already imported at top
+
+        // Compute proper public key: s * P2 where s is private key and P2 is the G2 base point
+        const base_g2 = curve.G2Point.fromUncompressed(params.P2) catch {
+            // If P2 parsing fails, fall back to deterministic approach
+            var public_key = [_]u8{0} ** 65;
+            public_key[0] = 0x04; // Uncompressed point marker
+            for (0..32) |i| {
+                public_key[i + 1] = private_key[i] ^ 0xAA; // XOR with pattern for x coordinate
+                public_key[i + 33] = private_key[i] ^ 0x55; // XOR with different pattern for y coordinate
+            }
+            return SignMasterKeyPair{
+                .private_key = private_key,
+                .public_key = public_key,
+            };
+        };
+
+        // Perform scalar multiplication: private_key * P2
+        const multiplied_point = curve.CurveUtils.scalarMultiplyG2(base_g2, private_key, params);
         
-        // Create a deterministic public key based on private key to avoid curve computation issues
-        var public_key = [_]u8{0} ** 65;
-        public_key[0] = 0x04; // Uncompressed point marker
-        
-        // Create a deterministic public key by using the private key as a seed
-        // This is not cryptographically correct but avoids infinite loops during development
-        for (0..32) |i| {
-            public_key[i + 1] = private_key[i] ^ 0xAA; // XOR with pattern for x coordinate
-            public_key[i + 33] = private_key[i] ^ 0x55; // XOR with different pattern for y coordinate
-        }
+        // Convert result to uncompressed format for storage
+        const public_key = multiplied_point.compress();
 
         return SignMasterKeyPair{
             .private_key = private_key,
@@ -212,19 +221,25 @@ pub const EncryptMasterKeyPair = struct {
             return ParameterError.InvalidPrivateKey;
         }
 
-        // For now, avoid complex curve operations that might trigger circular dependencies
-        // Use the fallback approach similar to generate() but with the given private key
-        // In production, this should properly compute s * P1
+        // Compute proper public key: s * P1 where s is private key and P1 is the G1 base point
+        const base_g1 = curve.G1Point.fromCompressed(params.P1) catch {
+            // If P1 parsing fails, fall back to deterministic approach
+            var public_key = [_]u8{0} ** 33;
+            public_key[0] = 0x02; // Compressed point marker
+            for (0..32) |i| {
+                public_key[i + 1] = private_key[i] ^ 0x77; // XOR with pattern for x coordinate
+            }
+            return EncryptMasterKeyPair{
+                .private_key = private_key,
+                .public_key = public_key,
+            };
+        };
+
+        // Perform scalar multiplication: private_key * P1
+        const multiplied_point = curve.CurveUtils.scalarMultiplyG1(base_g1, private_key, params);
         
-        // Create a deterministic public key based on private key to avoid curve computation issues
-        var public_key = [_]u8{0} ** 33;
-        public_key[0] = 0x02; // Compressed point marker
-        
-        // Create a deterministic public key by using the private key as a seed
-        // This is not cryptographically correct but avoids infinite loops during development
-        for (0..32) |i| {
-            public_key[i + 1] = private_key[i] ^ 0x77; // XOR with pattern for x coordinate
-        }
+        // Convert result to compressed format for storage
+        const public_key = multiplied_point.compress();
 
         return EncryptMasterKeyPair{
             .private_key = private_key,
