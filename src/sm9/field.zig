@@ -10,7 +10,6 @@ const bigint = @import("bigint.zig");
 /// - Optimized Montgomery ladder for exponentiation
 /// - Secure field element operations
 /// - Support for both Fp and Fp2 arithmetic
-
 /// Field element representation
 pub const FieldElement = [32]u8;
 

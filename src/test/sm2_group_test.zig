@@ -181,19 +181,13 @@ test "SM2: 无效点编码处理" {
     };
 
     // 验证拒绝无效点
-    try testing.expectError(
-        error.InvalidEncoding,
-        SM2.fromAffineCoordinates(invalid_point.affineCoordinates())
-    );
+    try testing.expectError(error.InvalidEncoding, SM2.fromAffineCoordinates(invalid_point.affineCoordinates()));
 
     // 测试无效SEC1编码 (全FF)
     const invalid_sec1 = [_]u8{0x04} ++ [_]u8{0xFF} ** 64;
 
     // 预期错误应为 NonCanonical
-    try testing.expectError(
-        error.NonCanonical,
-        SM2.fromSec1(&invalid_sec1)
-    );
+    try testing.expectError(error.NonCanonical, SM2.fromSec1(&invalid_sec1));
 }
 
 test "SM2: 验证基点在曲线上" {
@@ -230,7 +224,6 @@ test "SM2: 公钥标量乘法验证" {
     // 验证结果相同
     try testing.expect(p1.equivalent(p2));
 }
-
 
 test "SM2: ECDH 密钥交换" {
     const dha = SM2.scalar.random(.little);
@@ -354,7 +347,6 @@ test "SM2: 双基标量乘法 (大标量)" {
     // 验证结果相同
     try testing.expect(pr1.equivalent(pr2));
 }
-
 
 test "SM2: 标量奇偶性" {
     // 创建标量

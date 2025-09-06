@@ -4,8 +4,8 @@ const print = std.debug.print;
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
-const SM4_KEY_SIZE = 16;   // 128-bit keys
-const ROUNDS = 32;         // 32 rounds
+const SM4_KEY_SIZE = 16; // 128-bit keys
+const ROUNDS = 32; // 32 rounds
 
 // SM4 S-Box (256-byte substitution table)
 const SBOX = [256]u8{
@@ -124,19 +124,19 @@ pub const SM4 = struct {
         const t = x1 ^ x2 ^ x3 ^ rk;
         const sbox_out = tau(t);
         const l = sbox_out ^
-                  rotl(sbox_out, 2) ^
-                  rotl(sbox_out, 10) ^
-                  rotl(sbox_out, 18) ^
-                  rotl(sbox_out, 24);
+            rotl(sbox_out, 2) ^
+            rotl(sbox_out, 10) ^
+            rotl(sbox_out, 18) ^
+            rotl(sbox_out, 24);
         return x0 ^ l;
     }
 
     // Nonlinear transformation τ (S-box substitution)
     fn tau(a: u32) u32 {
         return (@as(u32, SBOX[@as(u8, @truncate(a >> 24))]) << 24) |
-               (@as(u32, SBOX[@as(u8, @truncate(a >> 16))]) << 16) |
-               (@as(u32, SBOX[@as(u8, @truncate(a >> 8))]) << 8) |
-               (@as(u32, SBOX[@as(u8, @truncate(a))]));
+            (@as(u32, SBOX[@as(u8, @truncate(a >> 16))]) << 16) |
+            (@as(u32, SBOX[@as(u8, @truncate(a >> 8))]) << 8) |
+            (@as(u32, SBOX[@as(u8, @truncate(a))]));
     }
 
     // Linear transformation L
@@ -150,7 +150,7 @@ pub const SM4 = struct {
 
     // Rotate left helper
     fn rotl(x: u32, n: u5) u32 {
-        return (x << n) | (x >> @as(u5, @intCast( @as(u6, 32) - n)));
+        return (x << n) | (x >> @as(u5, @intCast(@as(u6, 32) - n)));
     }
 };
 
@@ -173,7 +173,7 @@ pub const SM4_CBC = struct {
         var iv = self.iv;
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
-            const block = input[i..i + SM4_BLOCK_SIZE];
+            const block = input[i .. i + SM4_BLOCK_SIZE];
             var xored: [SM4_BLOCK_SIZE]u8 = undefined;
 
             // XOR with IV or previous ciphertext
@@ -197,7 +197,7 @@ pub const SM4_CBC = struct {
         var iv = self.iv;
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
-            const ciphertext  = input[i..i + SM4_BLOCK_SIZE];
+            const ciphertext = input[i .. i + SM4_BLOCK_SIZE];
             var decrypted: [SM4_BLOCK_SIZE]u8 = undefined;
 
             // 保存下一个IV
@@ -258,7 +258,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
     const ctx = SM4.init(&key);
 
     const test_sizes = [_]usize{
-        1024,      // 64 blocks
+        1024, // 64 blocks
         1024 * 16, // 1KB
         1024 * 1024, // 1MB
         10 * 1024 * 1024, // 10MB
@@ -331,10 +331,10 @@ pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
     var ctx = SM4_CBC.init(&key, &key);
 
     const test_sizes = [_]usize{
-        16 * 64,      // 1KB
-        1024 * 16,    // 16KB
-        1024 * 1024,  // 1MB
-        10 * 1024 * 1024,  // 10MB
+        16 * 64, // 1KB
+        1024 * 16, // 16KB
+        1024 * 1024, // 1MB
+        10 * 1024 * 1024, // 10MB
         100 * 1024 * 1024, // 100MB
     };
 

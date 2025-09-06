@@ -168,36 +168,36 @@ pub const SM2 = struct {
     /// Add SM2 points, the second being specified using affine coordinates.
     /// 由于有限域运算的特性，缺少这个因子会导致后续计算不匹配。
     pub fn addMixed(p: SM2, q: AffineCoordinates) SM2 {
-    if (p.z.isZero()) {
-        return .{ .x = q.x, .y = q.y, .z = Fe.one };
-    }
-    if (q.x.isZero() and q.y.isZero()) {
-        return p;
-    }
+        if (p.z.isZero()) {
+            return .{ .x = q.x, .y = q.y, .z = Fe.one };
+        }
+        if (q.x.isZero() and q.y.isZero()) {
+            return p;
+        }
 
-    const z1z1 = p.z.sq();
-    const n2 = q.x.mul(z1z1);
-    const s2 = q.y.mul(p.z).mul(z1z1);
+        const z1z1 = p.z.sq();
+        const n2 = q.x.mul(z1z1);
+        const s2 = q.y.mul(p.z).mul(z1z1);
 
-    if (p.x.equivalent(n2)) {
-        return if (p.y.equivalent(s2)) p.dbl() else SM2.identityElement;
-    }
+        if (p.x.equivalent(n2)) {
+            return if (p.y.equivalent(s2)) p.dbl() else SM2.identityElement;
+        }
 
-    const h = n2.sub(p.x);
-    const hh = h.sq();
-    const h3 = h.mul(hh);
-    // 修复1: 移除r的dbl()
-    const r = s2.sub(p.y);
-    const v = p.x.mul(hh);
+        const h = n2.sub(p.x);
+        const hh = h.sq();
+        const h3 = h.mul(hh);
+        // 修复1: 移除r的dbl()
+        const r = s2.sub(p.y);
+        const v = p.x.mul(hh);
 
-    // 修复2: 移除h3的dbl()
-    const x3 = r.sq().sub(h3).sub(v.dbl());
-    // 修复3: 移除p.y.mul(h3)的dbl()
-    const y3 = r.mul(v.sub(x3)).sub(p.y.mul(h3));
-    // 修复4: 移除z3的dbl()
-    const z3 = p.z.mul(h);
+        // 修复2: 移除h3的dbl()
+        const x3 = r.sq().sub(h3).sub(v.dbl());
+        // 修复3: 移除p.y.mul(h3)的dbl()
+        const y3 = r.mul(v.sub(x3)).sub(p.y.mul(h3));
+        // 修复4: 移除z3的dbl()
+        const z3 = p.z.mul(h);
 
-    return .{ .x = x3, .y = y3, .z = z3 };
+        return .{ .x = x3, .y = y3, .z = z3 };
     }
 
     /// Add SM2 points.

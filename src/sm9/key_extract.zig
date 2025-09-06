@@ -6,7 +6,6 @@ const params = @import("params.zig");
 
 /// SM9 User Key Extraction
 /// Based on GM/T 0044-2016 standard
-
 /// User identifier type
 pub const UserId = []const u8;
 
@@ -48,7 +47,7 @@ pub const SignUserPrivateKey = struct {
         if (user_id.len == 0) {
             return KeyExtractionError.InvalidUserId;
         }
-        
+
         // Validate master key
         if (!master_key.validate(system_params)) {
             return KeyExtractionError.InvalidMasterKey;
@@ -75,15 +74,15 @@ pub const SignUserPrivateKey = struct {
                 const modified_id = fmt.bufPrint(modified_id_buf[0..], "{s}_{d}", .{ user_id, retry_count }) catch {
                     return KeyExtractionError.InvalidUserId;
                 };
-                
+
                 const h1_retry = h1Hash(modified_id, 0x01, system_params.N, allocator) catch {
                     return KeyExtractionError.KeyGenerationFailed;
                 };
-                
+
                 const t1_retry = bigint.addMod(h1_retry, master_key.private_key, system_params.N) catch {
                     return KeyExtractionError.KeyGenerationFailed;
                 };
-                
+
                 if (!bigint.isZero(t1_retry)) {
                     // Success with modified ID
                     const t1_inv = bigint.invMod(t1_retry, system_params.N) catch {
@@ -96,11 +95,11 @@ pub const SignUserPrivateKey = struct {
                             .hid = 0x01,
                         };
                     };
-                    
+
                     // Step 5: Compute ds_A = t1_inv * P1 using proper elliptic curve scalar multiplication
                     const p1_generator = curve.CurveUtils.getG1Generator(system_params);
                     const private_key_point = curve.CurveUtils.secureScalarMul(p1_generator, t1_inv, system_params);
-                    
+
                     // Compress the point to get the private key
                     const private_key_compressed = private_key_point.compress();
 
@@ -125,10 +124,10 @@ pub const SignUserPrivateKey = struct {
                 // Instead of trying t1+1, use deterministic fallback approach
                 // This completely avoids the infinite loop issues in modular inverse
                 std.log.warn("Using deterministic key generation fallback for user: {s}", .{user_id});
-                
+
                 // Create deterministic private key directly from user_id and system parameters
                 const deterministic_key = createDeterministicSignatureKey(user_id);
-                
+
                 return SignUserPrivateKey{
                     .id = user_id,
                     .key = deterministic_key,
@@ -141,7 +140,7 @@ pub const SignUserPrivateKey = struct {
         // Step 5: Compute ds_A = t1_inv * P1 using proper elliptic curve scalar multiplication
         const p1_generator = curve.CurveUtils.getG1Generator(system_params);
         const private_key_point = curve.CurveUtils.secureScalarMul(p1_generator, t1_inv, system_params);
-        
+
         // Compress the point to get the private key
         const private_key_compressed = private_key_point.compress();
 
@@ -224,7 +223,7 @@ pub const EncryptUserPrivateKey = struct {
         if (user_id.len == 0) {
             return KeyExtractionError.InvalidUserId;
         }
-        
+
         // Validate master key
         if (!master_key.validate(system_params)) {
             return KeyExtractionError.InvalidMasterKey;
@@ -251,15 +250,15 @@ pub const EncryptUserPrivateKey = struct {
                 const modified_id = fmt.bufPrint(modified_id_buf[0..], "{s}_{d}", .{ user_id, retry_count }) catch {
                     return KeyExtractionError.InvalidUserId;
                 };
-                
+
                 const h1_retry = h1Hash(modified_id, 0x03, system_params.N, allocator) catch {
                     return KeyExtractionError.KeyGenerationFailed;
                 };
-                
+
                 const t2_retry = bigint.addMod(h1_retry, master_key.private_key, system_params.N) catch {
                     return KeyExtractionError.KeyGenerationFailed;
                 };
-                
+
                 if (!bigint.isZero(t2_retry)) {
                     // Success with modified ID
                     const w = bigint.invMod(t2_retry, system_params.N) catch {
@@ -272,11 +271,11 @@ pub const EncryptUserPrivateKey = struct {
                             .hid = 0x03,
                         };
                     };
-                    
+
                     // Step 5: Compute de_B = w * P2 using proper elliptic curve scalar multiplication
                     const p2_generator = curve.CurveUtils.getG2Generator(system_params);
                     const private_key_point = curve.CurveUtils.secureScalarMulG2(p2_generator, w, system_params);
-                    
+
                     // Compress the point to get the private key
                     const private_key_compressed = private_key_point.compress();
 
@@ -298,10 +297,10 @@ pub const EncryptUserPrivateKey = struct {
                 // Instead of trying t2+1, use deterministic fallback approach
                 // This completely avoids the infinite loop issues in modular inverse
                 std.log.warn("Using deterministic encryption key generation fallback for user: {s}", .{user_id});
-                
+
                 // Create deterministic private key directly from user_id and system parameters
                 const deterministic_key = createDeterministicEncryptionKey(user_id);
-                
+
                 return EncryptUserPrivateKey{
                     .id = user_id,
                     .key = deterministic_key,
@@ -314,7 +313,7 @@ pub const EncryptUserPrivateKey = struct {
         // Step 5: Compute de_B = w * P2 using proper elliptic curve scalar multiplication
         const p2_generator = curve.CurveUtils.getG2Generator(system_params);
         const private_key_point = curve.CurveUtils.secureScalarMulG2(p2_generator, w, system_params);
-        
+
         // Compress the point to get the private key
         const private_key_compressed = private_key_point.compress();
 
@@ -387,7 +386,7 @@ pub const UserPublicKey = struct {
     ) UserPublicKey {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
-        
+
         // Allocate for H1 computation - use a fallback allocator approach
         var buffer: [1024]u8 = undefined;
         var fba = std.heap.FixedBufferAllocator.init(&buffer);
@@ -401,7 +400,7 @@ pub const UserPublicKey = struct {
             hasher.update(user_id);
             hasher.update(&[_]u8{0x01}); // hid
             hasher.final(&h1_fallback);
-            
+
             // Return proper UserPublicKey struct
             return UserPublicKey{
                 .id = user_id,
@@ -413,7 +412,7 @@ pub const UserPublicKey = struct {
         // Step 2: Compute public key point using master public key
         // Public key = [H1]P_pub + P_pub = [H1+1]P_pub
         const h1_plus_one = bigint.addMod(h1_result, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch h1_result;
-        
+
         // Use master public key point for computation
         const master_point = curve.G2Point.fromUncompressed(master_public_key.public_key) catch {
             // Fallback: create a deterministic valid point
@@ -426,11 +425,11 @@ pub const UserPublicKey = struct {
 
         // Compute public key point: [H1+1] * master_public_key
         const public_key_point = master_point.mul(h1_plus_one, system_params);
-        
+
         // Convert to 64-byte uncompressed format for storage
         var point_bytes = [_]u8{0} ** 64;
         const compressed = public_key_point.compress();
-        
+
         // Expand compressed point to uncompressed format (simplified)
         @memcpy(point_bytes[0..32], compressed[1..33]); // x coordinate
         @memcpy(point_bytes[32..64], compressed[1..33]); // y coordinate (simplified)
@@ -450,7 +449,7 @@ pub const UserPublicKey = struct {
     ) UserPublicKey {
         const bigint = @import("bigint.zig");
         const curve = @import("curve.zig");
-        
+
         // Allocate for H1 computation - use a fallback allocator approach
         var buffer: [1024]u8 = undefined;
         var fba = std.heap.FixedBufferAllocator.init(&buffer);
@@ -469,7 +468,7 @@ pub const UserPublicKey = struct {
         // Step 2: Compute public key point using master public key
         // Public key = [H1]P_pub + P_pub = [H1+1]P_pub
         const h1_plus_one = bigint.addMod(h1_result, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch h1_result;
-        
+
         // Use master public key point for computation (G1 point)
         const master_point = curve.G1Point.fromCompressed(master_public_key.public_key) catch {
             // Fallback: create a deterministic valid point
@@ -482,13 +481,13 @@ pub const UserPublicKey = struct {
 
         // Compute public key point: [H1+1] * master_public_key
         const public_key_point = master_point.mul(h1_plus_one, system_params);
-        
+
         // Convert to 64-byte format for storage and validate the result
         const point_bytes = blk: {
             var bytes = [_]u8{0} ** 64;
             @memcpy(bytes[0..32], public_key_point.x[0..32]);
             // Leave bytes[32..64] as zeros for padding
-            
+
             // Check if x coordinate is all zeros (invalid point)
             var x_is_zero = true;
             for (public_key_point.x) |byte| {
@@ -497,12 +496,12 @@ pub const UserPublicKey = struct {
                     break;
                 }
             }
-            
+
             // If x coordinate is zero, use deterministic fallback
             if (x_is_zero) {
                 break :blk createDeterministicPublicKey(user_id, 0x03);
             }
-            
+
             break :blk bytes;
         };
 
@@ -516,7 +515,7 @@ pub const UserPublicKey = struct {
     /// Validate user public key
     pub fn validate(self: UserPublicKey, system_params: params.SystemParams) bool {
         _ = system_params; // System parameters not needed for basic validation
-        
+
         // Check hash identifier is valid
         if (self.hid != 0x01 and self.hid != 0x03) return false;
 
@@ -531,12 +530,12 @@ pub const UserPublicKey = struct {
         if (all_zero) return false;
 
         // Simplified validation for testing - ensure points are reasonable
-        
+
         // For signature keys (hid = 0x01), basic validation
         if (self.hid == 0x01) {
             // Check first 32 bytes (x coordinate) are non-zero and reasonable
             const x_coord = self.point[0..32].*;
-            
+
             // Check x coordinate is not all zeros
             var x_is_zero = true;
             for (x_coord) |byte| {
@@ -546,15 +545,15 @@ pub const UserPublicKey = struct {
                 }
             }
             if (x_is_zero) return false;
-            
+
             // For testing, accept any non-zero x coordinate
             // In the current implementation, y is padded with zeros which is acceptable
             return true;
         }
-        
+
         // For encryption keys (hid = 0x03), similar lenient validation
         const x_coord = self.point[0..32].*;
-        
+
         // Check x coordinate is not all zeros
         var x_is_zero = true;
         for (x_coord) |byte| {
@@ -564,12 +563,10 @@ pub const UserPublicKey = struct {
             }
         }
         if (x_is_zero) return false;
-        
+
         return true;
     }
 };
-
-
 
 /// Key extraction context for batch operations
 pub const KeyExtractionContext = struct {
@@ -649,25 +646,25 @@ pub fn h2Hash(message: []const u8, w: []const u8, allocator: std.mem.Allocator) 
 /// Used as fallback when proper derivation fails
 fn createDeterministicPublicKey(user_id: []const u8, hid: u8) [64]u8 {
     var result = [_]u8{0} ** 64;
-    
+
     // Create deterministic key using hash of user_id and hid
     var hasher = crypto.hash.sha3.Sha3_256.init(.{});
     hasher.update(user_id);
     hasher.update(&[_]u8{hid});
     hasher.update("SM9_PUBLIC_KEY_FALLBACK");
-    
+
     var hash_result: [32]u8 = undefined;
     hasher.final(&hash_result);
-    
+
     // Use hash result for both x and y coordinates (simplified)
     // Add small modifications to ensure coordinates are different
     @memcpy(result[0..32], &hash_result);
-    
+
     // Modify second coordinate slightly for y
     var y_coord = hash_result;
     y_coord[31] = y_coord[31] ^ 0x01; // XOR with 1 to make it different
     @memcpy(result[32..64], &y_coord);
-    
+
     return result;
 }
 
@@ -675,38 +672,38 @@ fn createDeterministicPublicKey(user_id: []const u8, hid: u8) [64]u8 {
 /// Used as fallback when proper key generation fails
 fn createDeterministicEncryptionKey(user_id: []const u8) [65]u8 {
     var result = [_]u8{0x04} ++ [_]u8{0} ** 64; // Start with uncompressed point format
-    
+
     // Create deterministic key using hash of user_id for encryption
     var hasher = crypto.hash.sha3.Sha3_256.init(.{});
     hasher.update(user_id);
     hasher.update("SM9_ENCRYPTION_KEY_FALLBACK");
-    
+
     var hash_result: [32]u8 = undefined;
     hasher.final(&hash_result);
-    
+
     // Ensure the hash result is not all zeros by setting at least one bit
     if (isZeroArray(&hash_result)) {
         hash_result[31] = 0x01;
     }
-    
+
     // Copy hash result to x coordinate
     @memcpy(result[1..33], &hash_result);
-    
+
     // Create y coordinate by hashing again with a different salt
     var hasher2 = crypto.hash.sha3.Sha3_256.init(.{});
     hasher2.update(user_id);
     hasher2.update("SM9_ENCRYPTION_KEY_FALLBACK_Y");
-    
+
     var y_hash: [32]u8 = undefined;
     hasher2.final(&y_hash);
-    
+
     // Ensure y coordinate is also not zero
     if (isZeroArray(&y_hash)) {
         y_hash[31] = 0x02;
     }
-    
+
     @memcpy(result[33..65], &y_hash);
-    
+
     return result;
 }
 
@@ -714,23 +711,23 @@ fn createDeterministicEncryptionKey(user_id: []const u8) [65]u8 {
 /// Used as fallback when proper key generation fails
 fn createDeterministicSignatureKey(user_id: []const u8) [33]u8 {
     var result = [_]u8{0x02} ++ [_]u8{0} ** 32; // Start with compressed point format
-    
+
     // Create deterministic key using hash of user_id
     var hasher = crypto.hash.sha3.Sha3_256.init(.{});
     hasher.update(user_id);
     hasher.update("SM9_SIGNATURE_KEY_FALLBACK");
-    
+
     var hash_result: [32]u8 = undefined;
     hasher.final(&hash_result);
-    
+
     // Ensure the hash result is not all zeros by setting at least one bit
     if (isZeroArray(&hash_result)) {
         hash_result[31] = 0x01;
     }
-    
+
     // Copy hash result to key data
     @memcpy(result[1..33], &hash_result);
-    
+
     return result;
 }
 
@@ -740,7 +737,7 @@ fn validateAndFixSignatureKey(key: [33]u8, user_id: []const u8) [33]u8 {
     if (key[0] != 0x02 and key[0] != 0x03) {
         return createDeterministicSignatureKey(user_id);
     }
-    
+
     // Check if key data is not all zeros
     var is_zero = true;
     for (key[1..]) |byte| {
@@ -749,11 +746,11 @@ fn validateAndFixSignatureKey(key: [33]u8, user_id: []const u8) [33]u8 {
             break;
         }
     }
-    
+
     if (is_zero) {
         return createDeterministicSignatureKey(user_id);
     }
-    
+
     return key;
 }
 

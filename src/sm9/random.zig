@@ -15,7 +15,6 @@ const SM3 = @import("../sm3.zig").SM3;
 /// - Deterministic random generation for testing
 /// - Random field element and point generation
 /// - Proper error handling for entropy sources
-
 /// Random number generation errors
 pub const RandomError = error{
     EntropyFailure,
@@ -141,7 +140,7 @@ pub const DeterministicRandom = struct {
             hasher.final(&block);
 
             const copy_len = @min(32, buffer.len - offset);
-            std.mem.copyForwards(u8, buffer[offset..offset + copy_len], block[0..copy_len]);
+            std.mem.copyForwards(u8, buffer[offset .. offset + copy_len], block[0..copy_len]);
 
             offset += copy_len;
             self.counter += 1;
@@ -270,7 +269,7 @@ pub const EntropyPool = struct {
             round_hasher.final(&block);
 
             const copy_len = @min(32, buffer.len - offset);
-            std.mem.copyForwards(u8, buffer[offset..offset + copy_len], block[0..copy_len]);
+            std.mem.copyForwards(u8, buffer[offset .. offset + copy_len], block[0..copy_len]);
 
             offset += copy_len;
             counter += 1;
@@ -317,7 +316,7 @@ pub fn testEntropy(seed: []const u8, output: []u8) void {
         round_hasher.final(&block);
 
         const copy_len = @min(32, output.len - offset);
-        std.mem.copyForwards(u8, output[offset..offset + copy_len], block[0..copy_len]);
+        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block[0..copy_len]);
 
         offset += copy_len;
         counter += 1;

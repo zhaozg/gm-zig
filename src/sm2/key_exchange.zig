@@ -7,7 +7,6 @@ const utils = @import("utils.zig");
 
 /// SM2 Key Exchange Protocol implementation
 /// Based on GM/T 0003.3-2012 standard
-
 /// Key exchange participant role
 pub const Role = enum {
     initiator,
@@ -17,11 +16,11 @@ pub const Role = enum {
 /// Key exchange context for a participant
 pub const KeyExchangeContext = struct {
     role: Role,
-    private_key: [32]u8,     // Private key dA or dB
-    public_key: SM2,         // Public key PA or PB
-    user_id: []const u8,     // User identifier IDA or IDB
+    private_key: [32]u8, // Private key dA or dB
+    public_key: SM2, // Public key PA or PB
+    user_id: []const u8, // User identifier IDA or IDB
     ephemeral_private: [32]u8, // Ephemeral private key rA or rB
-    ephemeral_public: SM2,   // Ephemeral public key RA or RB
+    ephemeral_public: SM2, // Ephemeral public key RA or RB
 
     /// Initialize key exchange context
     pub fn init(
@@ -119,7 +118,7 @@ pub fn keyExchangeInitiator(
             responder_public_key,
             responder_ephemeral_key,
             responder_user_id,
-            derived_key[key_length..key_length + 32],
+            derived_key[key_length .. key_length + 32],
         );
     }
 
@@ -177,7 +176,7 @@ pub fn keyExchangeResponder(
             initiator_public_key,
             initiator_ephemeral_key,
             initiator_user_id,
-            derived_key[key_length..key_length + 32],
+            derived_key[key_length .. key_length + 32],
         );
     }
 
@@ -346,4 +345,3 @@ pub fn ephemeralKeyFromCoordinates(x: [32]u8, y: [32]u8) !SM2 {
 pub fn ephemeralKeyFromSec1(sec1_bytes: []const u8) !SM2 {
     return try SM2.fromSec1(sec1_bytes);
 }
-

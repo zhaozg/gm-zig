@@ -307,10 +307,7 @@ test "SM2 encryption error handling" {
     const identity_key = SM2.identityElement;
     const message = "test message";
 
-    try testing.expectError(
-        error.IdentityElement,
-        encryption.encrypt(allocator, message, identity_key, .c1c3c2)
-    );
+    try testing.expectError(error.IdentityElement, encryption.encrypt(allocator, message, identity_key, .c1c3c2));
 
     // Test decryption with wrong private key
     const wrong_private_key = SM2.scalar.random(.big);
@@ -412,10 +409,7 @@ test "SM2 encryption ciphertext length validation" {
     // Test invalid ciphertext length
     const too_short = [_]u8{0x04} ** 50; // Less than minimum 97 bytes
 
-    try testing.expectError(
-        error.InvalidCiphertextLength,
-        encryption.Ciphertext.fromBytes(allocator, &too_short, .c1c3c2)
-    );
+    try testing.expectError(error.InvalidCiphertextLength, encryption.Ciphertext.fromBytes(allocator, &too_short, .c1c3c2));
 }
 
 test "SM2 encryption deterministic properties" {

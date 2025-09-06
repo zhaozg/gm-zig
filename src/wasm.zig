@@ -57,8 +57,7 @@ export fn sm3hash(input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) v
     std.mem.copyForwards(u8, output_ptr[0..32], &output);
 }
 
-export fn sm3hmac(key_ptr: [*]const u8, key_len: usize,
-                 input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
+export fn sm3hmac(key_ptr: [*]const u8, key_len: usize, input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
     // 处理输入切片
     const input = input_ptr[0..input_len];
     // 处理输出缓冲区
@@ -66,8 +65,7 @@ export fn sm3hmac(key_ptr: [*]const u8, key_len: usize,
     std.mem.copyForwards(u8, output_ptr[0..32], &output);
 }
 
-export fn sm4cbc(key_ptr: [*]const u8, iv_ptr: [*]const u8, encrypt: bool,
-                 input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
+export fn sm4cbc(key_ptr: [*]const u8, iv_ptr: [*]const u8, encrypt: bool, input_ptr: [*]const u8, input_len: usize, output_ptr: [*]u8) void {
     // 处理输入切片
     const input = input_ptr[0..input_len];
     // 处理输出缓冲区
@@ -132,5 +130,4 @@ export fn sm2verify(pubKey: [*]const u8, msg: [*]const u8, msg_len: usize, signa
     return valid;
 }
 
-pub fn main() !void {
-}
+pub fn main() !void {}

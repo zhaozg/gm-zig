@@ -4,7 +4,7 @@ const sm9 = @import("../sm9.zig");
 
 test "SM9 Pairing Operations - Gt Element Basic Operations" {
     std.debug.print("\n=== Starting SM9 Pairing Test ===\n", .{});
-    
+
     // Test identity element
     std.debug.print("Creating identity element...\n", .{});
     const identity = sm9.pairing.GtElement.identity();
@@ -56,12 +56,12 @@ test "SM9 Pairing Operations - Gt Element Exponentiation" {
 test "SM9 Pairing Operations - Gt Element Inversion" {
     const elem = sm9.pairing.GtElement.random("test_element");
     const inverted = elem.invert();
-    
+
     // Test that element and its inverse are different (unless element is identity)
     if (!elem.isIdentity()) {
         try testing.expect(!elem.equal(inverted));
     }
-    
+
     // Test that inversion is consistent
     const double_inverted = inverted.invert();
     // Note: Due to simplified implementation, this may not hold exactly
@@ -71,54 +71,54 @@ test "SM9 Pairing Operations - Gt Element Inversion" {
 
 test "SM9 Pairing Operations - Bilinearity Properties" {
     const system_params = sm9.params.SystemParams.init();
-    
+
     // Create test points for bilinearity verification
     // Use generator points from system parameters
     const P1 = sm9.curve.G1Point.fromCompressed(system_params.P1) catch blk: {
         // Fallback to a simple valid point
         var x = [_]u8{0} ** 32;
         x[31] = 1;
-        var y = [_]u8{0} ** 32; 
+        var y = [_]u8{0} ** 32;
         y[31] = 2;
         break :blk sm9.curve.G1Point.affine(x, y);
     };
-    
+
     // Create G2 point
     var g2_x = [_]u8{0} ** 64;
     var g2_y = [_]u8{0} ** 64;
     std.mem.copyForwards(u8, g2_x[0..32], system_params.P2[1..33]);
     std.mem.copyForwards(u8, g2_y[0..32], system_params.P2[33..65]);
     const P2 = sm9.curve.G2Point.affine(g2_x, g2_y);
-    
+
     // Test basic pairing computation
     const e1 = sm9.pairing.pairing(P1, P2, system_params) catch sm9.pairing.GtElement.identity();
     try testing.expect(!e1.isIdentity());
-    
+
     // Test pairing with infinity points
     const inf_G1 = sm9.curve.G1Point.infinity();
     const inf_G2 = sm9.curve.G2Point.infinity();
-    
+
     const e_inf1 = sm9.pairing.pairing(inf_G1, P2, system_params) catch sm9.pairing.GtElement.identity();
     try testing.expect(e_inf1.isIdentity());
-    
+
     const e_inf2 = sm9.pairing.pairing(P1, inf_G2, system_params) catch sm9.pairing.GtElement.identity();
     try testing.expect(e_inf2.isIdentity());
-    
+
     // Test scalar multiplication properties (simplified)
     var scalar = [_]u8{0} ** 32;
     scalar[31] = 2; // Test with scalar = 2
-    
+
     const P1_scaled = sm9.curve.CurveUtils.scalarMultiplyG1(P1, scalar, system_params);
     const P2_scaled = sm9.curve.CurveUtils.scalarMultiplyG2(P2, scalar, system_params);
-    
+
     // e([2]P1, P2) should relate to e(P1, P2)^2 (bilinearity property)
     const e_scaled1 = sm9.pairing.pairing(P1_scaled, P2, system_params) catch sm9.pairing.GtElement.identity();
     const e_squared = e1.pow(scalar);
-    
+
     // Due to simplified implementation, we test structural consistency rather than exact equality
     try testing.expect(!e_scaled1.isIdentity());
     try testing.expect(!e_squared.isIdentity());
-    
+
     // Test e(P1, [2]P2) should also relate to e(P1, P2)^2
     const e_scaled2 = sm9.pairing.pairing(P1, P2_scaled, system_params) catch sm9.pairing.GtElement.identity();
     try testing.expect(!e_scaled2.isIdentity());
@@ -126,34 +126,34 @@ test "SM9 Pairing Operations - Bilinearity Properties" {
 
 test "SM9 Pairing Operations - Miller Loop Consistency" {
     const system_params = sm9.params.SystemParams.init();
-    
+
     // Test that multiple calls with same parameters give consistent results
     var x1 = [_]u8{0} ** 32;
     x1[31] = 1;
     var y1 = [_]u8{0} ** 32;
     y1[31] = 2;
     const P1 = sm9.curve.G1Point.affine(x1, y1);
-    
+
     var g2_x = [_]u8{0} ** 64;
     var g2_y = [_]u8{0} ** 64;
     g2_x[31] = 3;
     g2_y[31] = 4;
     const P2 = sm9.curve.G2Point.affine(g2_x, g2_y);
-    
+
     // Compute pairing multiple times
     const result1 = sm9.pairing.pairing(P1, P2, system_params) catch sm9.pairing.GtElement.identity();
     const result2 = sm9.pairing.pairing(P1, P2, system_params) catch sm9.pairing.GtElement.identity();
-    
+
     // Results should be identical (deterministic)
     try testing.expect(result1.equal(result2));
-    
+
     // Test with different points should give different results
     var x3 = [_]u8{0} ** 32;
     x3[31] = 5;
     var y3 = [_]u8{0} ** 32;
     y3[31] = 6;
     const P3 = sm9.curve.G1Point.affine(x3, y3);
-    
+
     const result3 = sm9.pairing.pairing(P3, P2, system_params) catch sm9.pairing.GtElement.identity();
     try testing.expect(!result1.equal(result3) or result1.isIdentity());
 }

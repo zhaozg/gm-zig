@@ -7,7 +7,6 @@ const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Public Key Encryption and Decryption
 /// Based on GM/T 0044-2016 standard
-
 /// Encryption/Decryption errors
 pub const EncryptionError = error{
     InvalidMessage,
@@ -102,8 +101,8 @@ pub const Ciphertext = struct {
             },
             .c1_c2_c3 => {
                 @memcpy(result[0..33], &self.c1);
-                @memcpy(result[33..33 + self.c2.len], self.c2);
-                @memcpy(result[33 + self.c2.len..], &self.c3);
+                @memcpy(result[33 .. 33 + self.c2.len], self.c2);
+                @memcpy(result[33 + self.c2.len ..], &self.c3);
             },
         }
 
@@ -133,8 +132,8 @@ pub const Ciphertext = struct {
             },
             .c1_c2_c3 => {
                 @memcpy(&c1, bytes[0..33]);
-                @memcpy(c2, bytes[33..33 + message_len]);
-                @memcpy(&c3, bytes[33 + message_len..]);
+                @memcpy(c2, bytes[33 .. 33 + message_len]);
+                @memcpy(&c3, bytes[33 + message_len ..]);
             },
         }
 
@@ -513,8 +512,6 @@ pub const KEMContext = struct {
     }
 };
 
-
-
 /// Utility functions for SM9 encryption
 pub const EncryptionUtils = struct {
     /// Key derivation function for SM9 with enhanced security
@@ -523,14 +520,14 @@ pub const EncryptionUtils = struct {
         if (input.len == 0) return error.KDFComputationFailed;
         if (output_len == 0) return error.KDFComputationFailed;
         if (output_len > 0x10000) return error.KDFComputationFailed; // Reasonable limit
-        
+
         // Use the proper KDF implementation from hash module
         const hash = @import("hash.zig");
         const result = hash.kdf(input, output_len, allocator) catch {
             // Fallback KDF using repeated hashing
             return fallbackKdf(input, output_len, allocator);
         };
-        
+
         // Validate KDF output is not all zeros (security requirement)
         var all_zero = true;
         for (result) |byte| {
@@ -539,13 +536,13 @@ pub const EncryptionUtils = struct {
                 break;
             }
         }
-        
+
         if (all_zero) {
             allocator.free(result);
             // Generate non-zero fallback
             return fallbackKdf(input, output_len, allocator);
         }
-        
+
         return result;
     }
 
@@ -554,27 +551,27 @@ pub const EncryptionUtils = struct {
         var result = try allocator.alloc(u8, output_len);
         var counter: u32 = 0;
         var offset: usize = 0;
-        
+
         while (offset < output_len) {
             var hasher = SM3.init(.{});
             hasher.update(input);
             hasher.update(&@as([4]u8, @bitCast(@byteSwap(counter)))); // Big-endian counter
-            
+
             var hash_output: [32]u8 = undefined;
             hasher.final(&hash_output);
-            
+
             const copy_len = @min(32, output_len - offset);
-            @memcpy(result[offset..offset + copy_len], hash_output[0..copy_len]);
-            
+            @memcpy(result[offset .. offset + copy_len], hash_output[0..copy_len]);
+
             offset += copy_len;
             counter += 1;
         }
-        
+
         // Ensure result is not all zeros
         if (std.mem.allEqual(u8, result, 0)) {
             result[0] = 1; // Make it non-zero
         }
-        
+
         return result;
     }
 
@@ -639,11 +636,11 @@ pub const EncryptionUtils = struct {
 
         // Check coordinates are within field bounds
         const bigint = @import("bigint.zig");
-        
+
         // Split into x and y coordinates (each is 32 bytes for simplified Fp2)
         const x_coord = point[1..33].*;
         const y_coord = point[33..65].*;
-        
+
         if (!bigint.lessThan(x_coord, system_params.q)) {
             return false;
         }

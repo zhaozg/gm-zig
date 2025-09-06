@@ -4,7 +4,6 @@ const sm9 = @import("../sm9.zig");
 /// SM9 Complete Implementation Usage Example
 /// Demonstrates the fully implemented SM9 identity-based cryptographic algorithm
 /// according to GM/T 0044-2016 Chinese National Standard
-
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -57,7 +56,7 @@ pub fn main() !void {
     // Verify DER roundtrip
     const der_decoded = try sm9.sign.Signature.fromDER(der_encoded);
     const roundtrip_ok = std.mem.eql(u8, &alice_signature.h, &der_decoded.h) and
-                        std.mem.eql(u8, &alice_signature.S, &der_decoded.S);
+        std.mem.eql(u8, &alice_signature.S, &der_decoded.S);
     std.debug.print("✅ DER roundtrip successful: {}\n", .{roundtrip_ok});
 
     // Bob verifies Alice's signature
@@ -75,8 +74,7 @@ pub fn main() !void {
     // Alice encrypts for Bob
     const ciphertext_for_bob = try encrypt_context.encrypt(message, bob_id, .{});
     defer ciphertext_for_bob.deinit();
-    std.debug.print("✅ Alice encrypted for Bob: C1={}, C2={} bytes, C3={x:02}\n",
-                   .{ ciphertext_for_bob.c1[0], ciphertext_for_bob.c2.len, ciphertext_for_bob.c3[0] });
+    std.debug.print("✅ Alice encrypted for Bob: C1={}, C2={} bytes, C3={x:02}\n", .{ ciphertext_for_bob.c1[0], ciphertext_for_bob.c2.len, ciphertext_for_bob.c3[0] });
 
     // Bob decrypts Alice's message
     const decrypted_by_bob = try encrypt_context.decrypt(ciphertext_for_bob, bob_encrypt_key, .{});
@@ -139,9 +137,9 @@ pub fn main() !void {
 
     // Validate all generated keys
     const keys_valid = alice_sign_key.validate(system.params) and
-                      alice_encrypt_key.validate(system.params) and
-                      bob_sign_key.validate(system.params) and
-                      bob_encrypt_key.validate(system.params);
+        alice_encrypt_key.validate(system.params) and
+        bob_sign_key.validate(system.params) and
+        bob_encrypt_key.validate(system.params);
     std.debug.print("✅ All extracted keys valid: {}\n", .{keys_valid});
 
     // Validate signatures

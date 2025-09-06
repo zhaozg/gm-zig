@@ -273,31 +273,25 @@ test "SM2 key exchange role validation" {
     const key_length = 32;
 
     // Should fail with wrong roles
-    try testing.expectError(
-        error.InvalidRole,
-        key_exchange.keyExchangeInitiator(
-            allocator,
-            &alice_ctx_wrong,
-            bob_public,
-            bob_ctx_wrong.ephemeral_public,
-            bob_id,
-            key_length,
-            false,
-        )
-    );
+    try testing.expectError(error.InvalidRole, key_exchange.keyExchangeInitiator(
+        allocator,
+        &alice_ctx_wrong,
+        bob_public,
+        bob_ctx_wrong.ephemeral_public,
+        bob_id,
+        key_length,
+        false,
+    ));
 
-    try testing.expectError(
-        error.InvalidRole,
-        key_exchange.keyExchangeResponder(
-            allocator,
-            &bob_ctx_wrong,
-            alice_public,
-            alice_ctx_wrong.ephemeral_public,
-            alice_id,
-            key_length,
-            false,
-        )
-    );
+    try testing.expectError(error.InvalidRole, key_exchange.keyExchangeResponder(
+        allocator,
+        &bob_ctx_wrong,
+        alice_public,
+        alice_ctx_wrong.ephemeral_public,
+        alice_id,
+        key_length,
+        false,
+    ));
 }
 
 test "SM2 key exchange identity element rejection" {
@@ -312,38 +306,37 @@ test "SM2 key exchange identity element rejection" {
     const bob_id = "bob";
 
     var alice_ctx = key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
-    const bob_ctx = key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id, );
+    const bob_ctx = key_exchange.KeyExchangeContext.init(
+        .responder,
+        bob_private,
+        bob_public,
+        bob_id,
+    );
 
     const identity = SM2.identityElement;
     const key_length = 32;
 
     // Should fail with identity element as public key
-    try testing.expectError(
-        error.IdentityElement,
-        key_exchange.keyExchangeInitiator(
-            allocator,
-            &alice_ctx,
-            identity,
-            bob_ctx.ephemeral_public,
-            bob_id,
-            key_length,
-            false,
-        )
-    );
+    try testing.expectError(error.IdentityElement, key_exchange.keyExchangeInitiator(
+        allocator,
+        &alice_ctx,
+        identity,
+        bob_ctx.ephemeral_public,
+        bob_id,
+        key_length,
+        false,
+    ));
 
     // Should fail with identity element as ephemeral key
-    try testing.expectError(
-        error.IdentityElement,
-        key_exchange.keyExchangeInitiator(
-            allocator,
-            &alice_ctx,
-            bob_public,
-            identity,
-            bob_id,
-            key_length,
-            false,
-        )
-    );
+    try testing.expectError(error.IdentityElement, key_exchange.keyExchangeInitiator(
+        allocator,
+        &alice_ctx,
+        bob_public,
+        identity,
+        bob_id,
+        key_length,
+        false,
+    ));
 }
 
 test "SM2 key exchange coordinate extraction" {

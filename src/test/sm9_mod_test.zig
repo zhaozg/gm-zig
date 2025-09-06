@@ -159,7 +159,7 @@ test "SM9 error handling" {
         // If it succeeds, that's also valid behavior
     } else |err| {
         try testing.expect(err == sm9.SM9Error.InvalidUserId or
-                           err == sm9.SM9Error.KeyGenerationFailed);
+            err == sm9.SM9Error.KeyGenerationFailed);
     }
 }
 

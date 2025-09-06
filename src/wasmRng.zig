@@ -6,15 +6,15 @@ var global: ByteArrayRandom = undefined;
 pub const ByteArrayRandom = struct {
     data: []const u8,
     index: usize,
-    exhausted: bool,  // 添加耗尽标记
+    exhausted: bool, // 添加耗尽标记
 
     /// 初始化随机数生成器
     /// seed: 随机源字节序列（非空）
     pub fn init(seed: []const u8) ByteArrayRandom {
         // 若传入空切片，使用默认单字节种子
         const effective_seed = std.heap.wasm_allocator.alloc(u8, seed.len) catch @panic("allocation failed");
-        for(0..seed.len) |i| {
-            effective_seed[i]=seed[i];
+        for (0..seed.len) |i| {
+            effective_seed[i] = seed[i];
         }
         return .{
             .data = effective_seed,
@@ -63,7 +63,7 @@ pub const ByteArrayRandom = struct {
     }
 };
 
-pub fn init(seed: []const u8)  void {
+pub fn init(seed: []const u8) void {
     global = ByteArrayRandom.init(seed);
 }
 pub fn random(buf: []u8) void {
@@ -104,7 +104,7 @@ test "ByteArrayRandom basic usage" {
     // 验证耗尽后返回0
     var zero_buf: [4]u8 = undefined;
     rand.fillFn(rand.ptr, &zero_buf);
-    try std.testing.expectEqualSlices(u8, &[_]u8{0, 0, 0, 0}, &zero_buf);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0 }, &zero_buf);
 
     // 验证整数生成
     const num = std.Random.int(rand, u32);
@@ -144,12 +144,12 @@ test "ByteArrayRandom partial request" {
     // 请求3字节（超过剩余2字节）应返回全0
     var buf3: [3]u8 = undefined;
     rand.fillFn(rand.ptr, &buf3);
-    try std.testing.expectEqualSlices(u8, &[_]u8{0, 0, 0}, &buf3);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0 }, &buf3);
 
     // 再次请求应返回0
     var zero_buf: [3]u8 = undefined;
     rand.fillFn(rand.ptr, &zero_buf);
-    try std.testing.expectEqualSlices(u8, &[_]u8{0, 0, 0}, &zero_buf);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0 }, &zero_buf);
 }
 
 test "ByteArrayRandom over request" {
@@ -160,12 +160,12 @@ test "ByteArrayRandom over request" {
     // 尝试请求超过剩余长度的数据（5字节）应返回全0
     var buf: [5]u8 = undefined;
     rand.fillFn(rand.ptr, &buf);
-    try std.testing.expectEqualSlices(u8, &[_]u8{0, 0, 0, 0, 0}, &buf);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0, 0, 0, 0, 0 }, &buf);
 
     // 后续请求也应返回0
     var zero_buf: [2]u8 = undefined;
     rand.fillFn(rand.ptr, &zero_buf);
-    try std.testing.expectEqualSlices(u8, &[_]u8{0, 0}, &zero_buf);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0, 0 }, &zero_buf);
 }
 
 test "ByteArrayRandom exact request" {

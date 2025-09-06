@@ -4,7 +4,6 @@ const KeyPair = kp.KeyPair;
 const testing = std.testing;
 
 test "SM2 key pair generation" {
-
     const key_pair = kp.generateKeyPair();
 
     // Verify public key is valid (not identity element)
@@ -17,4 +16,3 @@ test "SM2 key pair generation" {
     const compressed = key_pair.getPublicKeyCompressed();
     try testing.expect(compressed[0] == 0x02 or compressed[0] == 0x03); // Compressed marker
 }
-

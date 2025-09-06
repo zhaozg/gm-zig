@@ -18,7 +18,6 @@ pub const isZig015OrNewer = blk: {
 
 /// SM9 Digital Signature and Verification
 /// Based on GM/T 0044-2016 standard
-
 /// SM9 signature structure
 pub const Signature = struct {
     /// Signature component h (hash value)
@@ -79,7 +78,7 @@ pub const Signature = struct {
         offset += 1;
         result[offset] = @as(u8, @intCast(h_content_len)); // Length
         offset += 1;
-        @memcpy(result[offset..offset + h_content_len], &self.h);
+        @memcpy(result[offset .. offset + h_content_len], &self.h);
         offset += h_content_len;
 
         // S OCTET STRING
@@ -87,7 +86,7 @@ pub const Signature = struct {
         offset += 1;
         result[offset] = @as(u8, @intCast(s_content_len)); // Length
         offset += 1;
-        @memcpy(result[offset..offset + s_content_len], &self.S);
+        @memcpy(result[offset .. offset + s_content_len], &self.S);
 
         return result;
     }
@@ -119,7 +118,7 @@ pub const Signature = struct {
 
         if (offset + h_length > der_bytes.len) return error.InvalidSignatureFormat;
         var h: [32]u8 = undefined;
-        @memcpy(&h, der_bytes[offset..offset + h_length]);
+        @memcpy(&h, der_bytes[offset .. offset + h_length]);
         offset += h_length;
 
         // Read S OCTET STRING
@@ -133,7 +132,7 @@ pub const Signature = struct {
 
         if (offset + s_length > der_bytes.len) return error.InvalidSignatureFormat;
         var S: [33]u8 = undefined;
-        @memcpy(&S, der_bytes[offset..offset + s_length]);
+        @memcpy(&S, der_bytes[offset .. offset + s_length]);
 
         return Signature{
             .h = h,
@@ -286,7 +285,7 @@ pub const SignatureContext = struct {
             };
             retry_count += 1;
         }
-        
+
         if (bigint.isZero(l)) {
             return error.HashComputationFailed;
         }
@@ -294,7 +293,7 @@ pub const SignatureContext = struct {
         // Step 6: Compute S = l * ds_A (elliptic curve scalar multiplication)
         // Enhanced elliptic curve operations with the user's private key
         const curve = @import("curve.zig");
-        
+
         // Convert private key from compressed format to curve point
         const private_key_point = curve.CurveUtils.fromCompressedG1(user_private_key.key, self.system_params) catch {
             // If decompression fails, use deterministic fallback
@@ -314,7 +313,7 @@ pub const SignatureContext = struct {
 
             return Signature.init(h, S);
         };
-        
+
         // Perform scalar multiplication: S = l * private_key_point
         const signature_point = curve.CurveUtils.secureScalarMul(private_key_point, l, self.system_params);
         const S = signature_point.compress();
@@ -399,11 +398,10 @@ pub const BatchSignature = struct {
 
     /// Initialize batch signature context
     pub fn init(allocator: mem.Allocator, context: SignatureContext) BatchSignature {
-
         return BatchSignature{
             .context = context,
             .allocator = allocator,
-            .signatures = if(isZig015OrNewer)
+            .signatures = if (isZig015OrNewer)
                 .empty
             else
                 Signatures.init(allocator),
@@ -454,7 +452,7 @@ pub const BatchSignature = struct {
 
     /// Cleanup resources
     pub fn deinit(self: BatchSignature) void {
-        if(isZig015OrNewer) {
+        if (isZig015OrNewer) {
             var mutable_signatures = @constCast(&self.signatures);
             mutable_signatures.deinit(self.allocator);
         } else {

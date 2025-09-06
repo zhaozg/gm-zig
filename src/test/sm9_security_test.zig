@@ -12,9 +12,9 @@ test "SM9 basic import test" {
 // Test constant-time operations for timing attack resistance
 test "SM9 constant-time operations" {
     // Test constant-time equality
-    const a = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
-    const b = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
-    const c = [_]u8{0x12, 0x34, 0x56, 0x79} ++ [_]u8{0} ** 28;
+    const a = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ [_]u8{0} ** 28;
+    const b = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ [_]u8{0} ** 28;
+    const c = [_]u8{ 0x12, 0x34, 0x56, 0x79 } ++ [_]u8{0} ** 28;
 
     // Test equal values
     try testing.expect(sm9.bigint.equal(a, b));
@@ -30,7 +30,7 @@ test "SM9 constant-time operations" {
 
 // Test secure memory clearing
 test "SM9 secure memory clearing" {
-    var sensitive_data = [_]u8{0xDE, 0xAD, 0xBE, 0xEF} ++ [_]u8{0xFF} ** 28;
+    var sensitive_data = [_]u8{ 0xDE, 0xAD, 0xBE, 0xEF } ++ [_]u8{0xFF} ** 28;
 
     // Verify data is not zero initially
     try testing.expect(!sm9.bigint.isZero(sensitive_data));

@@ -38,7 +38,7 @@ test "SM9 key extraction mathematical robustness" {
         try testing.expect(sign_key.hid == 0x01);
         try testing.expectEqualStrings(user_id, sign_key.id);
 
-        // Test encryption key extraction  
+        // Test encryption key extraction
         const encrypt_key = key_context.extractEncryptKey(user_id) catch |err| {
             std.debug.print("Encrypt key extraction failed for '{s}': {}\n", .{ user_id, err });
             continue;
@@ -62,7 +62,7 @@ test "SM9 public key derivation robustness" {
 
     const test_users = [_][]const u8{
         "alice@test.com",
-        "bob@test.com", 
+        "bob@test.com",
         "charlie@domain.org",
         "test_user_123@example.net",
     };
@@ -134,7 +134,7 @@ test "SM9 bigint mathematical boundary conditions" {
     // Test modular arithmetic edge cases
     const a = sm9.bigint.fromU64(12345);
     const b = sm9.bigint.fromU64(67890);
-    
+
     // Addition should not overflow
     const sum = try sm9.bigint.addMod(a, b, modulus);
     try testing.expect(!sm9.bigint.isZero(sum));

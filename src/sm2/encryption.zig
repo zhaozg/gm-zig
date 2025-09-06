@@ -7,7 +7,6 @@ const utils = @import("utils.zig");
 
 /// SM2 Public Key Encryption implementation
 /// Based on GM/T 0003.4-2012 standard
-
 /// Ciphertext format options
 pub const CiphertextFormat = enum {
     c1c3c2, // C1 || C3 || C2 (standard format)
@@ -16,9 +15,9 @@ pub const CiphertextFormat = enum {
 
 /// SM2 ciphertext structure
 pub const Ciphertext = struct {
-    c1: [65]u8,    // Uncompressed point (0x04 + 32 bytes x + 32 bytes y)
-    c2: []u8,      // Encrypted message (same length as plaintext)
-    c3: [32]u8,    // MAC value (SM3 hash)
+    c1: [65]u8, // Uncompressed point (0x04 + 32 bytes x + 32 bytes y)
+    c2: []u8, // Encrypted message (same length as plaintext)
+    c3: [32]u8, // MAC value (SM3 hash)
     format: CiphertextFormat,
 
     /// Get total ciphertext length
@@ -41,8 +40,8 @@ pub const Ciphertext = struct {
             .c1c2c3 => {
                 // C1 || C2 || C3
                 @memcpy(result[0..65], &self.c1);
-                @memcpy(result[65..65 + self.c2.len], self.c2);
-                @memcpy(result[65 + self.c2.len..], &self.c3);
+                @memcpy(result[65 .. 65 + self.c2.len], self.c2);
+                @memcpy(result[65 + self.c2.len ..], &self.c3);
             },
         }
 
@@ -77,8 +76,8 @@ pub const Ciphertext = struct {
             .c1c2c3 => {
                 // C1 || C2 || C3
                 @memcpy(&result.c1, bytes[0..65]);
-                @memcpy(result.c2, bytes[65..65 + message_len]);
-                @memcpy(&result.c3, bytes[65 + message_len..]);
+                @memcpy(result.c2, bytes[65 .. 65 + message_len]);
+                @memcpy(&result.c3, bytes[65 + message_len ..]);
             },
         }
 
@@ -250,4 +249,3 @@ pub fn decryptWithFormat(
 
     return try decrypt(allocator, ciphertext, private_key);
 }
-

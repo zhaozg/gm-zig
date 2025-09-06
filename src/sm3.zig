@@ -111,7 +111,7 @@ pub const SM3 = struct {
 
         // 消息字加载 - 大端序
         for (0..16) |j| {
-            w[j] = mem.readInt(u32, block[j * 4..][0..4], .big);
+            w[j] = mem.readInt(u32, block[j * 4 ..][0..4], .big);
         }
 
         // 消息扩展
@@ -149,14 +149,14 @@ pub const SM3 = struct {
             const tt2 = gg_j +% h +% ss1 +% w[j];
 
             // 正确的工作变量更新顺序
-            dd = c;                  // D = C
+            dd = c; // D = C
             c = math.rotl(u32, b, 9); // C = B <<< 9
-            b = a;                   // B = A
-            a = tt1;                 // A = TT1
-            h = g;                   // H = G
+            b = a; // B = A
+            a = tt1; // A = TT1
+            h = g; // H = G
             g = math.rotl(u32, f, 19); // G = F <<< 19
-            f = e;                   // F = E
-            e = p0(tt2);             // E = P0(TT2)
+            f = e; // F = E
+            e = p0(tt2); // E = P0(TT2)
         }
 
         // 更新哈希值

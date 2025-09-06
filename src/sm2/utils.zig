@@ -44,7 +44,7 @@ pub fn kdf(allocator: std.mem.Allocator, z: []const u8, klen: usize) ![]u8 {
         hasher.final(&hash_result);
 
         const bytes_to_copy = @min(v, klen - offset);
-        mem.copyForwards(u8, output[offset..offset + bytes_to_copy], hash_result[0..bytes_to_copy]);
+        mem.copyForwards(u8, output[offset .. offset + bytes_to_copy], hash_result[0..bytes_to_copy]);
         offset += bytes_to_copy;
     }
 
@@ -120,7 +120,6 @@ pub const SignatureEncoding = enum {
 /// Input: r and s as 32-byte arrays
 /// Output: DER-encoded signature
 pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![]u8 {
-
     if (isZig015OrNewer) {
         // Simple DER encoding: SEQUENCE { r INTEGER, s INTEGER }
         var buffer: Buffer = .empty;
@@ -129,7 +128,6 @@ pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![
         // Helper function to encode integer
         const encodeInteger = struct {
             fn call(buf: *Buffer, allocat: std.mem.Allocator, value: [32]u8) !void {
-
                 try buf.append(allocat, 0x02); // INTEGER tag
 
                 // Find first non-zero byte
@@ -277,7 +275,7 @@ pub fn decodeSignatureDER(der_sig: []const u8) !struct { r: [32]u8, s: [32]u8 } 
             if (actual_len > 32) return error.InvalidDERSignature;
 
             const offset = 32 - actual_len;
-            mem.copyForwards(u8, result[offset..], data[start_pos..pos + len]);
+            mem.copyForwards(u8, result[offset..], data[start_pos .. pos + len]);
 
             position.* = pos + len;
             return result;

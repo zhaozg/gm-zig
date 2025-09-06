@@ -6,7 +6,6 @@ const SM3 = @import("../sm3.zig").SM3;
 /// SM9 Hash Functions Implementation
 /// Provides H1, H2, and KDF functions as specified in GM/T 0044-2016
 /// Based on SM3 cryptographic hash function
-
 /// Hash function errors
 pub const HashError = error{
     InvalidInput,
@@ -25,7 +24,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     if (data.len == 0) {
         return HashError.InvalidInput;
     }
-    
+
     // Validate that order is not zero
     if (bigint.isZero(order)) {
         return HashError.InvalidInput;
@@ -73,7 +72,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 
     // Enhanced fallback: use modular reduction with multiple strategies
     var reduction_result = result;
-    
+
     // Strategy 1: Simple modular reduction
     const mod_result = bigint.mod(reduction_result, order) catch blk: {
         // Strategy 2: Bitwise reduction if mod fails
@@ -93,7 +92,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
         }
         break :blk bit_reduced;
     };
-    
+
     reduction_result = mod_result;
 
     // Ensure result is not zero (required by SM9 spec)
@@ -189,7 +188,7 @@ pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) !
 
         // Copy to output (partial block for last iteration)
         const copy_len = @min(hash_len, output_len - offset);
-        std.mem.copyForwards(u8, output[offset..offset + copy_len], block_hash[0..copy_len]);
+        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block_hash[0..copy_len]);
 
         offset += copy_len;
         counter += 1;
@@ -200,13 +199,7 @@ pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) !
 
 /// SM9 expanded KDF for large key derivation
 /// Uses iterative hashing for enhanced security
-pub fn expandedKdf(
-    input: []const u8,
-    salt: []const u8,
-    info: []const u8,
-    output_len: usize,
-    allocator: std.mem.Allocator
-) ![]u8 {
+pub fn expandedKdf(input: []const u8, salt: []const u8, info: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
     if (output_len == 0) return error.InvalidLength;
 
     // Step 1: Extract phase - create pseudorandom key from input and salt
@@ -248,7 +241,7 @@ pub fn expandedKdf(
 
         // Copy to output
         const copy_len = @min(hash_len, output_len - offset);
-        std.mem.copyForwards(u8, output[offset..offset + copy_len], block_hash[0..copy_len]);
+        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block_hash[0..copy_len]);
 
         // Save for next iteration
         previous_block = block_hash;
@@ -317,7 +310,7 @@ pub fn deterministicRandom(seed: []const u8, length: usize, allocator: std.mem.A
         hasher.final(&block);
 
         const copy_len = @min(32, length - offset);
-        std.mem.copyForwards(u8, output[offset..offset + copy_len], block[0..copy_len]);
+        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block[0..copy_len]);
 
         offset += copy_len;
         counter += 1;

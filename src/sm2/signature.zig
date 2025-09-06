@@ -189,11 +189,7 @@ pub fn verify(
     const s_bytes = s_scalar.toBytes(.big);
     const t_bytes = t_scalar.toBytes(.big);
 
-    const point = SM2.mulDoubleBasePublic(
-        SM2.basePoint, s_bytes,
-        public_key, t_bytes,
-        .big
-    ) catch return false;
+    const point = SM2.mulDoubleBasePublic(SM2.basePoint, s_bytes, public_key, t_bytes, .big) catch return false;
 
     // Step 3: Compute R = (e + x1') mod n
     const coords = point.affineCoordinates();
@@ -207,4 +203,3 @@ pub fn verify(
     // Step 4: Verify R = r
     return utils.constantTimeEqual(&R_bytes, &signature.r);
 }
-

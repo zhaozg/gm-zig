@@ -47,7 +47,7 @@ test "SM2 signature serialization" {
 
     // Test raw bytes serialization
     const bytes = sig.toBytes();
-    const sig2= signature.Signature.fromBytes(bytes);
+    const sig2 = signature.Signature.fromBytes(bytes);
 
     try testing.expectEqualSlices(u8, &sig.r, &sig2.r);
     try testing.expectEqualSlices(u8, &sig.s, &sig2.s);
@@ -116,7 +116,7 @@ test "SM2 signature comprehensive tests" {
 
     // Test 5: Precomputed hash signature
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
-    const message_hash = [_]u8{0x12, 0x34, 0x56, 0x78} ** 8; // 32 bytes
+    const message_hash = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ** 8; // 32 bytes
 
     const sig_hash = try signature.sign(&message_hash, key_pair.private_key, key_pair.public_key, hash_options);
     const is_valid_hash = try signature.verify(&message_hash, sig_hash, key_pair.public_key, hash_options);
@@ -157,7 +157,6 @@ test "SM2 signature comprehensive tests" {
 }
 
 test "SM2 signature error handling" {
-
     const key_pair = kp.generateKeyPair();
     const message = "test message";
     const options = signature.SignatureOptions{};
@@ -166,19 +165,13 @@ test "SM2 signature error handling" {
     const invalid_hash = [_]u8{0x01} ** 16; // Wrong length
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
 
-    try testing.expectError(
-        error.InvalidPrecomputedHashLength,
-        signature.sign(&invalid_hash, key_pair.private_key, key_pair.public_key, hash_options)
-    );
+    try testing.expectError(error.InvalidPrecomputedHashLength, signature.sign(&invalid_hash, key_pair.private_key, key_pair.public_key, hash_options));
 
     // Test signature verification with identity element should fail
     const identity_key = SM2.SM2.identityElement;
     const sig = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
 
-    try testing.expectError(
-        error.IdentityElement,
-        signature.verify(message, sig, identity_key, options)
-    );
+    try testing.expectError(error.IdentityElement, signature.verify(message, sig, identity_key, options));
 }
 
 test "SM2 signature compatibility" {

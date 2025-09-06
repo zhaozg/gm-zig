@@ -68,9 +68,7 @@ pub fn publicKeyFromPrivateKey(private_key: [32]u8) !SM2 {
     return try SM2.basePoint.mul(private_key, .big);
 }
 
-
 /// Generate SM2 key pair
 pub fn generateKeyPair() KeyPair {
     return KeyPair.generate();
 }
-

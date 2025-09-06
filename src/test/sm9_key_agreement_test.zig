@@ -200,10 +200,8 @@ test "SM9 key agreement session ID generation" {
     // Verify session ID format (should be 64 hex characters)
     try testing.expect(session_id1.len == 64);
     for (session_id1) |char| {
-        try testing.expect(
-            (char >= '0' and char <= '9') or
-            (char >= 'a' and char <= 'f')
-        );
+        try testing.expect((char >= '0' and char <= '9') or
+            (char >= 'a' and char <= 'f'));
     }
 }
 

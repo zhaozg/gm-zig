@@ -87,12 +87,8 @@ test "SM9 master key pair fromPrivateKey correctness" {
     const encrypt_from = try sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, private_key);
 
     // 公钥一致性
-    try testing.expectEqualSlices(u8, &sign_from.public_key, &curve.CurveUtils.scalarMultiplyG2(
-        try curve.G2Point.fromUncompressed(params.P2), private_key, params
-    ).compress());
-    try testing.expectEqualSlices(u8, &encrypt_from.public_key, &curve.CurveUtils.scalarMultiplyG1(
-        try curve.G1Point.fromCompressed(params.P1), private_key, params
-    ).compress());
+    try testing.expectEqualSlices(u8, &sign_from.public_key, &curve.CurveUtils.scalarMultiplyG2(try curve.G2Point.fromUncompressed(params.P2), private_key, params).compress());
+    try testing.expectEqualSlices(u8, &encrypt_from.public_key, &curve.CurveUtils.scalarMultiplyG1(try curve.G1Point.fromCompressed(params.P1), private_key, params).compress());
 
     // 验证密钥对合法
     try testing.expect(sign_from.validate(params));
@@ -104,12 +100,8 @@ test "SM9 fromPrivateKey invalid input" {
     const zero_key = [_]u8{0} ** 32;
     const over_key = [_]u8{0xFF} ** 32;
 
-    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
-        sm9.params.SignMasterKeyPair.fromPrivateKey(params, zero_key));
-    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
-        sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, zero_key));
-    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
-        sm9.params.SignMasterKeyPair.fromPrivateKey(params, over_key));
-    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey,
-        sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, over_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey, sm9.params.SignMasterKeyPair.fromPrivateKey(params, zero_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey, sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, zero_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey, sm9.params.SignMasterKeyPair.fromPrivateKey(params, over_key));
+    try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey, sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, over_key));
 }

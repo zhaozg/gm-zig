@@ -7,7 +7,6 @@ const SM3 = @import("../sm3.zig").SM3;
 /// SM9 Bilinear Pairing Operations
 /// Implements R-ate pairing for BN256 curve used in SM9
 /// Based on GM/T 0044-2016 standard
-
 /// Gt group element (result of pairing)
 pub const GtElement = struct {
     /// Internal representation as 12 field elements (Fp12)
@@ -142,7 +141,7 @@ pub const GtElement = struct {
             expand_hasher.final(&block);
 
             const copy_len = @min(32, 384 - offset);
-            std.mem.copyForwards(u8, result.data[offset..offset + copy_len], block[0..copy_len]);
+            std.mem.copyForwards(u8, result.data[offset .. offset + copy_len], block[0..copy_len]);
 
             offset += copy_len;
             counter += 1;
@@ -183,47 +182,47 @@ pub fn pairing(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemPa
 /// Core algorithm for computing pairings using proper Miller's algorithm structure
 fn millerLoop(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemParams) PairingError!GtElement {
     // Enhanced Miller loop implementation following standard algorithm structure
-    
+
     var f = GtElement.identity();
     var T = Q; // Working point
-    
+
     // BN256 curve parameter t for Miller loop (simplified but mathematically consistent)
     // Using a reduced parameter for computational efficiency while maintaining correctness
     const loop_count = [32]u8{
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F  // Small parameter for efficiency
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, // Small parameter for efficiency
     };
-    
+
     var bit_index: usize = 0;
     const total_bits = 64; // Process more bits for better mathematical behavior
-    
+
     while (bit_index < total_bits) : (bit_index += 1) {
         // Square step: f = f² * l_{T,T}(P)
         f = f.mul(f);
-        
+
         // Line function evaluation for point doubling
         const line_value = evaluateLineFunction(T, T, P, curve_params) catch GtElement.identity();
         f = f.mul(line_value);
-        
+
         // Point doubling: T = 2T
         T = T.double(curve_params);
-        
+
         // Check if bit is set in loop count (process from MSB to LSB)
         const byte_idx = 31 - (bit_index / 8);
         const bit_idx = @as(u3, @intCast(7 - (bit_index % 8)));
-        
+
         if (byte_idx < loop_count.len and ((loop_count[byte_idx] >> bit_idx) & 1) == 1) {
             // Addition step: f = f * l_{T,Q}(P)
             const add_line_value = evaluateLineFunction(T, Q, P, curve_params) catch GtElement.identity();
             f = f.mul(add_line_value);
-            
+
             // Point addition: T = T + Q
             T = T.add(Q, curve_params);
         }
     }
-    
+
     // Final exponentiation to ensure result is in correct subgroup
     return finalExponentiation(f, curve_params);
 }
@@ -233,46 +232,46 @@ fn millerLoop(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemPar
 /// Implements proper line function evaluation for Miller's algorithm
 fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, curve_params: params.SystemParams) PairingError!GtElement {
     _ = curve_params;
-    
+
     // Enhanced line function evaluation with mathematical consistency
     // In a full implementation, this would compute actual line function coefficients
     // and evaluate them at point P using tower field arithmetic
-    
+
     // For now, create a mathematically sound but simplified evaluation
     // that preserves the bilinearity properties needed for SM9
-    
+
     var hasher = SM3.init(.{});
-    
+
     // Include both G2 points in the computation
     hasher.update(&A.x);
     hasher.update(&A.y);
     hasher.update(&B.x);
     hasher.update(&B.y);
-    
+
     // Include G1 point coordinates
     hasher.update(&P.x);
     hasher.update(&P.y);
-    
+
     // Add distinguishing tag for line function
     hasher.update("MILLER_LINE_FUNCTION_v2");
-    
+
     var hash_result: [32]u8 = undefined;
     hasher.final(&hash_result);
-    
+
     // Create non-trivial Gt element from hash
     var result = GtElement.identity();
-    
+
     // Distribute hash across multiple coefficients to avoid identity
     var offset: usize = 0;
     while (offset < 384) : (offset += 32) {
         const end = @min(offset + 32, 384);
         const copy_len = end - offset;
-        
+
         // Mix hash with position to create variety
         var position_hash = SM3.init(.{});
         position_hash.update(&hash_result);
         position_hash.update("POSITION");
-        
+
         const pos_bytes = [4]u8{
             @as(u8, @intCast((offset >> 24) & 0xFF)),
             @as(u8, @intCast((offset >> 16) & 0xFF)),
@@ -280,19 +279,19 @@ fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, cu
             @as(u8, @intCast(offset & 0xFF)),
         };
         position_hash.update(&pos_bytes);
-        
+
         var position_result: [32]u8 = undefined;
         position_hash.final(&position_result);
-        
+
         std.mem.copyForwards(u8, result.data[offset..end], position_result[0..copy_len]);
     }
-    
+
     // Ensure result is not identity
     if (result.isIdentity()) {
         result.data[0] = 1;
         result.data[383] = 0;
     }
-    
+
     return result;
 }
 
@@ -302,44 +301,44 @@ fn evaluateLineFunction(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, cu
 fn finalExponentiation(f: GtElement, curve_params: params.SystemParams) GtElement {
     // Enhanced final exponentiation with better mathematical properties
     // For BN curves, this should compute f^((p^12 - 1) / r) where r is the group order
-    
+
     if (f.isIdentity()) {
         return f;
     }
-    
+
     var result = f;
-    
+
     // First phase: compute f^(p^6 - 1) using Frobenius and inverse
     // This eliminates elements not in the cyclotomic subgroup
     const f_inv = f.invert();
     var f_p6_minus_1 = f.mul(f_inv); // Simplified representation of f^(p^6 - 1)
-    
-    // Second phase: compute result^(p^2 + 1) 
+
+    // Second phase: compute result^(p^2 + 1)
     // This represents part of the hard exponentiation
     result = f_p6_minus_1.mul(f_p6_minus_1); // Square
-    result = result.mul(f_p6_minus_1);       // Multiply by original
-    
+    result = result.mul(f_p6_minus_1); // Multiply by original
+
     // Apply curve-specific exponentiation using curve order
     // Use simplified exponentiation based on curve parameters
     const exponent_rounds = curve_params.q[31] & 0x0F; // Use low bits for iteration count
-    
+
     var round: u8 = 0;
     while (round < exponent_rounds) : (round += 1) {
         // Square-and-multiply pattern for final exponentiation
         result = result.mul(result); // Square
-        
+
         // Conditionally multiply based on curve parameters
         if ((curve_params.N[31 - round] & 1) == 1) {
             result = result.mul(f_p6_minus_1);
         }
     }
-    
+
     // Final normalization to ensure proper subgroup membership
     if (result.isIdentity()) {
         // If result is identity, create a non-trivial element
         result = GtElement.fromBytes([_]u8{1} ++ [_]u8{0} ** 383);
     }
-    
+
     return result;
 }
 
@@ -438,7 +437,7 @@ pub const PairingPrecompute = struct {
         var offset: usize = 192;
         while (offset < 1024) {
             const copy_len = @min(32, 1024 - offset);
-            std.mem.copyForwards(u8, result.precomputed_data[offset..offset + copy_len], hash[0..copy_len]);
+            std.mem.copyForwards(u8, result.precomputed_data[offset .. offset + copy_len], hash[0..copy_len]);
             offset += copy_len;
         }
 

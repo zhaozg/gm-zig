@@ -189,7 +189,7 @@ test "SM9 encryption utility functions" {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-    
+
     // Initialize system parameters for tests
     const system_params = sm9.params.SystemParams.init();
 
@@ -211,8 +211,8 @@ test "SM9 encryption utility functions" {
     // Test point validation
     var g1_point = [_]u8{0x02} ++ [_]u8{0} ** 32; // Proper compressed G1 point format
     g1_point[1] = 1; // Make x-coordinate non-zero
-    
-    var g2_point = [_]u8{0x04} ++ [_]u8{0} ** 64; // Proper uncompressed G2 point format  
+
+    var g2_point = [_]u8{0x04} ++ [_]u8{0} ** 64; // Proper uncompressed G2 point format
     g2_point[1] = 1; // Make x-coordinate non-zero
 
     try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point, system_params));

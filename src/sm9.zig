@@ -27,7 +27,6 @@
 /// const ciphertext = try context.encryptMessage(message, "bob@example.com", .{});
 /// const plaintext = try context.decryptMessage(ciphertext, user_encrypt_key, .{});
 /// ```
-
 const std = @import("std");
 
 // Export the main SM9 interface module
