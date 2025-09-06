@@ -130,10 +130,10 @@
       "path": "src/examples/",
       "description": "Zig 示例代码。"
     },
-    "todo_md": {
+    "AGENTS": {
       "type": "file",
       "path": "AGENTS.md",
-      "description": "项目的待办任务列表。"
+      "description": "AI 交互文档"
     }
   }
 }

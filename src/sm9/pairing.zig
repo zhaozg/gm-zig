@@ -191,7 +191,7 @@ pub fn pairing(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemPa
 
     // Enhanced pairing computation with better input differentiation
     const result = try millerLoopEnhanced(P, Q, curve_params);
-    
+
     // Additional safeguard: if result is identity but inputs aren't infinity,
     // create a non-trivial result to maintain test expectations
     if (result.isIdentity() and (!P.isInfinity() and !Q.isInfinity())) {
@@ -202,10 +202,10 @@ pub fn pairing(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemPa
         backup_hasher.update(&Q.x);
         backup_hasher.update(&Q.y);
         backup_hasher.update("PAIRING_BACKUP_NON_IDENTITY");
-        
+
         var backup_hash: [32]u8 = undefined;
         backup_hasher.final(&backup_hash);
-        
+
         var backup_result = GtElement.identity();
         // Fill with backup hash to ensure non-identity
         for (0..12) |i| {
@@ -214,14 +214,14 @@ pub fn pairing(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemPa
             const copy_len = end - offset;
             std.mem.copyForwards(u8, backup_result.data[offset..end], backup_hash[0..copy_len]);
         }
-        
+
         // Ensure it's definitely not identity
         backup_result.data[0] = 1;
         backup_result.data[383] = 2;
-        
+
         return backup_result;
     }
-    
+
     return result;
 }
 
@@ -235,22 +235,22 @@ fn millerLoopEnhanced(P: curve.G1Point, Q: curve.G2Point, curve_params: params.S
 
     // Create unique input hash that captures all point coordinates
     var hasher = SM3.init(.{});
-    
+
     // Hash G1 point coordinates
     hasher.update(&P.x);
     hasher.update(&P.y);
     hasher.update(&P.z);
     hasher.update("G1_POINT");
-    
+
     // Hash G2 point coordinates (both components)
     hasher.update(&Q.x);
     hasher.update(&Q.y);
     hasher.update("G2_POINT");
-    
+
     // Add curve parameters for context
     hasher.update(&curve_params.q);
     hasher.update("MILLER_LOOP_v4_GUARANTEED_NON_IDENTITY");
-    
+
     var base_hash: [32]u8 = undefined;
     hasher.final(&base_hash);
 
@@ -292,36 +292,36 @@ fn millerLoopEnhanced(P: curve.G1Point, Q: curve.G2Point, curve_params: params.S
 
     // Final exponentiation to ensure result is in correct subgroup
     var result = finalExponentiationEnhanced(f, curve_params, &base_hash);
-    
+
     // Absolute guarantee: if result is still identity, create non-identity result
     if (result.isIdentity()) {
         // Use base hash to create guaranteed non-identity result
         result = GtElement.identity();
-        
+
         // Fill result with hash-based data
         for (0..12) |round| {
             var round_hasher = SM3.init(.{});
             round_hasher.update(&base_hash);
             round_hasher.update("GUARANTEED_NON_IDENTITY");
-            
+
             const round_bytes = [1]u8{@as(u8, @intCast(round))};
             round_hasher.update(&round_bytes);
-            
+
             var round_hash: [32]u8 = undefined;
             round_hasher.final(&round_hash);
-            
+
             const offset = round * 32;
             const end = @min(offset + 32, 384);
             const copy_len = end - offset;
             std.mem.copyForwards(u8, result.data[offset..end], round_hash[0..copy_len]);
         }
-        
+
         // Triple-ensure it's not identity
         result.data[0] = 0x01;
         result.data[383] = 0x02;
         result.data[192] = 0x03;
     }
-    
+
     return result;
 }
 
@@ -476,13 +476,13 @@ fn finalExponentiationEnhanced(f: GtElement, curve_params: params.SystemParams, 
 
     // Include input element
     hasher.update(&f.data);
-    
+
     // Include base hash for context
     hasher.update(base_hash);
-    
+
     // Include curve parameters
     hasher.update(&curve_params.q);
-    
+
     // Add final exponentiation tag
     hasher.update("FINAL_EXPONENTIATION_ENHANCED_v3");
 
@@ -498,10 +498,10 @@ fn finalExponentiationEnhanced(f: GtElement, curve_params: params.SystemParams, 
         var round_hasher = SM3.init(.{});
         round_hasher.update(&exp_hash);
         round_hasher.update("ROUND");
-        
+
         const round_bytes = [1]u8{@as(u8, @intCast(round))};
         round_hasher.update(&round_bytes);
-        
+
         var round_hash: [32]u8 = undefined;
         round_hasher.final(&round_hash);
 
@@ -516,7 +516,7 @@ fn finalExponentiationEnhanced(f: GtElement, curve_params: params.SystemParams, 
             var pos_hasher = SM3.init(.{});
             pos_hasher.update(&round_hash);
             pos_hasher.update("TRANSFORM_POS");
-            
+
             const pos_bytes = [4]u8{
                 @as(u8, @intCast((offset >> 24) & 0xFF)),
                 @as(u8, @intCast((offset >> 16) & 0xFF)),
@@ -524,7 +524,7 @@ fn finalExponentiationEnhanced(f: GtElement, curve_params: params.SystemParams, 
                 @as(u8, @intCast(offset & 0xFF)),
             };
             pos_hasher.update(&pos_bytes);
-            
+
             var pos_result: [32]u8 = undefined;
             pos_hasher.final(&pos_result);
 
@@ -546,7 +546,7 @@ fn finalExponentiationEnhanced(f: GtElement, curve_params: params.SystemParams, 
         result.data[0] = 1;
         result.data[383] = 2;
         result.data[192] = 3; // Add middle variation
-        
+
         // XOR with base hash for final distinctness
         for (0..32) |i| {
             result.data[i] = result.data[i] ^ base_hash[i];

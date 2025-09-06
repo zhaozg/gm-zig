@@ -150,11 +150,11 @@ pub const G1Point = struct {
         // For production use, we need the field parameters, but to avoid circular dependency,
         // we'll use a conservative approach for point decompression in this case
         // This is a safe fallback that creates valid points for testing
-        
+
         // Use simplified y-coordinate derivation to avoid circular dependency
         // In a production system, this should use proper square root calculation
         var y = x; // Start with x as base
-        
+
         // Apply compression bit to create different y values
         if (compressed[0] == 0x03) {
             // Flip some bits to create a different valid-looking y coordinate
@@ -275,30 +275,30 @@ pub const G1Point = struct {
     /// Scalar multiplication: k * P for G1 points (simplified for testing)
     pub fn mul(self: G1Point, scalar: [32]u8, curve_params: params.SystemParams) G1Point {
         _ = curve_params; // Temporarily unused to avoid complex operations
-        
+
         if (self.isInfinity() or bigint.isZero(scalar)) {
             return G1Point.infinity();
         }
 
         // For testing purposes, use a simplified approach that avoids complex bigint operations
         // This prevents infinite loops while still providing a working implementation
-        
+
         // Check for scalar = 0 or 1 cases
         const zero = [_]u8{0} ** 32;
         const one = [_]u8{0} ** 31 ++ [_]u8{1};
-        
+
         if (bigint.equal(scalar, zero)) {
             return G1Point.infinity();
         }
-        
+
         if (bigint.equal(scalar, one)) {
             return self;
         }
-        
+
         // For small scalars (2, 3, etc.), use simple addition
         const two = [_]u8{0} ** 31 ++ [_]u8{2};
         const three = [_]u8{0} ** 31 ++ [_]u8{3};
-        
+
         if (bigint.equal(scalar, two)) {
             // k=2: return 2*P
             // Use a simplified doubling that doesn't use complex field operations
@@ -306,23 +306,23 @@ pub const G1Point = struct {
             result.x[31] = result.x[31] ^ 0x01; // Simple transformation for testing
             return result;
         }
-        
+
         if (bigint.equal(scalar, three)) {
-            // k=3: return 3*P 
+            // k=3: return 3*P
             // Use a simplified transformation
             var result = self;
             result.x[31] = result.x[31] ^ 0x02; // Different transformation for k=3
             result.y[31] = result.y[31] ^ 0x01;
             return result;
         }
-        
+
         // For larger scalars, return a deterministic but simplified result
         // This prevents infinite loops during testing while maintaining test validity
         var result = self;
         // Create a pseudo-multiplication result based on scalar and point
         result.x[30] = result.x[30] ^ scalar[31];
         result.y[30] = result.y[30] ^ scalar[30];
-        
+
         return result;
     }
 
@@ -396,7 +396,7 @@ pub const G1Point = struct {
         if (bigint.equal(self.x, curve_params.q) or bigint.equal(self.y, curve_params.q)) {
             return false; // Coordinates == q are definitely invalid
         }
-        
+
         // For very large coordinates, use strict field membership
         if (bigint.lessThan(curve_params.q, self.x) or bigint.lessThan(curve_params.q, self.y)) {
             return false; // Coordinates > q are invalid
@@ -650,12 +650,12 @@ pub const G2Point = struct {
         // Perform a deterministic transformation that's guaranteed to be different
         // Use rotation and XOR for better distribution
         var temp: u64 = 0;
-        
+
         // Transform x coordinate
         for (0..64) |i| {
             temp = temp +% (@as(u64, self.x[i]) * (i + 1));
         }
-        
+
         // Write transformed value back to x coordinate
         for (0..64) |i| {
             result.x[i] = @as(u8, @intCast((temp +% i) & 0xFF));
@@ -667,7 +667,7 @@ pub const G2Point = struct {
         for (0..64) |i| {
             temp = temp +% (@as(u64, self.y[i]) * (64 - i));
         }
-        
+
         for (0..64) |i| {
             result.y[i] = @as(u8, @intCast((temp +% (i * 7)) & 0xFF));
             temp = temp >> 1;
@@ -719,50 +719,50 @@ pub const G2Point = struct {
     /// Scalar multiplication: k * P for G2 points (simplified for testing)
     pub fn mul(self: G2Point, scalar: [32]u8, curve_params: params.SystemParams) G2Point {
         _ = curve_params; // Temporarily unused to avoid complex operations
-        
+
         if (self.isInfinity() or bigint.isZero(scalar)) {
             return G2Point.infinity();
         }
 
         // For testing purposes, use a simplified approach that avoids complex bigint operations
         // This prevents infinite loops while still providing a working implementation
-        
+
         // Check for scalar = 0 or 1 cases
         const zero = [_]u8{0} ** 32;
         const one = [_]u8{0} ** 31 ++ [_]u8{1};
-        
+
         if (bigint.equal(scalar, zero)) {
             return G2Point.infinity();
         }
-        
+
         if (bigint.equal(scalar, one)) {
             return self;
         }
-        
+
         // For small scalars (2, 3, etc.), use simple transformations
         const two = [_]u8{0} ** 31 ++ [_]u8{2};
         const three = [_]u8{0} ** 31 ++ [_]u8{3};
-        
+
         if (bigint.equal(scalar, two)) {
             // k=2: return 2*P
             var result = self;
-            result.x[31] = result.x[31] ^ 0x01; 
+            result.x[31] = result.x[31] ^ 0x01;
             return result;
         }
-        
+
         if (bigint.equal(scalar, three)) {
-            // k=3: return 3*P 
+            // k=3: return 3*P
             var result = self;
-            result.x[31] = result.x[31] ^ 0x02; 
+            result.x[31] = result.x[31] ^ 0x02;
             result.y[31] = result.y[31] ^ 0x01;
             return result;
         }
-        
+
         // For larger scalars, return a deterministic but simplified result
         var result = self;
         result.x[30] = result.x[30] ^ scalar[31];
         result.y[30] = result.y[30] ^ scalar[30];
-        
+
         return result;
     }
 
@@ -985,7 +985,7 @@ pub const CurveUtils = struct {
         // Accept coordinates that are valid field elements or have reasonable test structure
         const x_has_structure = point.x[0] <= 0x04 or bigint.isZero(point.x) or !bigint.isZero(point.x);
         const y_has_structure = point.y[0] <= 0x04 or bigint.isZero(point.y) or !bigint.isZero(point.y);
-        
+
         if (!x_has_structure or !y_has_structure) return false;
 
         // Enhanced curve equation validation with boundary tolerance
@@ -1036,7 +1036,7 @@ pub const CurveUtils = struct {
         // Enhanced coordinate validation for Fp2 elements (64-byte coordinates)
         // Accept mathematical boundary conditions for test scenarios
         var has_reasonable_coords = false;
-        
+
         // Check if coordinates are reasonable (not all zeros, has some structure)
         for (point.x) |byte| {
             if (byte != 0 and byte <= 0x10) {
@@ -1050,7 +1050,7 @@ pub const CurveUtils = struct {
                 break;
             }
         }
-        
+
         // Accept points with reasonable structure or standard validation
         return point.validate(curve_params) or has_reasonable_coords;
     }
@@ -1068,34 +1068,34 @@ pub const CurveUtils = struct {
 
         // Use simplified but stable approach to avoid infinite loops
         var result = G1Point.infinity();
-        
+
         // Calculate a simple hash-based result that's deterministic but avoids infinite loops
         var hash_input: [64]u8 = undefined; // 32 bytes for point + 32 bytes for scalar
         @memcpy(hash_input[0..32], &point.x);
         @memcpy(hash_input[32..64], &scalar);
-        
+
         // Use SM3 hash to create deterministic result
         var hasher = SM3.init(.{});
         hasher.update(&hash_input);
-        
+
         var hash_result: [32]u8 = undefined;
         hasher.final(&hash_result);
-        
+
         // Reduce hash results modulo q to ensure they're valid field elements
         result.x = bigint.mod(hash_result, curve_params.q) catch hash_result;
-        
+
         // Create different y coordinate by XORing with scalar
         var y_input: [32]u8 = undefined;
         for (0..32) |i| {
             y_input[i] = hash_result[i] ^ scalar[i];
         }
         result.y = bigint.mod(y_input, curve_params.q) catch y_input;
-        
+
         // Set Z to 1 for affine coordinates
         result.z = [_]u8{0} ** 32;
         result.z[31] = 1;
         result.is_infinity = false;
-        
+
         return result;
     }
 
@@ -1113,19 +1113,19 @@ pub const CurveUtils = struct {
         // Use a much simpler but stable approach
         // Instead of complex double-and-add, use direct scalar-based transformation
         var result = G2Point.infinity();
-        
+
         // Calculate a simple hash-based result that's deterministic but avoids infinite loops
         var hash_input: [96]u8 = undefined; // 64 bytes for point + 32 bytes for scalar
         @memcpy(hash_input[0..64], &point.x);
         @memcpy(hash_input[64..96], &scalar);
-        
+
         // Use SM3 hash to create deterministic result
         var hasher = SM3.init(.{});
         hasher.update(&hash_input);
-        
+
         var hash_result: [32]u8 = undefined;
         hasher.final(&hash_result);
-        
+
         // Create result point from hash, ensuring coordinates are in field
         // For G2, we need 64-byte coordinates (Fp2 elements)
         const x1_reduced = bigint.mod(hash_result, curve_params.q) catch hash_result;
@@ -1134,30 +1134,30 @@ pub const CurveUtils = struct {
             x2_input[i] = hash_result[i] ^ scalar[i];
         }
         const x2_reduced = bigint.mod(x2_input, curve_params.q) catch x2_input;
-        
+
         var y1_input: [32]u8 = undefined;
         for (0..32) |i| {
             y1_input[i] = hash_result[i] ^ 0xAA;
         }
         const y1_reduced = bigint.mod(y1_input, curve_params.q) catch y1_input;
-        
+
         var y2_input: [32]u8 = undefined;
         for (0..32) |i| {
             y2_input[i] = hash_result[i] ^ 0x55;
         }
         const y2_reduced = bigint.mod(y2_input, curve_params.q) catch y2_input;
-        
+
         // Copy reduced coordinates to result
         @memcpy(result.x[0..32], &x1_reduced);
         @memcpy(result.x[32..64], &x2_reduced);
         @memcpy(result.y[0..32], &y1_reduced);
         @memcpy(result.y[32..64], &y2_reduced);
-        
+
         // Set z to non-zero for proper point representation
         result.z = [_]u8{0} ** 64;
         result.z[63] = 1; // Set z = (1, 0) in Fp2
         result.is_infinity = false;
-        
+
         return result;
     }
 

@@ -84,16 +84,16 @@ pub fn safeMod(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!bigint.Big
 fn conservativeMod(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!bigint.BigInt {
     // For cases where normal mod fails, use a different strategy
     // This might not be mathematically optimal but guarantees termination
-    
+
     // Check if modulus is one of the known SM9 parameters
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
     const sm9_n = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
-    
+
     if (bigint.equal(m, sm9_q) or bigint.equal(m, sm9_n)) {
         // For known SM9 parameters, use bit-shifting approach
         return bitwiseMod(a, m);
     }
-    
+
     // Fallback: if all else fails, return a safe value that won't cause infinite loops
     return bigint.BigIntError.InvalidModulus;
 }
@@ -101,10 +101,10 @@ fn conservativeMod(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!bigint
 /// Bitwise modular reduction (slower but guaranteed to terminate)
 fn bitwiseMod(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!bigint.BigInt {
     if (bigint.lessThan(a, m)) return a;
-    
+
     // Use binary long division approach
     var remainder = a;
-    
+
     // Process from most significant bit
     var bit_pos: i32 = 255; // Start from MSB
     while (bit_pos >= 0) : (bit_pos -= 1) {
@@ -116,11 +116,11 @@ fn bitwiseMod(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!bigint.BigI
                 remainder = sub_result.result;
             }
         }
-        
+
         // Early termination if remainder is smaller than modulus
         if (bigint.lessThan(remainder, m)) break;
     }
-    
+
     return remainder;
 }
 
@@ -152,7 +152,7 @@ fn safeFermatsInverse(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!big
     // For prime p, a^(-1) ≡ a^(p-2) (mod p)
     // Compute exponent = m - 2
     var exp = m;
-    
+
     // Safely subtract 2
     if (exp[31] >= 2) {
         exp[31] -= 2;
@@ -169,7 +169,7 @@ fn safeFermatsInverse(a: bigint.BigInt, m: bigint.BigInt) bigint.BigIntError!big
             }
         }
     }
-    
+
     // Use safe modular exponentiation
     return safeModPow(a, exp, m);
 }
@@ -200,7 +200,7 @@ fn safeModPow(base: bigint.BigInt, exp: bigint.BigInt, m: bigint.BigInt) bigint.
 
         // Square the base for the next bit
         base_power = safeMulMod(base_power, base_power, m) catch return bigint.BigIntError.NotInvertible;
-        
+
         // Early exit if base_power becomes 1 (optimization)
         if (bigint.equal(base_power, one)) break;
     }

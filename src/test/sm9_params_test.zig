@@ -88,7 +88,7 @@ test "SM9 master key pair fromPrivateKey correctness" {
 
     // 公钥一致性 - temporarily skip G2 scalar multiplication that hangs
     // try testing.expectEqualSlices(u8, &sign_from.public_key, &curve.CurveUtils.scalarMultiplyG2(try curve.G2Point.fromUncompressed(system_params.P2), private_key, system_params).compress());
-    
+
     // Test G1 scalar multiplication
     try testing.expectEqualSlices(u8, &encrypt_from.public_key, &curve.CurveUtils.scalarMultiplyG1(try curve.G1Point.fromCompressed(system_params.P1), private_key, system_params).compress());
 

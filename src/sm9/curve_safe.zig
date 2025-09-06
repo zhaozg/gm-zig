@@ -12,7 +12,7 @@ pub fn safeScalarMul(point: curve.G1Point, scalar: [32]u8, curve_params: params.
     if (bigint.isZero(scalar)) {
         return curve.G1Point.infinity();
     }
-    
+
     if (point.isInfinity()) {
         return curve.G1Point.infinity();
     }
@@ -24,14 +24,14 @@ pub fn safeScalarMul(point: curve.G1Point, scalar: [32]u8, curve_params: params.
     var bit_pos: u32 = 0;
     var consecutive_zero_bits: u32 = 0;
     const max_consecutive_zeros: u32 = 64; // Early termination if we see too many zeros
-    
+
     while (bit_pos < 256) : (bit_pos += 1) {
         const byte_idx = (255 - bit_pos) / 8;
         const bit_shift = @as(u3, @intCast((255 - bit_pos) % 8));
-        
+
         // Extract the bit
         const bit = (scalar[byte_idx] >> bit_shift) & 1;
-        
+
         // Track consecutive zero bits for early termination
         if (bit == 0) {
             consecutive_zero_bits += 1;
@@ -151,33 +151,33 @@ pub fn safePointAdd(p1: curve.G1Point, p2: curve.G1Point, curve_params: params.S
 /// Safe affine conversion with timeout protection
 fn safeToAffine(point: curve.G1Point, curve_params: params.SystemParams) curve.G1Point {
     if (point.isInfinity()) return point;
-    
+
     // Check if already affine (z = 1)
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
     if (bigint.equal(point.z, one)) {
         return point;
     }
-    
+
     // For projective to affine conversion: (x/z, y/z)
-    // But to avoid complex inverse calculations that might loop, 
+    // But to avoid complex inverse calculations that might loop,
     // we'll use a simplified approach for safety
-    
+
     // If z is close to 1, assume it's essentially affine
     const field_p = curve_params.q;
-    
+
     // Try to compute z^(-1) safely
     const z_inv = bigint_safe.safeInvMod(point.z, field_p) catch {
         // If inversion fails, return a safe fallback
         // In practice, this means treating the point as if it's already normalized
         return curve.G1Point.affine(point.x, point.y);
     };
-    
+
     // Compute x_affine = x * z^(-1) mod p
     const x_affine = bigint_safe.safeMulMod(point.x, z_inv, field_p) catch point.x;
-    
-    // Compute y_affine = y * z^(-1) mod p  
+
+    // Compute y_affine = y * z^(-1) mod p
     const y_affine = bigint_safe.safeMulMod(point.y, z_inv, field_p) catch point.y;
-    
+
     return curve.G1Point.affine(x_affine, y_affine);
 }
 
@@ -212,7 +212,7 @@ pub fn safeFromCompressed(compressed: [33]u8, curve_params: params.SystemParams)
     // For safety, use a simplified y-coordinate derivation that avoids
     // complex square root operations that might cause infinite loops
     var y = x; // Start with x as base
-    
+
     // Apply compression bit to create different y values
     if (compressed[0] == 0x03) {
         // Flip some bits to create a different valid-looking y coordinate

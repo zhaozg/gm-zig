@@ -3,23 +3,16 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 Pairing Operations - Gt Element Basic Operations" {
-    std.debug.print("\n=== Starting SM9 Pairing Test ===\n", .{});
 
     // Test identity element
-    std.debug.print("Creating identity element...\n", .{});
     const identity = sm9.pairing.GtElement.identity();
-    std.debug.print("Testing identity check...\n", .{});
     try testing.expect(identity.isIdentity());
-    std.debug.print("Identity element test passed\n", .{});
 
     // Test non-identity element
-    std.debug.print("Creating random element...\n", .{});
     const random_elem = sm9.pairing.GtElement.random("test_seed");
-    std.debug.print("Random element created successfully\n", .{});
     try testing.expect(!random_elem.isIdentity());
 
     // Test multiplication
-    std.debug.print("Testing multiplication...\n", .{});
     const product = identity.mul(random_elem);
     // Multiplying by identity should return the other element
     // Note: This depends on proper implementation details
@@ -50,7 +43,7 @@ test "SM9 Pairing Operations - Gt Element Exponentiation" {
     const small_exp = [_]u8{0} ** 31 ++ [_]u8{3};
     const result_small = base.pow(small_exp);
     try testing.expect(!result_small.isIdentity());
-    
+
     // Enhanced validation: accept that small exponent results may equal base in simplified implementations
     const small_valid = !result_small.equal(base) or result_small.equal(base);
     try testing.expect(small_valid);
@@ -342,11 +335,11 @@ test "SM9 Pairing Operations - Error Handling and Edge Cases" {
     const small_x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
     const small_y1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
     const small_P = sm9.curve.G1Point.affine(small_x1, small_y1);
-    
+
     const small_x2 = [_]u8{0x01} ++ [_]u8{0} ** 63;
     const small_y2 = [_]u8{0x01} ++ [_]u8{0} ** 63;
     const small_Q = sm9.curve.G2Point.affine(small_x2, small_y2);
-    
+
     // Should not error even with small coordinates
     const small_result = try sm9.pairing.pairing(small_P, small_Q, params);
     _ = small_result; // Accept any result for edge case tolerance

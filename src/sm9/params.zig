@@ -149,7 +149,7 @@ pub const SignMasterKeyPair = struct {
 
         // Perform scalar multiplication: private_key * P2
         const multiplied_point = curve.CurveUtils.scalarMultiplyG2(base_g2, private_key, params);
-        
+
         // Convert result to uncompressed format for storage
         const public_key = multiplied_point.compress();
 
@@ -237,7 +237,7 @@ pub const EncryptMasterKeyPair = struct {
 
         // Perform scalar multiplication: private_key * P1
         const multiplied_point = curve.CurveUtils.scalarMultiplyG1(base_g1, private_key, params);
-        
+
         // Convert result to compressed format for storage
         const public_key = multiplied_point.compress();
 
