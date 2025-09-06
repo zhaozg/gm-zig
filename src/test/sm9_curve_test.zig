@@ -3,50 +3,83 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 Curve Operations - G1 Point Creation and Validation" {
+    std.debug.print("Starting test: SM9 Curve Operations - G1 Point Creation and Validation\n", .{});
+    
+    std.debug.print("About to call SystemParams.init()...\n", .{});
     const params = sm9.params.SystemParams.init();
+    std.debug.print("SystemParams.init() completed successfully\n", .{});
 
     // Test point at infinity
+    std.debug.print("About to create infinity point...\n", .{});
     const infinity = sm9.curve.G1Point.infinity();
+    std.debug.print("Infinity point created\n", .{});
+    
+    std.debug.print("About to test infinity.isInfinity()...\n", .{});
     try testing.expect(infinity.isInfinity());
+    std.debug.print("infinity.isInfinity() test passed\n", .{});
+    
+    std.debug.print("About to test infinity.validate(params)...\n", .{});
     try testing.expect(infinity.validate(params));
+    std.debug.print("infinity.validate(params) test passed\n", .{});
 
     // Test affine point creation
+    std.debug.print("About to create affine point...\n", .{});
     const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
     const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
     const point = sm9.curve.G1Point.affine(x, y);
+    std.debug.print("Affine point created\n", .{});
 
+    std.debug.print("About to test !point.isInfinity()...\n", .{});
     try testing.expect(!point.isInfinity());
+    std.debug.print("!point.isInfinity() test passed\n", .{});
+    
     // Note: Point validation might not pass for arbitrary coordinates
     // but the structure should be valid
+    std.debug.print("About to test point.validate(params)...\n", .{});
     _ = point.validate(params);
+    std.debug.print("point.validate(params) completed\n", .{});
+    
+    std.debug.print("Test completed successfully\n", .{});
 }
 
 test "SM9 Curve Operations - G1 Point Compression" {
+    std.debug.print("Starting test: SM9 Curve Operations - G1 Point Compression\n", .{});
+    
     const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
     const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    std.debug.print("About to create affine point...\n", .{});
     const point = sm9.curve.G1Point.affine(x, y);
+    std.debug.print("Affine point created\n", .{});
 
     // Test compression
+    std.debug.print("About to call point.compress()...\n", .{});
     const compressed = point.compress();
+    std.debug.print("Point compression completed\n", .{});
+    
     try testing.expect(compressed.len == 33);
     try testing.expect(compressed[0] == 0x02 or compressed[0] == 0x03);
 
     // Test decompression
+    std.debug.print("About to call fromCompressed...\n", .{});
     const decomp_point = sm9.curve.G1Point.fromCompressed(compressed) catch |err| {
         std.debug.print("Point decompression failed: {}\n", .{err});
         return err;
     };
+    std.debug.print("Point decompression completed\n", .{});
 
     // X coordinates should match
     try testing.expect(sm9.bigint.equal(point.x, decomp_point.x));
 
     // Test infinity compression
+    std.debug.print("About to test infinity compression...\n", .{});
     const infinity = sm9.curve.G1Point.infinity();
     const inf_compressed = infinity.compress();
     try testing.expect(inf_compressed[0] == 0x00);
 
     const inf_decompressed = try sm9.curve.G1Point.fromCompressed(inf_compressed);
     try testing.expect(inf_decompressed.isInfinity());
+    
+    std.debug.print("Test completed successfully\n", .{});
 }
 
 test "SM9 Curve Operations - G1 Point Arithmetic" {
