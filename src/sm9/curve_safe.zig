@@ -2,7 +2,7 @@
 /// This module provides enhanced versions of curve operations with guaranteed termination
 const std = @import("std");
 const bigint = @import("bigint.zig");
-const bigint_safe = @import("bigint_safe.zig");
+const bigint_unified = @import("bigint_unified.zig");
 const params = @import("params.zig");
 const curve = @import("curve.zig");
 
@@ -67,30 +67,30 @@ pub fn safePointDouble(point: curve.G1Point, curve_params: params.SystemParams) 
     const field_p = curve_params.q;
 
     // Compute 3*x^2 mod p
-    const x_squared = bigint_safe.safeMulMod(affine_pt.x, affine_pt.x, field_p) catch return curve.G1Point.infinity();
-    var three_x_squared = bigint_safe.safeAddMod(x_squared, x_squared, field_p) catch return curve.G1Point.infinity();
-    three_x_squared = bigint_safe.safeAddMod(three_x_squared, x_squared, field_p) catch return curve.G1Point.infinity();
+    const x_squared = bigint_unified.safeMulMod(affine_pt.x, affine_pt.x, field_p) catch return curve.G1Point.infinity();
+    var three_x_squared = bigint_unified.safeAddMod(x_squared, x_squared, field_p) catch return curve.G1Point.infinity();
+    three_x_squared = bigint_unified.safeAddMod(three_x_squared, x_squared, field_p) catch return curve.G1Point.infinity();
 
     // Compute 2*y mod p
-    const two_y = bigint_safe.safeAddMod(affine_pt.y, affine_pt.y, field_p) catch return curve.G1Point.infinity();
+    const two_y = bigint_unified.safeAddMod(affine_pt.y, affine_pt.y, field_p) catch return curve.G1Point.infinity();
 
     // Compute modular inverse of 2*y
-    const inv_two_y = bigint_safe.safeInvMod(two_y, field_p) catch {
+    const inv_two_y = bigint_unified.safeInvMod(two_y, field_p) catch {
         // If modular inverse fails, return point at infinity (safe fallback)
         return curve.G1Point.infinity();
     };
 
     // Compute slope = (3*x^2) / (2*y) mod p
-    const slope = bigint_safe.safeMulMod(three_x_squared, inv_two_y, field_p) catch return curve.G1Point.infinity();
+    const slope = bigint_unified.safeMulMod(three_x_squared, inv_two_y, field_p) catch return curve.G1Point.infinity();
 
     // Compute x3 = slope^2 - 2*x mod p
-    const slope_squared = bigint_safe.safeMulMod(slope, slope, field_p) catch return curve.G1Point.infinity();
-    const two_x = bigint_safe.safeAddMod(affine_pt.x, affine_pt.x, field_p) catch return curve.G1Point.infinity();
+    const slope_squared = bigint_unified.safeMulMod(slope, slope, field_p) catch return curve.G1Point.infinity();
+    const two_x = bigint_unified.safeAddMod(affine_pt.x, affine_pt.x, field_p) catch return curve.G1Point.infinity();
     const result_x = bigint.subMod(slope_squared, two_x, field_p) catch return curve.G1Point.infinity();
 
     // Compute y3 = slope*(x - x3) - y mod p
     const x_diff = bigint.subMod(affine_pt.x, result_x, field_p) catch return curve.G1Point.infinity();
-    const slope_x_diff = bigint_safe.safeMulMod(slope, x_diff, field_p) catch return curve.G1Point.infinity();
+    const slope_x_diff = bigint_unified.safeMulMod(slope, x_diff, field_p) catch return curve.G1Point.infinity();
     const result_y = bigint.subMod(slope_x_diff, affine_pt.y, field_p) catch return curve.G1Point.infinity();
 
     return curve.G1Point.affine(result_x, result_y);
@@ -127,22 +127,22 @@ pub fn safePointAdd(p1: curve.G1Point, p2: curve.G1Point, curve_params: params.S
     const x_diff = bigint.subMod(pt2.x, pt1.x, field_p) catch return curve.G1Point.infinity();
 
     // Compute modular inverse of (x2 - x1)
-    const inv_x_diff = bigint_safe.safeInvMod(x_diff, field_p) catch {
+    const inv_x_diff = bigint_unified.safeInvMod(x_diff, field_p) catch {
         // If modular inverse fails, return point at infinity (safe fallback)
         return curve.G1Point.infinity();
     };
 
     // Compute slope = (y2 - y1) / (x2 - x1) mod p
-    const slope = bigint_safe.safeMulMod(y_diff, inv_x_diff, field_p) catch return curve.G1Point.infinity();
+    const slope = bigint_unified.safeMulMod(y_diff, inv_x_diff, field_p) catch return curve.G1Point.infinity();
 
     // Compute x3 = slope^2 - x1 - x2 mod p
-    const slope_squared = bigint_safe.safeMulMod(slope, slope, field_p) catch return curve.G1Point.infinity();
+    const slope_squared = bigint_unified.safeMulMod(slope, slope, field_p) catch return curve.G1Point.infinity();
     const temp = bigint.subMod(slope_squared, pt1.x, field_p) catch return curve.G1Point.infinity();
     const result_x = bigint.subMod(temp, pt2.x, field_p) catch return curve.G1Point.infinity();
 
     // Compute y3 = slope*(x1 - x3) - y1 mod p
     const x1_minus_x3 = bigint.subMod(pt1.x, result_x, field_p) catch return curve.G1Point.infinity();
-    const slope_times_diff = bigint_safe.safeMulMod(slope, x1_minus_x3, field_p) catch return curve.G1Point.infinity();
+    const slope_times_diff = bigint_unified.safeMulMod(slope, x1_minus_x3, field_p) catch return curve.G1Point.infinity();
     const result_y = bigint.subMod(slope_times_diff, pt1.y, field_p) catch return curve.G1Point.infinity();
 
     return curve.G1Point.affine(result_x, result_y);
@@ -166,17 +166,17 @@ fn safeToAffine(point: curve.G1Point, curve_params: params.SystemParams) curve.G
     const field_p = curve_params.q;
 
     // Try to compute z^(-1) safely
-    const z_inv = bigint_safe.safeInvMod(point.z, field_p) catch {
+    const z_inv = bigint_unified.safeInvMod(point.z, field_p) catch {
         // If inversion fails, return a safe fallback
         // In practice, this means treating the point as if it's already normalized
         return curve.G1Point.affine(point.x, point.y);
     };
 
     // Compute x_affine = x * z^(-1) mod p
-    const x_affine = bigint_safe.safeMulMod(point.x, z_inv, field_p) catch point.x;
+    const x_affine = bigint_unified.safeMulMod(point.x, z_inv, field_p) catch point.x;
 
     // Compute y_affine = y * z^(-1) mod p
-    const y_affine = bigint_safe.safeMulMod(point.y, z_inv, field_p) catch point.y;
+    const y_affine = bigint_unified.safeMulMod(point.y, z_inv, field_p) catch point.y;
 
     return curve.G1Point.affine(x_affine, y_affine);
 }
