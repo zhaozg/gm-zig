@@ -25,7 +25,9 @@ jobs:
       run: zig version
 
     - name: Run tests
-      run: zig test src/test.zig
+      run: |
+        zig test src/test.zig
+        zig test src/testsm9.zig
 
     - name: Build project
       run: zig build
