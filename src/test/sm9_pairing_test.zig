@@ -3,15 +3,23 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 Pairing Operations - Gt Element Basic Operations" {
+    std.debug.print("\n=== Starting SM9 Pairing Test ===\n", .{});
+    
     // Test identity element
+    std.debug.print("Creating identity element...\n", .{});
     const identity = sm9.pairing.GtElement.identity();
+    std.debug.print("Testing identity check...\n", .{});
     try testing.expect(identity.isIdentity());
+    std.debug.print("Identity element test passed\n", .{});
 
     // Test non-identity element
+    std.debug.print("Creating random element...\n", .{});
     const random_elem = sm9.pairing.GtElement.random("test_seed");
+    std.debug.print("Random element created successfully\n", .{});
     try testing.expect(!random_elem.isIdentity());
 
     // Test multiplication
+    std.debug.print("Testing multiplication...\n", .{});
     const product = identity.mul(random_elem);
     // Multiplying by identity should return the other element
     // Note: This depends on proper implementation details
