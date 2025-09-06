@@ -1,41 +1,30 @@
 test {
-    // Add SM9 tests - some have infinite loop issues that need to be addressed
-    // _ = @import("test/sm9_field_test.zig"); // ✓ Working - 10 tests
-    // TEMPORARILY DISABLE sm9_curve_test while debugging
-    _ = @import("test/sm9_curve_test.zig"); // ✓ Working - 9 additional tests, but hanging
-    //
-    // // Test if our params.zig fixes resolved the mod test hanging
-    // _ = @import("test/sm9_mod_test.zig"); // TEST: Re-enable after params fixes
-
-    // Tests with infinite loop issues that need more investigation:
-    // These tests hang due to infinite loops in core SM9 algorithms that occur when
-    // attempting to initialize contexts or perform key extraction operations.
-    // The infinite loops appear to be in modular exponentiation or key generation logic.
-
-    // SM9 Tests currently DISABLED due to infinite loops:
-    // PROGRESS: After bigint fixes, sm9_mod_test progresses further but still hangs at test 89/102
-    // _ = @import("test/sm9_params_test.zig"); // Hangs on test 91/102 - encryption master key generation
-    // _ = @import("test/sm9_key_extract_test.zig"); // Hangs on test 89/100 - signature key extraction
-    // _ = @import("test/sm9_sign_test.zig"); // Hangs on test 91/101 - signature context
-    // _ = @import("test/sm9_pairing_test.zig"); // Hangs on test 92/107 - pairing operations
-    // _ = @import("test/sm9_encrypt_test.zig");
-    // _ = @import("test/sm9_implementation_test.zig");
-    // _ = @import("test/sm9_security_test.zig");
-    // _ = @import("test/sm9_standard_vectors_test.zig");
-    // _ = @import("test/sm9_standard_compliance_test.zig");
-    // _ = @import("test/sm9_random_test.zig");
-    // _ = @import("test/sm9_robustness_test.zig");
-    // _ = @import("test/sm9_key_agreement_test.zig");
-    //
-    // // Tests that may depend on problematic core functions - test individually:
-    // _ = @import("test/sm9_sign_test.zig");
-    // _ = @import("test/sm9_encrypt_test.zig");
-    // _ = @import("test/sm9_implementation_test.zig");
-    // _ = @import("test/sm9_security_test.zig");
-    // _ = @import("test/sm9_standard_vectors_test.zig");
-    // _ = @import("test/sm9_standard_compliance_test.zig");
-    // _ = @import("test/sm9_random_test.zig");
-    // _ = @import("test/sm9_pairing_test.zig");
-    // _ = @import("test/sm9_robustness_test.zig");
-    // _ = @import("test/sm9_key_agreement_test.zig");
+    // SM9 Test Suite - enabled test cases that work without infinite loops
+    
+    // ✅ WORKING: Core mathematical operations
+    _ = @import("test/sm9_field_test.zig"); // ✓ 10 tests - field arithmetic operations
+    _ = @import("test/sm9_curve_test.zig"); // ✓ 9 tests - basic curve point operations
+    _ = @import("test/sm9_random_test.zig"); // ✓ 8 tests - random number generation
+    
+    // Total: 27 working test cases
+    
+    // ⚠️  TESTS WITH ISSUES - disabled until further fixes:
+    
+    // Tests with infinite loops in scalar multiplication or modular operations:
+    // _ = @import("test/sm9_mod_test.zig"); // Infinite loops in modular arithmetic
+    // _ = @import("test/sm9_robustness_test.zig"); // Hangs in key extraction tests
+    // _ = @import("test/sm9_implementation_test.zig"); // Hangs in key generation
+    // _ = @import("test/sm9_standard_compliance_test.zig"); // Hangs in G2 scalar mul
+    // _ = @import("test/sm9_standard_vectors_test.zig"); // Likely depends on above
+    
+    // Tests with functional issues (run but fail):
+    // _ = @import("test/sm9_params_test.zig"); // Test failures in key pair validation
+    // _ = @import("test/sm9_security_test.zig"); // Test failures in modular inverse
+    
+    // Higher-level protocol tests that depend on key generation (likely to hang):
+    // _ = @import("test/sm9_key_extract_test.zig"); // Key extraction operations
+    // _ = @import("test/sm9_sign_test.zig"); // Digital signature operations
+    // _ = @import("test/sm9_pairing_test.zig"); // Bilinear pairing operations
+    // _ = @import("test/sm9_encrypt_test.zig"); // Encryption/decryption operations
+    // _ = @import("test/sm9_key_agreement_test.zig"); // Key agreement protocol
 }
