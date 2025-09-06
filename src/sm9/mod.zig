@@ -243,7 +243,13 @@ pub const Utils = struct {
 
     /// Secure zero memory
     pub fn secureZero(bytes: []u8) void {
-        crypto.secureZero(u8, bytes);
+        if (@hasDecl(crypto, "utils")) {
+            // Zig 0.14+
+            crypto.utils.secureZero(u8, bytes);
+        } else {
+            // Zig 0.13 and earlier
+            crypto.secureZero(u8, bytes);
+        }
     }
 
     /// Constant-time byte comparison
