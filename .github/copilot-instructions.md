@@ -30,9 +30,8 @@ zig version  # Should output: 0.14.1
   - `zig build -Dtarget=wasm32-freestanding` -- WASM build, takes ~4 seconds.
 - Test the repository:
   - `zig build test` -- takes ~10 seconds. NEVER CANCEL. Set timeout to 30+ minutes.
-  - `zig test src/test.zig` -- core tests (119 tests), takes ~7 seconds.
-  - `zig test src/testsm9.zig` -- SM9 specific tests (14 tests), takes ~3 seconds.
-  - Combined CI tests: `zig test src/test.zig && zig test src/testsm9.zig` -- takes ~13 seconds total.
+  - `zig test src/test.zig` -- complete test suite (219 tests), takes ~7 seconds.
+  - Combined CI tests: `zig test src/test.zig` -- takes ~7 seconds total.
 - Run the demo application:
   - `zig build run` -- runs demo with performance tests, takes ~7 seconds (debug) or ~0.5 seconds (optimized).
 
@@ -48,7 +47,7 @@ zig version  # Should output: 0.14.1
 ### CRITICAL Build and Test Timing Expectations
 - **NEVER CANCEL BUILDS OR TESTS** - All operations complete quickly but set generous timeouts
 - Build: 15 seconds (debug), 13 seconds (optimized), 4 seconds (WASM) - NEVER CANCEL, use 30+ minute timeout
-- Tests: 10-13 seconds total - NEVER CANCEL, use 30+ minute timeout  
+- Tests: 7-10 seconds total - NEVER CANCEL, use 30+ minute timeout  
 - Demo run: 7 seconds (debug), 0.5 seconds (optimized)
 
 ### Manual Validation Scenarios
@@ -80,10 +79,9 @@ After making changes, ALWAYS run through these validation scenarios:
 ### CI Validation
 The GitHub Actions CI runs:
 1. `zig version` - Verify Zig installation
-2. `zig test src/test.zig` - Core tests (119 tests)  
-3. `zig test src/testsm9.zig` - SM9 tests (14 tests)
-4. `zig build` - Build project
-5. `zig build test` - Build and run tests
+2. `zig test src/test.zig` - Complete test suite (219 tests)
+3. `zig build` - Build project
+4. `zig build test` - Build and run tests
 
 Always run these exact commands locally before committing to ensure CI will pass.
 
@@ -101,12 +99,13 @@ gm-zig/
 │   ├── sm2.zig sm3.zig sm4.zig sm9.zig  # Algorithm implementations
 │   ├── sm2/               # SM2 implementation modules
 │   ├── sm9/               # SM9 implementation modules  
-│   ├── test.zig           # Main test suite runner
-│   ├── testsm9.zig        # SM9-specific test runner
+│   ├── test.zig           # Complete test suite runner
 │   └── test/              # Individual test modules
 ├── README.md              # Comprehensive project documentation
 ├── SM2_IMPLEMENTATION.md  # SM2 technical details
 ├── SM9_IMPLEMENTATION.md  # SM9 technical details
+├── GM_ZIG_ANALYSIS_REPORT.md  # Complete project analysis
+├── SM9_ANALYSIS_REPORT.md # SM9 specific analysis
 └── .github/workflows/ci.yml  # CI configuration
 ```
 
@@ -124,12 +123,12 @@ gm-zig/
 - Constant-time implementations to prevent timing attacks
 
 ### Testing Infrastructure
-- **Total Tests**: 133 tests (119 core + 14 SM9)
+- **Total Tests**: 219 tests (comprehensive suite including all algorithms)
 - **Test Categories**: 
   - SM2: Group operations, signatures, encryption, key exchange
   - SM3: Hash functions and performance
   - SM4: Block cipher operations  
-  - SM9: Field operations, curves, security, parameters
+  - SM9: Field operations, curves, security, parameters, encryption, signing
 - **Test Execution**: All tests pass reliably with deterministic results
 - **Individual Test Modules**: Cannot be run standalone - must use test runners
 
@@ -148,7 +147,7 @@ gm-zig/
 ## Development Workflow
 1. Always verify Zig version: `zig version` (must be 0.14.1+)
 2. Build: `zig build` (15 seconds, never cancel)
-3. Test: `zig build test` (10 seconds, never cancel) 
+3. Test: `zig build test` (7-10 seconds, never cancel) 
 4. Validate: `zig build run` (must complete successfully)
 5. For performance work: Use `zig build -Doptimize=ReleaseFast`
 6. Before committing: Run CI commands locally to ensure they pass
