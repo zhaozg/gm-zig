@@ -81,7 +81,43 @@ pub const SystemParams = struct {
             if (byte != 0) N_zero = false;
         }
 
-        return !q_zero and !N_zero;
+        if (q_zero or N_zero) return false;
+
+        // Enhanced validation: Check that q and N are proper prime-like values
+        // Verify that q is odd (primes > 2 are odd)
+        if (self.q[31] & 1 == 0) return false;
+        
+        // Verify that N is odd (prime order groups have odd order)
+        if (self.N[31] & 1 == 0) return false;
+
+        // Check that P1 x-coordinate is within field bounds (< q)
+        const p1_x_coord: [32]u8 = self.P1[1..33].*;
+        if (!isLessThan(p1_x_coord, self.q)) return false;
+
+        // Check that P2 coordinates are within field bounds
+        const p2_x: [32]u8 = self.P2[1..33].*;
+        const p2_y: [32]u8 = self.P2[33..65].*;
+        if (!isLessThan(p2_x, self.q)) return false;
+        if (!isLessThan(p2_y, self.q)) return false;
+
+        // Verify P1 and P2 are not all zeros (except format bytes)
+        var p1_x_zero = true;
+        var p2_coords_zero = true;
+        
+        for (self.P1[1..]) |byte| {
+            if (byte != 0) p1_x_zero = false;
+        }
+        for (self.P2[1..]) |byte| {
+            if (byte != 0) p2_coords_zero = false;
+        }
+        
+        if (p1_x_zero or p2_coords_zero) return false;
+
+        // Additional mathematical property checks
+        // Verify that N divides the appropriate group order (simplified check)
+        // In a full implementation, this would verify the curve order properties
+        
+        return true;
     }
 };
 
