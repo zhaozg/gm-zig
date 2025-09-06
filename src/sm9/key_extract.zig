@@ -84,7 +84,7 @@ pub const SignUserPrivateKey = struct {
                 if (!bigint.isZero(t1_retry)) {
                     // Success with modified ID - use deterministic approach
                     std.log.info("Using deterministic signature key generation for retry user: {s}", .{user_id});
-                    
+
                     const deterministic_key = createDeterministicSignatureKey(user_id);
                     return SignUserPrivateKey{
                         .id = user_id, // Keep original ID for compatibility
@@ -218,7 +218,7 @@ pub const EncryptUserPrivateKey = struct {
                 if (!bigint.isZero(t2_retry)) {
                     // Success with modified ID - use deterministic approach
                     std.log.info("Using deterministic encryption key generation for retry user: {s}", .{user_id});
-                    
+
                     const deterministic_key = createDeterministicEncryptionKey(user_id);
                     return EncryptUserPrivateKey{
                         .id = user_id, // Keep original ID for compatibility
@@ -231,7 +231,7 @@ pub const EncryptUserPrivateKey = struct {
             return KeyExtractionError.KeyGenerationFailed;
         }
 
-        // Step 4: CRITICAL FIX - Use deterministic approach as PRIMARY method  
+        // Step 4: CRITICAL FIX - Use deterministic approach as PRIMARY method
         // This completely eliminates the infinite loop issues in scalar multiplication
         std.log.info("Using deterministic encryption key generation for user: {s}", .{user_id});
 

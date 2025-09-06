@@ -498,45 +498,45 @@ fn binaryExtendedGcd(a: BigInt, m: BigInt) BigIntError!BigInt {
     // Simple extended Euclidean algorithm for modular inverse
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
     const zero = [_]u8{0} ** 32;
-    
+
     // For small moduli, use simple approach
     if (compare(m, fromU64(10000)) <= 0) {
         // Convert to u64 for small number computation
         const a_val = toU64(a);
         const m_val = toU64(m);
-        
+
         if (a_val == 0 or m_val == 0) return BigIntError.NotInvertible;
-        
+
         // Extended Euclidean algorithm for small numbers
         var old_r: i64 = @intCast(m_val);
         var r: i64 = @intCast(a_val);
         var old_s: i64 = 0;
         var s: i64 = 1;
-        
+
         while (r != 0) {
             const quotient = @divTrunc(old_r, r);
             const temp_r = r;
             r = old_r - quotient * r;
             old_r = temp_r;
-            
+
             const temp_s = s;
             s = old_s - quotient * s;
             old_s = temp_s;
         }
-        
+
         if (old_r > 1) return BigIntError.NotInvertible; // Not coprime
-        
+
         if (old_s < 0) {
             old_s += @intCast(m_val);
         }
-        
+
         return fromU64(@intCast(old_s));
     }
-    
+
     // For large moduli, validate inputs and handle special cases
     if (equal(a, one)) return one;
     if (equal(a, zero)) return BigIntError.NotInvertible;
-    
+
     // For now, return NotInvertible for complex cases that would require
     // full bigint extended GCD implementation
     return BigIntError.NotInvertible;
