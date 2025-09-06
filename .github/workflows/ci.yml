@@ -24,6 +24,9 @@ jobs:
     - name: Verify Zig installation
       run: zig version
 
+    - name: Check code format
+      run: zig fmt --check build.zig src/
+
     - name: Run tests
       run: |
         zig test src/test.zig
