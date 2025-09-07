@@ -2,6 +2,8 @@ const std = @import("std");
 const root = @import("./root.zig");
 const sm3 = root.sm3;
 const sm4 = root.sm4;
+const sm2 = root.sm2;
+const sm9 = root.sm9;
 
 // Benchmark result structure for structured output
 pub const BenchmarkResult = struct {
@@ -208,6 +210,347 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     }
 }
 
+// Benchmark SM2 elliptic curve cryptography performance
+pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
+    const timestamp = std.time.timestamp();
+    
+    // Test message sizes for encryption/signature operations
+    const test_messages = [_][]const u8{
+        "Hello SM2!", // Small message
+        "This is a medium length message for SM2 testing that contains multiple words and sentences to provide a realistic benchmark scenario.",
+        // Large message (1KB)
+        "A" ** 1024,
+    };
+    
+    // 1. Benchmark key pair generation
+    {
+        const iterations = 100;
+        const start_time = std.time.nanoTimestamp();
+        
+        for (0..iterations) |_| {
+            _ = sm2.kp.generateKeyPair();
+        }
+        
+        const end_time = std.time.nanoTimestamp();
+        const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
+        const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
+        
+        const result = BenchmarkResult{
+            .algorithm = "SM2",
+            .operation = "keypair_generation",
+            .data_size_kb = 0, // Not applicable for key generation
+            .throughput_mb_s = ops_per_second, // Ops per second for this benchmark
+            .timestamp = timestamp,
+            .build_mode = getBuildMode(),
+            .platform = getPlatform(),
+        };
+        
+        try suite.addResult(result);
+    }
+    
+    // Generate a key pair for subsequent operations
+    const key_pair = sm2.kp.generateKeyPair();
+    const sign_options = sm2.signature.SignatureOptions{
+        .user_id = "benchmark@test.com",
+        .hash_type = .sm3,
+    };
+    
+    // 2. Benchmark digital signature operations
+    for (test_messages, 0..) |message, i| {
+        const data_size_kb = @as(f64, @floatFromInt(message.len)) / 1024.0;
+        
+        // Signature creation
+        {
+            const iterations: u32 = if (i == 2) 10 else 50; // Fewer iterations for large messages
+            const start_time = std.time.nanoTimestamp();
+            
+            for (0..iterations) |_| {
+                _ = sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
+            }
+            
+            const end_time = std.time.nanoTimestamp();
+            const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
+            const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
+            
+            const result = BenchmarkResult{
+                .algorithm = "SM2",
+                .operation = "sign",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(result);
+        }
+        
+        // Signature verification
+        {
+            const signature = sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
+            const iterations: u32 = if (i == 2) 10 else 50;
+            const start_time = std.time.nanoTimestamp();
+            
+            for (0..iterations) |_| {
+                _ = sm2.signature.verify(message, signature, key_pair.public_key, sign_options) catch continue;
+            }
+            
+            const end_time = std.time.nanoTimestamp();
+            const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
+            const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
+            
+            const result = BenchmarkResult{
+                .algorithm = "SM2",
+                .operation = "verify",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(result);
+        }
+        
+        // Encryption/Decryption operations
+        {
+            const iterations: u32 = if (i == 2) 5 else 20;
+            
+            // Encryption
+            const encrypt_start = std.time.nanoTimestamp();
+            for (0..iterations) |_| {
+                const ciphertext = sm2.encryption.encrypt(allocator, message, key_pair.public_key, .c1c3c2) catch continue;
+                ciphertext.deinit(allocator);
+            }
+            const encrypt_end = std.time.nanoTimestamp();
+            
+            const encrypt_duration = @as(f64, @floatFromInt(encrypt_end - encrypt_start));
+            const encrypt_ops_per_second = (@as(f64, @floatFromInt(iterations)) / encrypt_duration) * 1_000_000_000.0;
+            
+            const encrypt_result = BenchmarkResult{
+                .algorithm = "SM2",
+                .operation = "encrypt",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = encrypt_ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(encrypt_result);
+            
+            // Decryption
+            const ciphertext = sm2.encryption.encrypt(allocator, message, key_pair.public_key, .c1c3c2) catch return;
+            defer ciphertext.deinit(allocator);
+            
+            const decrypt_start = std.time.nanoTimestamp();
+            for (0..iterations) |_| {
+                const plaintext = sm2.encryption.decrypt(allocator, ciphertext, key_pair.private_key) catch continue;
+                allocator.free(plaintext);
+            }
+            const decrypt_end = std.time.nanoTimestamp();
+            
+            const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
+            const decrypt_ops_per_second = (@as(f64, @floatFromInt(iterations)) / decrypt_duration) * 1_000_000_000.0;
+            
+            const decrypt_result = BenchmarkResult{
+                .algorithm = "SM2",
+                .operation = "decrypt",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = decrypt_ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(decrypt_result);
+        }
+    }
+}
+
+// Benchmark SM9 identity-based cryptography performance
+pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
+    const timestamp = std.time.timestamp();
+    
+    // Initialize SM9 system
+    const system = sm9.params.SM9System.init();
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    
+    const test_user_id = "benchmark@test.edu.cn";
+    const test_messages = [_][]const u8{
+        "Hello SM9!",
+        "This is a medium length message for SM9 identity-based cryptography testing.",
+        "A" ** 512, // Large message (512 bytes for SM9)
+    };
+    
+    // 1. Benchmark key extraction
+    {
+        const iterations = 20;
+        
+        // Signing key extraction
+        const sign_extract_start = std.time.nanoTimestamp();
+        for (0..iterations) |_| {
+            _ = key_context.extractSignKey(test_user_id) catch continue;
+        }
+        const sign_extract_end = std.time.nanoTimestamp();
+        
+        const sign_extract_duration = @as(f64, @floatFromInt(sign_extract_end - sign_extract_start));
+        const sign_extract_ops = (@as(f64, @floatFromInt(iterations)) / sign_extract_duration) * 1_000_000_000.0;
+        
+        const sign_extract_result = BenchmarkResult{
+            .algorithm = "SM9",
+            .operation = "key_extract_sign",
+            .data_size_kb = 0,
+            .throughput_mb_s = sign_extract_ops,
+            .timestamp = timestamp,
+            .build_mode = getBuildMode(),
+            .platform = getPlatform(),
+        };
+        
+        try suite.addResult(sign_extract_result);
+        
+        // Encryption key extraction
+        const encrypt_extract_start = std.time.nanoTimestamp();
+        for (0..iterations) |_| {
+            _ = key_context.extractEncryptKey(test_user_id) catch continue;
+        }
+        const encrypt_extract_end = std.time.nanoTimestamp();
+        
+        const encrypt_extract_duration = @as(f64, @floatFromInt(encrypt_extract_end - encrypt_extract_start));
+        const encrypt_extract_ops = (@as(f64, @floatFromInt(iterations)) / encrypt_extract_duration) * 1_000_000_000.0;
+        
+        const encrypt_extract_result = BenchmarkResult{
+            .algorithm = "SM9",
+            .operation = "key_extract_encrypt",
+            .data_size_kb = 0,
+            .throughput_mb_s = encrypt_extract_ops,
+            .timestamp = timestamp,
+            .build_mode = getBuildMode(),
+            .platform = getPlatform(),
+        };
+        
+        try suite.addResult(encrypt_extract_result);
+    }
+    
+    // Extract keys for subsequent operations
+    const sign_key = key_context.extractSignKey(test_user_id) catch return;
+    const encrypt_key = key_context.extractEncryptKey(test_user_id) catch return;
+    
+    // 2. Benchmark digital signature operations
+    for (test_messages, 0..) |message, i| {
+        const data_size_kb = @as(f64, @floatFromInt(message.len)) / 1024.0;
+        const iterations: u32 = if (i == 2) 5 else 15;
+        
+        // Signature creation
+        {
+            const start_time = std.time.nanoTimestamp();
+            
+            for (0..iterations) |_| {
+                _ = sign_context.sign(message, sign_key, .{}) catch continue;
+            }
+            
+            const end_time = std.time.nanoTimestamp();
+            const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
+            const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
+            
+            const result = BenchmarkResult{
+                .algorithm = "SM9",
+                .operation = "sign",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(result);
+        }
+        
+        // Signature verification
+        {
+            const signature = sign_context.sign(message, sign_key, .{}) catch continue;
+            
+            const start_time = std.time.nanoTimestamp();
+            
+            for (0..iterations) |_| {
+                _ = sign_context.verify(message, signature, test_user_id, .{}) catch continue;
+            }
+            
+            const end_time = std.time.nanoTimestamp();
+            const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
+            const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
+            
+            const result = BenchmarkResult{
+                .algorithm = "SM9",
+                .operation = "verify",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(result);
+        }
+        
+        // Encryption/Decryption operations
+        {
+            const enc_iterations: u32 = if (i == 2) 3 else 10;
+            
+            // Encryption
+            const encrypt_start = std.time.nanoTimestamp();
+            for (0..enc_iterations) |_| {
+                const ciphertext = encrypt_context.encrypt(message, test_user_id, .{}) catch continue;
+                ciphertext.deinit();
+            }
+            const encrypt_end = std.time.nanoTimestamp();
+            
+            const encrypt_duration = @as(f64, @floatFromInt(encrypt_end - encrypt_start));
+            const encrypt_ops_per_second = (@as(f64, @floatFromInt(enc_iterations)) / encrypt_duration) * 1_000_000_000.0;
+            
+            const encrypt_result = BenchmarkResult{
+                .algorithm = "SM9",
+                .operation = "encrypt",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = encrypt_ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(encrypt_result);
+            
+            // Decryption
+            const ciphertext = encrypt_context.encrypt(message, test_user_id, .{}) catch return;
+            defer ciphertext.deinit();
+            
+            const decrypt_start = std.time.nanoTimestamp();
+            for (0..enc_iterations) |_| {
+                const plaintext = encrypt_context.decrypt(ciphertext, encrypt_key, .{}) catch continue;
+                allocator.free(plaintext);
+            }
+            const decrypt_end = std.time.nanoTimestamp();
+            
+            const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
+            const decrypt_ops_per_second = (@as(f64, @floatFromInt(enc_iterations)) / decrypt_duration) * 1_000_000_000.0;
+            
+            const decrypt_result = BenchmarkResult{
+                .algorithm = "SM9",
+                .operation = "decrypt",
+                .data_size_kb = data_size_kb,
+                .throughput_mb_s = decrypt_ops_per_second,
+                .timestamp = timestamp,
+                .build_mode = getBuildMode(),
+                .platform = getPlatform(),
+            };
+            
+            try suite.addResult(decrypt_result);
+        }
+    }
+}
+
 // Run all benchmarks and output JSON
 pub fn runBenchmarks(allocator: std.mem.Allocator, output_json: bool) !void {
     var suite = BenchmarkSuite.init(allocator);
@@ -215,6 +558,8 @@ pub fn runBenchmarks(allocator: std.mem.Allocator, output_json: bool) !void {
 
     try benchmarkSM3(allocator, &suite);
     try benchmarkSM4(allocator, &suite);
+    try benchmarkSM2(allocator, &suite);
+    try benchmarkSM9(allocator, &suite);
 
     if (output_json) {
         // Output JSON for CI consumption
