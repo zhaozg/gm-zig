@@ -8,3 +8,6 @@ zig-x86_64-linux-*/
 # Build artifacts
 *.a
 *.o
+
+# Temporary test files
+test-*
