@@ -384,39 +384,9 @@ pub const SignatureContext = struct {
         const w_bytes = &w;
         const h_prime = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.system_params.N, self.allocator);
 
-        // Step 9: Enhanced verification with proper mathematical relationships
-        // Verify both hash consistency and signature mathematical validity
-        const signature_valid = blk: {
-            // Primary check: h' must match h (basic cryptographic consistency)
-            if (!std.mem.eql(u8, &signature.h, &h_prime)) {
-                break :blk false;
-            }
-
-            // Secondary check: verify signature component S satisfies mathematical relationship
-            // This ensures the signature was created using proper scalar multiplication
-            const S_coordinates = signature.S[1..33]; // Extract 32-byte coordinate from compressed point
-
-            // Verify mathematical consistency: signature components must relate correctly
-            // Extract scalar l for mathematical verification (same computation as signing)
-            const r = bigint.mod(signature.h, self.system_params.N) catch signature.h;
-            const l_computed = bigint.subMod(r, signature.h, self.system_params.N) catch signature_fallback: {
-                const n_minus_h = bigint.subMod(self.system_params.N, signature.h, self.system_params.N) catch {
-                    break :signature_fallback bigint.addMod(r, signature.h, self.system_params.N) catch signature.h;
-                };
-                break :signature_fallback bigint.addMod(r, n_minus_h, self.system_params.N) catch signature.h;
-            };
-
-            // Verify S satisfies the scalar multiplication relationship
-            const expected_S = bigint.mulMod(l_computed, S_coordinates[0..32].*, self.system_params.N) catch {
-                // Fallback to hash consistency for compatibility
-                return std.mem.eql(u8, &signature.h, &h_prime);
-            };
-
-            // Final verification: both hash and mathematical relationship must be valid
-            break :blk std.mem.eql(u8, S_coordinates, &expected_S);
-        };
-
-        return signature_valid;
+        // Step 9: Proper SM9 signature verification per GM/T 0044-2016
+        // The verification checks if h' == h, which validates the signature
+        return std.mem.eql(u8, &signature.h, &h_prime);
     }
 };
 
