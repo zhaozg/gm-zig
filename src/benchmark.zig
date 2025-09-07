@@ -4,6 +4,13 @@ const sm3 = root.sm3;
 const sm4 = root.sm4;
 const sm2 = root.sm2;
 const sm9 = root.sm9;
+const builtin = @import("builtin");
+
+/// Conditional compilation for Zig version compatibility
+const isZig015OrNewer = blk: {
+    const version = builtin.zig_version;
+    break :blk (version.major == 0 and version.minor >= 15);
+};
 
 // Flag to control logging output in JSON mode
 var json_mode: bool = false;
@@ -36,10 +43,22 @@ pub const BenchmarkResult = struct {
     platform: []const u8,
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
-        var output = std.ArrayList(u8).init(allocator);
-        defer output.deinit();
+        var output = if (isZig015OrNewer)
+            std.ArrayList(u8).empty
+        else
+            std.ArrayList(u8).init(allocator);
+        
+        if (isZig015OrNewer) {
+            defer output.deinit(allocator);
+        } else {
+            defer output.deinit();
+        }
 
-        const writer = output.writer();
+        const writer = if (isZig015OrNewer)
+            output.writer(allocator)
+        else
+            output.writer();
+        
         try writer.print("{{", .{});
         try writer.print("\"algorithm\":\"{s}\",", .{self.algorithm});
         try writer.print("\"operation\":\"{s}\",", .{self.operation});
@@ -51,7 +70,10 @@ pub const BenchmarkResult = struct {
         try writer.print("\"platform\":\"{s}\"", .{self.platform});
         try writer.print("}}", .{});
 
-        return try output.toOwnedSlice();
+        return if (isZig015OrNewer)
+            try output.toOwnedSlice(allocator)
+        else
+            try output.toOwnedSlice();
     }
 };
 
@@ -61,24 +83,47 @@ pub const BenchmarkSuite = struct {
 
     pub fn init(allocator: std.mem.Allocator) BenchmarkSuite {
         return BenchmarkSuite{
-            .results = std.ArrayList(BenchmarkResult).init(allocator),
+            .results = if (isZig015OrNewer)
+                std.ArrayList(BenchmarkResult).empty
+            else
+                std.ArrayList(BenchmarkResult).init(allocator),
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *BenchmarkSuite) void {
-        self.results.deinit();
+        if (isZig015OrNewer) {
+            self.results.deinit(self.allocator);
+        } else {
+            self.results.deinit();
+        }
     }
 
     pub fn addResult(self: *BenchmarkSuite, result: BenchmarkResult) !void {
-        try self.results.append(result);
+        if (isZig015OrNewer) {
+            try self.results.append(self.allocator, result);
+        } else {
+            try self.results.append(result);
+        }
     }
 
     pub fn toJsonArray(self: *BenchmarkSuite) ![]u8 {
-        var output = std.ArrayList(u8).init(self.allocator);
-        defer output.deinit();
+        var output = if (isZig015OrNewer)
+            std.ArrayList(u8).empty
+        else
+            std.ArrayList(u8).init(self.allocator);
+        
+        if (isZig015OrNewer) {
+            defer output.deinit(self.allocator);
+        } else {
+            defer output.deinit();
+        }
 
-        const writer = output.writer();
+        const writer = if (isZig015OrNewer)
+            output.writer(self.allocator)
+        else
+            output.writer();
+        
         try writer.print("[", .{});
 
         for (self.results.items, 0..) |result, i| {
@@ -89,7 +134,10 @@ pub const BenchmarkSuite = struct {
         }
 
         try writer.print("]", .{});
-        return try output.toOwnedSlice();
+        return if (isZig015OrNewer)
+            try output.toOwnedSlice(self.allocator)
+        else
+            try output.toOwnedSlice();
     }
 
     // Print human-readable summary
@@ -135,7 +183,10 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
     for (test_sizes) |size| {
         // Allocate aligned memory
-        const alignment: u29 = 16;
+        const alignment = if (isZig015OrNewer)
+            @as(std.mem.Alignment, @enumFromInt(16))
+        else
+            @as(u29, 16);
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
@@ -190,7 +241,10 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     const timestamp = std.time.timestamp();
 
     for (test_sizes) |size| {
-        const alignment: u29 = 16;
+        const alignment = if (isZig015OrNewer)
+            @as(std.mem.Alignment, @enumFromInt(16))
+        else
+            @as(u29, 16);
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
