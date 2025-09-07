@@ -68,4 +68,24 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     // 确保所有测试都运行
     test_step.dependOn(&run_tests.step);
+
+    // Add benchmark executable
+    const benchmark_mod = b.createModule(.{
+        .root_source_file = b.path("src/benchmark.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    benchmark_mod.addImport("gmlib", lib_mod);
+
+    const benchmark_exe = b.addExecutable(.{
+        .name = "benchmark",
+        .root_module = benchmark_mod,
+    });
+    b.installArtifact(benchmark_exe);
+
+    const benchmark_cmd = b.addRunArtifact(benchmark_exe);
+    benchmark_cmd.step.dependOn(b.getInstallStep());
+
+    const benchmark_step = b.step("benchmark", "Run performance benchmarks");
+    benchmark_step.dependOn(&benchmark_cmd.step);
 }

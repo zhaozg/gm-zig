@@ -3,6 +3,7 @@
 /node_modules
 zig-x86_64-linux-*/
 *.tar.xz
+.performance-data/
 
 # Build artifacts
 *.a
