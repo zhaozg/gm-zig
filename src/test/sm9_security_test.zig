@@ -104,17 +104,17 @@ test "SM9 improved hash functions" {
     // Test H2 hash function
     const message = "Hello, SM9!";
     const additional_data = "additional";
-    const h2_result = try sm9.hash.h2Hash(message, additional_data, allocator);
+    const h2_result = try sm9.hash.h2Hash(message, additional_data, order, allocator);
 
     // Result should not be zero
     try testing.expect(!sm9.bigint.isZero(h2_result));
 
     // Result should be deterministic
-    const h2_result2 = try sm9.hash.h2Hash(message, additional_data, allocator);
+    const h2_result2 = try sm9.hash.h2Hash(message, additional_data, order, allocator);
     try testing.expect(sm9.bigint.equal(h2_result, h2_result2));
 
     // Different inputs should produce different outputs
-    const h2_result3 = try sm9.hash.h2Hash("Different message", additional_data, allocator);
+    const h2_result3 = try sm9.hash.h2Hash("Different message", additional_data, order, allocator);
     try testing.expect(!sm9.bigint.equal(h2_result, h2_result3));
 }
 

@@ -182,8 +182,8 @@ test "SM9 signature utility functions" {
     const random2 = sm9.sign.SignatureUtils.generateRandom();
     try testing.expect(!std.mem.eql(u8, &random1, &random2));
 
-    // Test component validation
+    // Test component validation with invalid inputs (should fail)
     const h = std.mem.zeroes([32]u8);
     const S = std.mem.zeroes([32]u8);
-    try testing.expect(sm9.sign.SignatureUtils.validateComponents(h, S, N));
+    try testing.expect(!sm9.sign.SignatureUtils.validateComponents(h, S, N)); // Should return false for zero values
 }

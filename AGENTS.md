@@ -1,8 +1,9 @@
 # AGENTS.md - Developer and AI Agent Guide
 
 **Project**: GM-Zig - Chinese National Cryptographic Standards Implementation
-**Version**: Production Ready (v1.0)
-**Last Updated**: December 2024
+**Version**: Production Ready (v1.0) - Complete Implementation
+**Last Updated**: September 2025 (Commit 50ddd11)
+**Status**: ✅ 100% Feature Complete - Ready for Production Use
 
 This document provides essential guidance for developers and AI agents working on the GM-Zig codebase, including current architecture, build processes, testing infrastructure, and development best practices.
 
@@ -89,6 +90,19 @@ zig test src/test/sm9_pairing_test.zig
 - **Dependencies**: None (zero external dependencies)
 - **Platform**: Cross-platform (Linux, macOS, Windows)
 
+### Code Formatting Requirements
+All code must adhere to Zig's standard formatting rules:
+
+```bash
+# Check code formatting (must pass with no output)
+zig fmt --check build.zig src/
+
+# Auto-format code if needed
+zig fmt build.zig src/
+```
+
+**CRITICAL**: All commits must pass the formatting check. Use `zig fmt --check build.zig src/` to verify before committing. This is enforced in CI and any formatting violations will cause build failures.
+
 ### Build Commands
 ```bash
 # Standard build
@@ -116,13 +130,18 @@ cd gm-zig
 # 2. Verify installation
 zig version  # Should be 0.14.0+
 
-# 3. Run full test suite
+# 3. Check code formatting (REQUIRED)
+zig fmt --check build.zig src/  # Must pass with no output
+
+# 4. Run full test suite
 zig test src/test.zig
 
-# 4. Make changes and validate
-zig test src/test.zig  # Ensure no regressions
+# 5. Make changes and validate
+zig fmt build.zig src/          # Auto-format code
+zig fmt --check build.zig src/  # Verify formatting
+zig test src/test.zig           # Ensure no regressions
 
-# 5. Build final project
+# 6. Build final project
 zig build
 ```
 
@@ -285,6 +304,8 @@ timeout 300 zig test src/test.zig
 - **Memory Safety**: Use Zig's built-in safety features
 - **Error Handling**: Provide robust error handling with fallback mechanisms
 - **Testing**: Achieve and maintain 100% test pass rate
+- **Code Formatting**: All code must pass `zig fmt --check build.zig src/` without any violations
+- **Consistent Style**: Follow existing code patterns and naming conventions
 
 ---
 

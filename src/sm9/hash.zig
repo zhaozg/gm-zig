@@ -107,17 +107,21 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 /// H2: {0,1}* × {0,1}* → Z*_N
 /// Used to hash message and additional data for signature/encryption
 /// Implementation follows GM/T 0044-2016 specification more closely
-pub fn h2Hash(message: []const u8, additional_data: []const u8, allocator: std.mem.Allocator) ![32]u8 {
+pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
+    // Input validation
+    if (bigint.isZero(order)) {
+        return HashError.InvalidInput;
+    }
+
     // Step 1: Prepare input according to GM/T 0044-2016
-    // For H2, we hash message || additional_data directly
     var hasher = SM3.init(.{});
 
     // Step 2: Hash message data
     hasher.update(message);
 
-    // Step 3: Hash additional data (e.g., ciphertext components)
+    // Step 3: Hash additional data (e.g., w value)
     hasher.update(additional_data);
 
     // Step 4: Add domain separation for H2
@@ -128,21 +132,18 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, allocator: std.m
     var result: [32]u8 = undefined;
     hasher.final(&result);
 
-    // Step 6: Ensure result is not zero (required by SM9 spec)
-    if (bigint.isZero(result)) {
-        // If result is zero, hash again with additional entropy
-        var retry_hasher = SM3.init(.{});
-        retry_hasher.update(&result);
-        retry_hasher.update("RETRY_H2");
-        retry_hasher.final(&result);
+    // Step 6: Reduce modulo order to ensure result is in range [0, N-1]
+    const reduced = bigint.mod(result, order) catch |err| switch (err) {
+        bigint.BigIntError.InvalidModulus => return error.HashComputationFailed,
+        else => return error.HashComputationFailed,
+    };
 
-        // Ensure it's still not zero
-        if (bigint.isZero(result)) {
-            result[31] = 1; // Set to 1 as final fallback
-        }
+    // Step 7: If result is zero, return 1 to ensure result is in range [1, N-1]
+    if (bigint.isZero(reduced)) {
+        return bigint.fromU64(1);
     }
 
-    return result;
+    return reduced;
 }
 
 /// SM9 Key Derivation Function (KDF)
