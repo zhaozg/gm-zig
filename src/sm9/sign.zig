@@ -229,26 +229,21 @@ pub const SignatureContext = struct {
             },
         }
 
-        // Step 1: Generate cryptographically secure random r
-        // Use proper cryptographic random number generation in production
-        var r = blk: {
-            break :blk random.secureRandomScalar(self.system_params) catch {
-                // Fallback to deterministic generation if secure random fails
-                var r_fallback = [_]u8{0} ** 32;
-                var r_hasher = SM3.init(.{});
-                r_hasher.update(processed_message);
-                r_hasher.update(&user_private_key.key);
-                r_hasher.update(user_private_key.id);
-                r_hasher.update("random_r_sign");
-                r_hasher.final(&r_fallback);
+        // Step 1: Generate deterministic r for signature reproducibility
+        // In production, this should use deterministic ECDSA-style nonce generation
+        // as per RFC 6979 to ensure signatures are deterministic while remaining secure
+        var r = [_]u8{0} ** 32;
+        var r_hasher = SM3.init(.{});
+        r_hasher.update(processed_message);
+        r_hasher.update(&user_private_key.key);
+        r_hasher.update(user_private_key.id);
+        r_hasher.update("deterministic_r_sign");
+        r_hasher.final(&r);
 
-                // Ensure r is not zero
-                if (std.mem.allEqual(u8, &r_fallback, 0)) {
-                    r_fallback[31] = 1;
-                }
-                break :blk r_fallback;
-            };
-        };
+        // Ensure r is not zero
+        if (std.mem.allEqual(u8, &r, 0)) {
+            r[31] = 1;
+        }
 
         // Note: h1 computation not needed in this step (used in verification step)
 
@@ -264,7 +259,7 @@ pub const SignatureContext = struct {
         const w_bytes = &w;
 
         // Step 3: Compute h = H2(M || w, N) using processed message
-        const h = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator);
+        const h = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.system_params.N, self.allocator);
 
         // Step 4: Compute l = (r - h) mod N using proper modular arithmetic
 
@@ -377,7 +372,7 @@ pub const SignatureContext = struct {
         w_hasher.final(&w);
 
         const w_bytes = &w;
-        const h_prime = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.allocator);
+        const h_prime = try key_extract.h2Hash(processed_message, w_bytes[0..32], self.system_params.N, self.allocator);
 
         // Step 9: Return h' == h
         return std.mem.eql(u8, &signature.h, &h_prime);
@@ -530,12 +525,10 @@ pub const SignatureUtils = struct {
     /// Compute SM9 hash function H2
     /// Implementation following GM/T 0044-2016 standard
     pub fn computeH2(message: []const u8, w: []const u8, N: [32]u8) [32]u8 {
-        _ = N; // N parameter available but not directly used in this simplified implementation
-
         // Use the proper h2Hash from hash module
         const hash = @import("hash.zig");
         const allocator = std.heap.page_allocator;
-        const result = hash.h2Hash(message, w, allocator) catch |err| switch (err) {
+        const result = hash.h2Hash(message, w, N, allocator) catch |err| switch (err) {
             error.InvalidInput => {
                 // Fallback: create deterministic hash from message and w
                 var hasher = SM3.init(.{});

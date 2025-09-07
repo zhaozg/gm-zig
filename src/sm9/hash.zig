@@ -107,42 +107,69 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 /// H2: {0,1}* × {0,1}* → Z*_N
 /// Used to hash message and additional data for signature/encryption
 /// Implementation follows GM/T 0044-2016 specification more closely
-pub fn h2Hash(message: []const u8, additional_data: []const u8, allocator: std.mem.Allocator) ![32]u8 {
+pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
-    // Step 1: Prepare input according to GM/T 0044-2016
-    // For H2, we hash message || additional_data directly
-    var hasher = SM3.init(.{});
-
-    // Step 2: Hash message data
-    hasher.update(message);
-
-    // Step 3: Hash additional data (e.g., ciphertext components)
-    hasher.update(additional_data);
-
-    // Step 4: Add domain separation for H2
-    const h2_suffix = "SM9H2";
-    hasher.update(h2_suffix);
-
-    // Step 5: Compute hash
-    var result: [32]u8 = undefined;
-    hasher.final(&result);
-
-    // Step 6: Ensure result is not zero (required by SM9 spec)
-    if (bigint.isZero(result)) {
-        // If result is zero, hash again with additional entropy
-        var retry_hasher = SM3.init(.{});
-        retry_hasher.update(&result);
-        retry_hasher.update("RETRY_H2");
-        retry_hasher.final(&result);
-
-        // Ensure it's still not zero
-        if (bigint.isZero(result)) {
-            result[31] = 1; // Set to 1 as final fallback
-        }
+    // Input validation
+    if (bigint.isZero(order)) {
+        return HashError.InvalidInput;
     }
 
-    return result;
+    // Step 1: Use iterative hashing until result is in valid range
+    // Start with a deterministic seed based on input data
+    var seed_hasher = SM3.init(.{});
+    seed_hasher.update(message);
+    seed_hasher.update(additional_data);
+    seed_hasher.update("SM9H2_SEED");
+    var seed: [32]u8 = undefined;
+    seed_hasher.final(&seed);
+
+    // Convert seed to starting counter (deterministic)
+    const starting_counter = (@as(u32, seed[0]) << 24) | (@as(u32, seed[1]) << 16) | (@as(u32, seed[2]) << 8) | seed[3];
+
+    var counter: u32 = starting_counter;
+    var result: [32]u8 = undefined;
+    const max_attempts: u32 = 256;
+    var attempts: u32 = 0;
+
+    while (attempts < max_attempts) : (attempts += 1) {
+        // Step 2: Prepare input according to GM/T 0044-2016
+        var hasher = SM3.init(.{});
+
+        // Step 3: Hash message data
+        hasher.update(message);
+
+        // Step 4: Hash additional data (e.g., w value)
+        hasher.update(additional_data);
+
+        // Step 5: Add domain separation for H2
+        const h2_suffix = "SM9H2";
+        hasher.update(h2_suffix);
+
+        // Step 6: Add counter to ensure we can find a valid value
+        const counter_bytes = [4]u8{
+            @as(u8, @intCast((counter >> 24) & 0xFF)),
+            @as(u8, @intCast((counter >> 16) & 0xFF)),
+            @as(u8, @intCast((counter >> 8) & 0xFF)),
+            @as(u8, @intCast(counter & 0xFF)),
+        };
+        hasher.update(&counter_bytes);
+
+        // Step 7: Compute hash
+        hasher.final(&result);
+
+        // Step 8: Check if result is in valid range [1, N-1]
+        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
+            return result;
+        }
+
+        // Try next counter value (deterministic progression)
+        counter = counter +% 1; // Use wrapping arithmetic
+    }
+
+    // If we couldn't find a valid value after max_attempts, create a fallback
+    // This should be extremely rare in practice
+    return error.HashComputationFailed;
 }
 
 /// SM9 Key Derivation Function (KDF)

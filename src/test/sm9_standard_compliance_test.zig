@@ -233,20 +233,23 @@ test "GM/T 0044-2016 - Hash function H2 compliance" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // Standard order from SM9 specification
+    const order = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
+
     const message = "Chinese IBE standard";
     const additional_data = "test_vector_data";
 
     // Test H2 hash function
-    const h2_result = try sm9.hash.h2Hash(message, additional_data, allocator);
+    const h2_result = try sm9.hash.h2Hash(message, additional_data, order, allocator);
     try testing.expect(!sm9.bigint.isZero(h2_result));
 
     // Test with different messages
     const different_message = "Different test message";
-    const h2_different = try sm9.hash.h2Hash(different_message, additional_data, allocator);
+    const h2_different = try sm9.hash.h2Hash(different_message, additional_data, order, allocator);
     try testing.expect(!sm9.bigint.equal(h2_result, h2_different));
 
     // Test determinism
-    const h2_repeat = try sm9.hash.h2Hash(message, additional_data, allocator);
+    const h2_repeat = try sm9.hash.h2Hash(message, additional_data, order, allocator);
     try testing.expect(sm9.bigint.equal(h2_result, h2_repeat));
 }
 

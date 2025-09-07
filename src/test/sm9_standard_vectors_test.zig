@@ -32,11 +32,14 @@ test "SM9 H2 standard test vectors" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // Standard order from SM9 specification
+    const order = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
+
     // Test Vector from GM/T 0044-2016 Appendix A
     const message = "Chinese IBS standard";
     const additional_data = "signature";
 
-    const h2_result = try sm9.hash.h2Hash(message, additional_data, allocator);
+    const h2_result = try sm9.hash.h2Hash(message, additional_data, order, allocator);
 
     // Verify result is not zero (32 bytes)
     var is_zero = true;

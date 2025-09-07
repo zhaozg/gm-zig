@@ -36,7 +36,7 @@ test "SM9 hash functions" {
     // Test H2 hash function
     const message = "Hello, SM9!";
     const additional_data = "additional";
-    const h2_result = try sm9.hash.h2Hash(message, additional_data, allocator);
+    const h2_result = try sm9.hash.h2Hash(message, additional_data, order, allocator);
     try testing.expect(!sm9.bigint.isZero(h2_result));
 
     // Test KDF

@@ -558,10 +558,10 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 }
 
 /// H2 hash function for SM9 signature
-pub fn h2Hash(message: []const u8, w: []const u8, allocator: std.mem.Allocator) ![32]u8 {
+pub fn h2Hash(message: []const u8, w: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     // Use the proper H2 implementation from hash module
     const hash = @import("hash.zig");
-    return hash.h2Hash(message, w, allocator);
+    return hash.h2Hash(message, w, order, allocator);
 }
 
 /// Create deterministic public key from user ID and hash identifier

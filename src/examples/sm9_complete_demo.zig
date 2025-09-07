@@ -109,7 +109,7 @@ pub fn main() !void {
 
     // Test enhanced hash functions
     const h1_result = try sm9.hash.h1Hash(alice_id, 0x01, system.params.N, allocator);
-    const h2_result = try sm9.hash.h2Hash(message, "additional_data", allocator);
+    const h2_result = try sm9.hash.h2Hash(message, "additional_data", system.params.N, allocator);
     std.debug.print("✅ H1 hash: {x:02}... (non-zero: {})\n", .{ h1_result[0], !sm9.bigint.isZero(h1_result) });
     std.debug.print("✅ H2 hash: {x:02}... (non-zero: {})\n", .{ h2_result[0], !sm9.bigint.isZero(h2_result) });
 
