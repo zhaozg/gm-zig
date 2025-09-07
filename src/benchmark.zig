@@ -36,10 +36,10 @@ pub const BenchmarkResult = struct {
     platform: []const u8,
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
-        var output: std.ArrayList(u8) = .empty;
-        defer output.deinit(allocator);
+        var output = std.ArrayList(u8).init(allocator);
+        defer output.deinit();
 
-        const writer = output.writer(allocator);
+        const writer = output.writer();
         try writer.print("{{", .{});
         try writer.print("\"algorithm\":\"{s}\",", .{self.algorithm});
         try writer.print("\"operation\":\"{s}\",", .{self.operation});
@@ -51,7 +51,7 @@ pub const BenchmarkResult = struct {
         try writer.print("\"platform\":\"{s}\"", .{self.platform});
         try writer.print("}}", .{});
 
-        return try output.toOwnedSlice(allocator);
+        return try output.toOwnedSlice();
     }
 };
 
@@ -61,24 +61,24 @@ pub const BenchmarkSuite = struct {
 
     pub fn init(allocator: std.mem.Allocator) BenchmarkSuite {
         return BenchmarkSuite{
-            .results = .empty,
+            .results = std.ArrayList(BenchmarkResult).init(allocator),
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *BenchmarkSuite) void {
-        self.results.deinit(self.allocator);
+        self.results.deinit();
     }
 
     pub fn addResult(self: *BenchmarkSuite, result: BenchmarkResult) !void {
-        try self.results.append(self.allocator, result);
+        try self.results.append(result);
     }
 
     pub fn toJsonArray(self: *BenchmarkSuite) ![]u8 {
-        var output: std.ArrayList(u8) = .empty;
-        defer output.deinit(self.allocator);
+        var output = std.ArrayList(u8).init(self.allocator);
+        defer output.deinit();
 
-        const writer = output.writer(self.allocator);
+        const writer = output.writer();
         try writer.print("[", .{});
 
         for (self.results.items, 0..) |result, i| {
@@ -89,7 +89,7 @@ pub const BenchmarkSuite = struct {
         }
 
         try writer.print("]", .{});
-        return try output.toOwnedSlice(self.allocator);
+        return try output.toOwnedSlice();
     }
 
     // Print human-readable summary
@@ -135,7 +135,7 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
     for (test_sizes) |size| {
         // Allocate aligned memory
-        const alignment: std.mem.Alignment = @enumFromInt(16);
+        const alignment: u29 = 16;
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
@@ -190,7 +190,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     const timestamp = std.time.timestamp();
 
     for (test_sizes) |size| {
-        const alignment: std.mem.Alignment = @enumFromInt(16);
+        const alignment: u29 = 16;
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 

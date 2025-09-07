@@ -59,7 +59,7 @@ const AnalysisReport = struct {
 };
 
 fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !std.ArrayList(PerformanceRecord) {
-    var history: std.ArrayList(PerformanceRecord) = .empty;
+    var history = std.ArrayList(PerformanceRecord).init(allocator);
 
     const history_path = try std.fmt.allocPrint(allocator, "{s}/performance-history.jsonl", .{data_dir});
     defer allocator.free(history_path);
@@ -85,7 +85,7 @@ fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !s
 
         // Deep copy the record to avoid use-after-free
         const record = try copyPerformanceRecord(allocator, parsed.value);
-        try history.append(allocator, record);
+        try history.append(record);
     }
 
     return history;
@@ -153,7 +153,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
         var trend_iter = trends.iterator();
         while (trend_iter.next()) |entry| {
             allocator.free(entry.key_ptr.*);
-            entry.value_ptr.deinit(allocator);
+            entry.value_ptr.deinit();
         }
         trends.deinit();
     }
@@ -165,12 +165,12 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 
             const get_result = try trends.getOrPut(key);
             if (!get_result.found_existing) {
-                get_result.value_ptr.* = .empty;
+                get_result.value_ptr.* = std.ArrayList(PerformanceDataPoint).init(allocator);
             } else {
                 allocator.free(key);
             }
 
-            try get_result.value_ptr.append(allocator, .{
+            try get_result.value_ptr.append(.{
                 .timestamp = result.timestamp,
                 .performance_value = result.performance_value,
             });
@@ -228,10 +228,10 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 }
 
 fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
-    var output: std.ArrayList(u8) = .empty;
-    defer output.deinit(allocator);
+    var output = std.ArrayList(u8).init(allocator);
+    defer output.deinit();
 
-    const writer = output.writer(allocator);
+    const writer = output.writer();
 
     try writer.print("=== GM-Zig Performance Analysis Report ===\n", .{});
     try writer.print("Generated: {}\n", .{std.time.timestamp()});
@@ -313,15 +313,15 @@ fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
 
 fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
     // Convert HashMap to an array of key-value pairs for JSON serialization
-    var trends_array: std.ArrayList(struct {
+    var trends_array = std.ArrayList(struct {
         algorithm_operation: []const u8,
         analysis: TrendAnalysis,
-    }) = .empty;
-    defer trends_array.deinit(allocator);
+    }).init(allocator);
+    defer trends_array.deinit();
 
     var iterator = report.performance_trends.iterator();
     while (iterator.next()) |entry| {
-        try trends_array.append(allocator, .{
+        try trends_array.append(.{
             .algorithm_operation = entry.key_ptr.*,
             .analysis = entry.value_ptr.*,
         });
@@ -346,10 +346,10 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
     };
 
     // Manual JSON serialization for simplicity
-    var output: std.ArrayList(u8) = .empty;
-    defer output.deinit(allocator);
+    var output = std.ArrayList(u8).init(allocator);
+    defer output.deinit();
 
-    const writer = output.writer(allocator);
+    const writer = output.writer();
 
     try writer.print("{{", .{});
     try writer.print("\"summary\":{{", .{});
@@ -376,7 +376,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
     try writer.print("]", .{});
     try writer.print("}}", .{});
 
-    return try output.toOwnedSlice(allocator);
+    return try output.toOwnedSlice();
 }
 
 pub fn main() !void {
@@ -434,7 +434,7 @@ pub fn main() !void {
         for (history.items) |record| {
             freePerformanceRecord(allocator, record);
         }
-        history.deinit(allocator);
+        history.deinit();
     }
 
     if (history.items.len == 0) {
