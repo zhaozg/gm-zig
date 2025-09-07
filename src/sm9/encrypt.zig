@@ -452,7 +452,7 @@ pub const EncryptionContext = struct {
         // ENHANCEMENT: Now using proper bilinear pairing operations matching encryption
 
         // First try to get user's identity hash and create Qb point (same as encryption)
-        const h1_result = key_extract.h1Hash(user_private_key.id, 0x01, self.system_params.N, self.allocator) catch {
+        const h1_result = key_extract.h1Hash(user_private_key.id, 0x03, self.system_params.N, self.allocator) catch {
             // Fallback to deterministic computation for test compatibility
             var w_fallback = [_]u8{0} ** 32;
             var w_hasher = SM3.init(.{});
