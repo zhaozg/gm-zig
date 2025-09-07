@@ -47,7 +47,7 @@ pub const BenchmarkResult = struct {
             std.ArrayList(u8).empty
         else
             std.ArrayList(u8).init(allocator);
-        
+
         if (isZig015OrNewer) {
             defer output.deinit(allocator);
         } else {
@@ -58,7 +58,7 @@ pub const BenchmarkResult = struct {
             output.writer(allocator)
         else
             output.writer();
-        
+
         try writer.print("{{", .{});
         try writer.print("\"algorithm\":\"{s}\",", .{self.algorithm});
         try writer.print("\"operation\":\"{s}\",", .{self.operation});
@@ -112,7 +112,7 @@ pub const BenchmarkSuite = struct {
             std.ArrayList(u8).empty
         else
             std.ArrayList(u8).init(self.allocator);
-        
+
         if (isZig015OrNewer) {
             defer output.deinit(self.allocator);
         } else {
@@ -123,7 +123,7 @@ pub const BenchmarkSuite = struct {
             output.writer(self.allocator)
         else
             output.writer();
-        
+
         try writer.print("[", .{});
 
         for (self.results.items, 0..) |result, i| {

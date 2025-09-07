@@ -175,7 +175,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
         std.StringHashMap(std.ArrayList(PerformanceDataPoint)).empty
     else
         std.StringHashMap(std.ArrayList(PerformanceDataPoint)).init(allocator);
-    
+
     defer {
         var trend_iter = trends.iterator();
         while (trend_iter.next()) |entry| {
@@ -277,7 +277,7 @@ fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         std.ArrayList(u8).empty
     else
         std.ArrayList(u8).init(allocator);
-    
+
     if (isZig015OrNewer) {
         defer output.deinit(allocator);
     } else {
@@ -379,7 +379,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
             algorithm_operation: []const u8,
             analysis: TrendAnalysis,
         }).init(allocator);
-    
+
     if (isZig015OrNewer) {
         defer trends_array.deinit(allocator);
     } else {
@@ -424,7 +424,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         std.ArrayList(u8).empty
     else
         std.ArrayList(u8).init(allocator);
-    
+
     if (isZig015OrNewer) {
         defer output.deinit(allocator);
     } else {
