@@ -59,7 +59,7 @@ const AnalysisReport = struct {
 };
 
 fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !std.ArrayList(PerformanceRecord) {
-    var history = std.ArrayList(PerformanceRecord).init(allocator);
+    var history: std.ArrayList(PerformanceRecord) = .empty;
 
     const history_path = try std.fmt.allocPrint(allocator, "{s}/performance-history.jsonl", .{data_dir});
     defer allocator.free(history_path);
@@ -85,7 +85,7 @@ fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !s
 
         // Deep copy the record to avoid use-after-free
         const record = try copyPerformanceRecord(allocator, parsed.value);
-        try history.append(record);
+        try history.append(allocator, record);
     }
 
     return history;
@@ -153,7 +153,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
         var trend_iter = trends.iterator();
         while (trend_iter.next()) |entry| {
             allocator.free(entry.key_ptr.*);
-            entry.value_ptr.deinit();
+            entry.value_ptr.deinit(allocator);
         }
         trends.deinit();
     }
@@ -165,12 +165,12 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 
             const get_result = try trends.getOrPut(key);
             if (!get_result.found_existing) {
-                get_result.value_ptr.* = std.ArrayList(PerformanceDataPoint).init(allocator);
+                get_result.value_ptr.* = .empty;
             } else {
                 allocator.free(key);
             }
 
-            try get_result.value_ptr.append(.{
+            try get_result.value_ptr.append(allocator, .{
                 .timestamp = result.timestamp,
                 .performance_value = result.performance_value,
             });
@@ -228,10 +228,10 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 }
 
 fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
-    var output = std.ArrayList(u8).init(allocator);
-    defer output.deinit();
+    var output: std.ArrayList(u8) = .empty;
+    defer output.deinit(allocator);
 
-    const writer = output.writer();
+    const writer = output.writer(allocator);
 
     try writer.print("=== GM-Zig Performance Analysis Report ===\n", .{});
     try writer.print("Generated: {}\n", .{std.time.timestamp()});
@@ -313,15 +313,15 @@ fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
 
 fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
     // Convert HashMap to an array of key-value pairs for JSON serialization
-    var trends_array = std.ArrayList(struct {
+    var trends_array: std.ArrayList(struct {
         algorithm_operation: []const u8,
         analysis: TrendAnalysis,
-    }).init(allocator);
-    defer trends_array.deinit();
+    }) = .empty;
+    defer trends_array.deinit(allocator);
 
     var iterator = report.performance_trends.iterator();
     while (iterator.next()) |entry| {
-        try trends_array.append(.{
+        try trends_array.append(allocator, .{
             .algorithm_operation = entry.key_ptr.*,
             .analysis = entry.value_ptr.*,
         });
@@ -345,7 +345,38 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         },
     };
 
-    return try std.json.stringifyAlloc(allocator, json_data, .{});
+    // Manual JSON serialization for simplicity
+    var output: std.ArrayList(u8) = .empty;
+    defer output.deinit(allocator);
+    
+    const writer = output.writer(allocator);
+    
+    try writer.print("{{", .{});
+    try writer.print("\"summary\":{{", .{});
+    try writer.print("\"total_data_points\":{},", .{json_data.summary.total_data_points});
+    try writer.print("\"improvements\":{},", .{json_data.summary.improvements});
+    try writer.print("\"regressions\":{},", .{json_data.summary.regressions});
+    try writer.print("\"stable\":{}", .{json_data.summary.stable});
+    try writer.print("}},", .{});
+    try writer.print("\"trends\":[", .{});
+    
+    for (json_data.trends, 0..) |trend, i| {
+        if (i > 0) try writer.print(",", .{});
+        try writer.print("{{", .{});
+        try writer.print("\"algorithm_operation\":\"{s}\",", .{trend.algorithm_operation});
+        try writer.print("\"analysis\":{{", .{});
+        try writer.print("\"trend_direction\":\"{s}\",", .{trend.analysis.trend_direction});
+        try writer.print("\"latest_performance\":{d},", .{trend.analysis.latest_performance});
+        try writer.print("\"previous_performance\":{d},", .{trend.analysis.previous_performance});
+        try writer.print("\"change_percent\":{d}", .{trend.analysis.change_percent});
+        try writer.print("}}", .{});
+        try writer.print("}}", .{});
+    }
+    
+    try writer.print("]", .{});
+    try writer.print("}}", .{});
+    
+    return try output.toOwnedSlice(allocator);
 }
 
 pub fn main() !void {
@@ -403,7 +434,7 @@ pub fn main() !void {
         for (history.items) |record| {
             freePerformanceRecord(allocator, record);
         }
-        history.deinit();
+        history.deinit(allocator);
     }
 
     if (history.items.len == 0) {
