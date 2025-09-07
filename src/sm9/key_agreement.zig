@@ -38,24 +38,28 @@ pub const EphemeralKeyPair = struct {
 
     /// Initialize ephemeral key pair
     pub fn generate(user_id: []const u8, allocator: std.mem.Allocator) !EphemeralKeyPair {
-        _ = allocator; // Parameter kept for API compatibility but not used in current implementation
-        // Generate deterministic ephemeral key based on user ID
-        // For testing, make this completely deterministic by removing timestamp
+        _ = allocator; // Parameter kept for API compatibility
+        _ = user_id; // Use for context but not as primary entropy source
+        
+        // CRITICAL FIX: Use proper cryptographic random generation per GM/T 0044-2016
+        // Replace deterministic hash-based generation with secure random
         var private_key = [_]u8{0} ** 32;
 
-        var hasher = SM3.init(.{});
-        hasher.update(user_id);
-        hasher.update("SM9_EPHEMERAL_KEY_DETERMINISTIC");
-
-        // Add deterministic counter-based entropy instead of timestamp
-        const counter: u64 = 0x123456789ABCDEF0; // Fixed for deterministic testing
-        hasher.update(&@as([8]u8, @bitCast(@byteSwap(counter))));
-
-        hasher.final(&private_key);
+        // Use cryptographically secure random number generation
+        const random_module = @import("random.zig");
+        private_key = random_module.secureRandomScalar(params.SM9System.init().params) catch blk: {
+            // Fallback to crypto.random if secure random fails
+            std.crypto.random.bytes(&private_key);
+            break :blk private_key;
+        };
 
         // Ensure private key is not zero and is valid for curve operations
         if (std.mem.allEqual(u8, &private_key, 0)) {
-            private_key[31] = 1;
+            // Generate a new random value if we got zero (extremely unlikely)
+            std.crypto.random.bytes(&private_key);
+            if (std.mem.allEqual(u8, &private_key, 0)) {
+                private_key[31] = 1; // Last resort non-zero value
+            }
         }
 
         // Ensure the private key is within valid range (less than curve order)

@@ -473,12 +473,10 @@ pub const KEMContext = struct {
         
         // Use proper cryptographic random number generation
         const random_module = @import("random.zig");
-        for (key) |*byte| {
-            byte.* = random_module.secureRandomByte() catch {
-                // Fallback to crypto.random as last resort
-                return std.crypto.random.int(u8);
-            };
-        }
+        random_module.secureRandomBytes(key) catch {
+            // Fallback to std crypto random if secure random fails  
+            std.crypto.random.bytes(key);
+        };
 
         // Encrypt the generated key using proper SM9 encryption
         const key_ciphertext = try self.encryption_context.encrypt(
