@@ -340,13 +340,13 @@ pub const G1Point = struct {
 
         // For projective coordinates (X, Y, Z), affine coordinates are (X/Z, Y/Z)
         // Implement proper modular division using modular inverse
-        
+
         // Compute Z^(-1) mod p
         const z_inv = bigint.invMod(self.z, curve_params.q) catch {
             // If inverse computation fails, return point at infinity as safe fallback
             return G1Point.infinity();
         };
-        
+
         // Compute affine coordinates: x = X * Z^(-1) mod p, y = Y * Z^(-1) mod p
         const affine_x = bigint.mulMod(self.x, z_inv, curve_params.q) catch {
             return G1Point.infinity();
@@ -354,7 +354,7 @@ pub const G1Point = struct {
         const affine_y = bigint.mulMod(self.y, z_inv, curve_params.q) catch {
             return G1Point.infinity();
         };
-        
+
         return G1Point.affine(affine_x, affine_y);
     }
 
@@ -863,35 +863,35 @@ pub const G2Point = struct {
         // In G2, points are over extension field F_p^2, so we need to handle 2 components
         // For now, create a simple but valid G2 point
         // In a full implementation, this would involve solving the curve equation over F_p^2
-        
+
         // Split the 64-byte x coordinate into two 32-byte components for F_p^2
         var x0: [32]u8 = undefined;
         var x1: [32]u8 = undefined;
         std.mem.copyForwards(u8, &x0, compressed[1..33]);
         std.mem.copyForwards(u8, &x1, compressed[33..65]);
-        
+
         // For decompression, we would normally solve: y^2 = x^3 + b over F_p^2
         // As a simplified implementation, derive y deterministically from x
         // This maintains consistency while avoiding complex field arithmetic
         var y0: [32]u8 = undefined;
         var y1: [32]u8 = undefined;
-        
+
         // Use hash-based derivation for y components
         var hasher = SM3.init(.{});
         hasher.update(&x0);
         hasher.update("G2_y0_derivation");
         hasher.final(&y0);
-        
+
         var hasher2 = SM3.init(.{});
         hasher2.update(&x1);
         hasher2.update("G2_y1_derivation");
         hasher2.final(&y1);
-        
+
         // Combine components back into full 64-byte coordinates
         var y: [64]u8 = undefined;
         std.mem.copyForwards(u8, y[0..32], &y0);
         std.mem.copyForwards(u8, y[32..64], &y1);
-        
+
         return G2Point.affine(x, y);
     }
 };

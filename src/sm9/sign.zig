@@ -229,7 +229,7 @@ pub const SignatureContext = struct {
             },
         }
 
-        // Step 1: Generate cryptographically secure random r  
+        // Step 1: Generate cryptographically secure random r
         // Use proper cryptographic random number generation in production
         var r = blk: {
             break :blk random.secureRandomScalar(self.system_params) catch {
@@ -241,7 +241,7 @@ pub const SignatureContext = struct {
                 r_hasher.update(user_private_key.id);
                 r_hasher.update("random_r_sign");
                 r_hasher.final(&r_fallback);
-                
+
                 // Ensure r is not zero
                 if (std.mem.allEqual(u8, &r_fallback, 0)) {
                     r_fallback[31] = 1;
@@ -448,7 +448,7 @@ pub const BatchSignature = struct {
             }
             return true;
         }
-        
+
         // For larger batches, implement optimized batch verification
         // This could involve combined pairing operations, but for now use individual verification
         // TODO: Implement full pairing-based batch verification for large batches
@@ -531,7 +531,7 @@ pub const SignatureUtils = struct {
     /// Implementation following GM/T 0044-2016 standard
     pub fn computeH2(message: []const u8, w: []const u8, N: [32]u8) [32]u8 {
         _ = N; // N parameter available but not directly used in this simplified implementation
-        
+
         // Use the proper h2Hash from hash module
         const hash = @import("hash.zig");
         const allocator = std.heap.page_allocator;
@@ -575,24 +575,24 @@ pub const SignatureUtils = struct {
         } else {
             return false; // h is zero
         }
-        
+
         // Check that S is not zero
         for (S) |byte| {
             if (byte != 0) break;
         } else {
             return false; // S is zero
         }
-        
+
         // Check that h < N
         if (!bigint.lessThan(h, N)) {
             return false;
         }
-        
+
         // Check that S < N
         if (!bigint.lessThan(S, N)) {
             return false;
         }
-        
+
         return true;
     }
 };

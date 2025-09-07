@@ -248,13 +248,13 @@ pub const EncryptionContext = struct {
         // Implement proper elliptic curve point operations
         // Compute Qb = H1(ID_B || hid, N) * P1 + P_pub-e
         const curve_ops = @import("curve.zig");
-        
+
         // Parse P1 (generator point) from system parameters
         const p1_point = curve_ops.G1Point.fromCompressed(self.system_params.P1) catch {
             // Fallback: create deterministic point if parsing fails
             var qb_bytes = [_]u8{0} ** 33;
             qb_bytes[0] = 0x02; // Compressed point prefix
-            
+
             // Create deterministic point from h1_result and user_id
             var point_hasher = SM3.init(.{});
             point_hasher.update(&h1_result);
@@ -263,7 +263,7 @@ pub const EncryptionContext = struct {
             var point_hash = [_]u8{0} ** 32;
             point_hasher.final(&point_hash);
             @memcpy(qb_bytes[1..], &point_hash);
-            
+
             return Ciphertext.initTakeOwnership(
                 self.allocator,
                 qb_bytes, // Use fallback Qb as C1
@@ -272,12 +272,12 @@ pub const EncryptionContext = struct {
                 options.format,
             );
         };
-        
+
         // For this implementation, create a deterministic Qb point based on h1_result
         // This avoids complex elliptic curve operations while maintaining consistency
         var qb_bytes = [_]u8{0} ** 33;
         qb_bytes[0] = 0x02; // Compressed point prefix
-        
+
         // Create deterministic Qb from h1_result and user_id for consistency
         var qb_hasher = SM3.init(.{});
         qb_hasher.update(&h1_result);
@@ -298,7 +298,7 @@ pub const EncryptionContext = struct {
                 r_hasher.update(message);
                 r_hasher.update("random_r");
                 r_hasher.final(&r_fallback);
-                
+
                 // Ensure r is not zero (avoid degenerate case)
                 if (std.mem.allEqual(u8, &r_fallback, 0)) {
                     r_fallback[31] = 1;
@@ -310,7 +310,7 @@ pub const EncryptionContext = struct {
         // Step 3: Compute C1 = r * P1 (elliptic curve scalar multiplication)
         // Implement proper elliptic curve point multiplication
         const c1_point = p1_point.mul(r, self.system_params);
-        
+
         // Compress C1 point for storage
         const c1 = c1_point.compress();
 
@@ -455,10 +455,10 @@ pub const KEMContext = struct {
         key_length: usize,
     ) !KeyEncapsulation {
         // Implement SM9 key encapsulation
-        // 1. Generate random symmetric key K  
+        // 1. Generate random symmetric key K
         // 2. Encrypt K using SM9 encryption (simplified implementation for testing)
         // 3. Return (K, encapsulation_data)
-        
+
         // Generate cryptographically secure key, with deterministic fallback
         const key = try self.encryption_context.allocator.alloc(u8, key_length);
 

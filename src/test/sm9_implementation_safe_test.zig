@@ -138,6 +138,6 @@ test "SM9 system parameters" {
 }
 
 // NOTE: Key extraction operations are working correctly in the full test suite
-// Individual test files cannot be run standalone due to import path dependencies  
+// Individual test files cannot be run standalone due to import path dependencies
 // Key extraction tests are enabled and working in sm9_implementation_test.zig and encrypt tests
 // The infinite loop issues have been resolved using deterministic approaches
