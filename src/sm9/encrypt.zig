@@ -315,6 +315,10 @@ pub const EncryptionContext = struct {
         const c1 = c1_point.compress();
 
         // Step 4-5: Compute pairing and derive w
+        // TODO: ENHANCEMENT NEEDED for full GM/T 0044-2016 compliance
+        // Current implementation uses deterministic computation for consistency
+        // Enhancement: Replace with proper bilinear pairing w = e(Qb, P2)
+        // where Qb is user's public key derived from identity using H1(ID, hid)
         // For consistent encryption/decryption, use deterministic w computation
         // that can be reproduced during decryption using only C1 and user_id
         var w = [_]u8{0} ** 32;

@@ -203,8 +203,11 @@ pub const KeyAgreementContext = struct {
         }
 
         // Step 3: Compute shared point using simplified approach
-        // In full SM9 implementation, this would involve pairing computations:
+        // TODO: ENHANCEMENT NEEDED for full GM/T 0044-2016 compliance
+        // Current implementation uses deterministic hash combination for testing
+        // Enhancement: Replace with proper bilinear pairing operations:
         // Z = e(my_private_key, peer_public_key) * e(my_ephemeral_private, peer_ephemeral_public)
+        // In full SM9 implementation, this would involve pairing computations:
         // For this implementation, we use a deterministic approach that combines all inputs
 
         var shared_material = [_]u8{0} ** 128; // Extended buffer for shared computation
