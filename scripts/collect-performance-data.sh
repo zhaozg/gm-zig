@@ -35,7 +35,10 @@ zig build benchmark > /dev/null 2>&1
 
 # Run benchmarks and capture JSON output
 echo "Running performance benchmarks..."
-BENCHMARK_JSON=$(./zig-out/bin/benchmark --json 2>&1)
+BENCHMARK_OUTPUT=$(./zig-out/bin/benchmark --json 2>&1)
+
+# Filter out info messages and extract only the JSON line
+BENCHMARK_JSON=$(echo "$BENCHMARK_OUTPUT" | grep -E '^\[.*\]$' | tail -1)
 
 # Validate the JSON was captured correctly
 if [[ -z "$BENCHMARK_JSON" ]]; then

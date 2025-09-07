@@ -5,6 +5,25 @@ const sm4 = root.sm4;
 const sm2 = root.sm2;
 const sm9 = root.sm9;
 
+// Flag to control logging output in JSON mode
+var json_mode: bool = false;
+
+// Custom log function that suppresses output in JSON mode
+pub fn log(
+    comptime message_level: std.log.Level,
+    comptime scope: @Type(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    // Suppress all info and debug messages in JSON mode
+    if (json_mode and (message_level == .info or message_level == .debug)) {
+        return;
+    }
+
+    // Use default logging for errors and warnings
+    std.log.defaultLog(message_level, scope, format, args);
+}
+
 // Benchmark result structure for structured output
 pub const BenchmarkResult = struct {
     algorithm: []const u8,
@@ -19,7 +38,7 @@ pub const BenchmarkResult = struct {
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
         var output: std.ArrayList(u8) = .empty;
         defer output.deinit(allocator);
-        
+
         const writer = output.writer(allocator);
         try writer.print("{{", .{});
         try writer.print("\"algorithm\":\"{s}\",", .{self.algorithm});
@@ -31,7 +50,7 @@ pub const BenchmarkResult = struct {
         try writer.print("\"build_mode\":\"{s}\",", .{self.build_mode});
         try writer.print("\"platform\":\"{s}\"", .{self.platform});
         try writer.print("}}", .{});
-        
+
         return try output.toOwnedSlice(allocator);
     }
 };
@@ -58,17 +77,17 @@ pub const BenchmarkSuite = struct {
     pub fn toJsonArray(self: *BenchmarkSuite) ![]u8 {
         var output: std.ArrayList(u8) = .empty;
         defer output.deinit(self.allocator);
-        
+
         const writer = output.writer(self.allocator);
         try writer.print("[", .{});
-        
+
         for (self.results.items, 0..) |result, i| {
             if (i > 0) try writer.print(",", .{});
             const result_json = try result.toJson(self.allocator);
             defer self.allocator.free(result_json);
             try writer.print("{s}", .{result_json});
         }
-        
+
         try writer.print("]", .{});
         return try output.toOwnedSlice(self.allocator);
     }
@@ -628,6 +647,9 @@ pub fn main() !void {
     defer std.process.argsFree(allocator, args);
 
     const output_json = args.len > 1 and std.mem.eql(u8, args[1], "--json");
+
+    // Set JSON mode to suppress info logging
+    json_mode = output_json;
 
     try runBenchmarks(allocator, output_json);
 }

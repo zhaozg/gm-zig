@@ -348,9 +348,9 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
     // Manual JSON serialization for simplicity
     var output: std.ArrayList(u8) = .empty;
     defer output.deinit(allocator);
-    
+
     const writer = output.writer(allocator);
-    
+
     try writer.print("{{", .{});
     try writer.print("\"summary\":{{", .{});
     try writer.print("\"total_data_points\":{},", .{json_data.summary.total_data_points});
@@ -359,7 +359,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
     try writer.print("\"stable\":{}", .{json_data.summary.stable});
     try writer.print("}},", .{});
     try writer.print("\"trends\":[", .{});
-    
+
     for (json_data.trends, 0..) |trend, i| {
         if (i > 0) try writer.print(",", .{});
         try writer.print("{{", .{});
@@ -372,10 +372,10 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         try writer.print("}}", .{});
         try writer.print("}}", .{});
     }
-    
+
     try writer.print("]", .{});
     try writer.print("}}", .{});
-    
+
     return try output.toOwnedSlice(allocator);
 }
 
