@@ -49,10 +49,7 @@ const AnalysisReport = struct {
 
     pub fn init(allocator: std.mem.Allocator) Self {
         return Self{
-            .performance_trends = if (isZig015OrNewer)
-                std.StringHashMap(TrendAnalysis).empty
-            else
-                std.StringHashMap(TrendAnalysis).init(allocator),
+            .performance_trends = std.StringHashMap(TrendAnalysis).init(allocator),
             .total_data_points = 0,
             .improvements = 0,
             .regressions = 0,
@@ -66,17 +63,13 @@ const AnalysisReport = struct {
         while (iterator.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
         }
-        if (isZig015OrNewer) {
-            self.performance_trends.deinit(self.allocator);
-        } else {
-            self.performance_trends.deinit();
-        }
+        self.performance_trends.deinit();
     }
 };
 
 fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !std.ArrayList(PerformanceRecord) {
     var history = if (isZig015OrNewer)
-        std.ArrayList(PerformanceRecord).empty
+        std.ArrayList(PerformanceRecord){}
     else
         std.ArrayList(PerformanceRecord).init(allocator);
 
@@ -171,10 +164,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
     }
 
     var report = AnalysisReport.init(allocator);
-    var trends = if (isZig015OrNewer)
-        std.StringHashMap(std.ArrayList(PerformanceDataPoint)).empty
-    else
-        std.StringHashMap(std.ArrayList(PerformanceDataPoint)).init(allocator);
+    var trends = std.StringHashMap(std.ArrayList(PerformanceDataPoint)).init(allocator);
 
     defer {
         var trend_iter = trends.iterator();
@@ -186,11 +176,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
                 entry.value_ptr.deinit();
             }
         }
-        if (isZig015OrNewer) {
-            trends.deinit(allocator);
-        } else {
-            trends.deinit();
-        }
+        trends.deinit();
     }
 
     // Group performance data by algorithm_operation key
@@ -201,7 +187,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
             const get_result = try trends.getOrPut(key);
             if (!get_result.found_existing) {
                 get_result.value_ptr.* = if (isZig015OrNewer)
-                    std.ArrayList(PerformanceDataPoint).empty
+                    std.ArrayList(PerformanceDataPoint){}
                 else
                     std.ArrayList(PerformanceDataPoint).init(allocator);
             } else {
@@ -274,7 +260,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 
 fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
     var output = if (isZig015OrNewer)
-        std.ArrayList(u8).empty
+        std.ArrayList(u8){}
     else
         std.ArrayList(u8).init(allocator);
 
@@ -373,7 +359,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         std.ArrayList(struct {
             algorithm_operation: []const u8,
             analysis: TrendAnalysis,
-        }).empty
+        }){}
     else
         std.ArrayList(struct {
             algorithm_operation: []const u8,
@@ -421,7 +407,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
 
     // Manual JSON serialization for simplicity
     var output = if (isZig015OrNewer)
-        std.ArrayList(u8).empty
+        std.ArrayList(u8){}
     else
         std.ArrayList(u8).init(allocator);
 

@@ -44,7 +44,7 @@ pub const BenchmarkResult = struct {
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
         var output = if (isZig015OrNewer)
-            std.ArrayList(u8).empty
+            std.ArrayList(u8){}
         else
             std.ArrayList(u8).init(allocator);
 
@@ -84,7 +84,7 @@ pub const BenchmarkSuite = struct {
     pub fn init(allocator: std.mem.Allocator) BenchmarkSuite {
         return BenchmarkSuite{
             .results = if (isZig015OrNewer)
-                std.ArrayList(BenchmarkResult).empty
+                std.ArrayList(BenchmarkResult){}
             else
                 std.ArrayList(BenchmarkResult).init(allocator),
             .allocator = allocator,
@@ -109,7 +109,7 @@ pub const BenchmarkSuite = struct {
 
     pub fn toJsonArray(self: *BenchmarkSuite) ![]u8 {
         var output = if (isZig015OrNewer)
-            std.ArrayList(u8).empty
+            std.ArrayList(u8){}
         else
             std.ArrayList(u8).init(self.allocator);
 
