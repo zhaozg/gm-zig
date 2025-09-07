@@ -499,7 +499,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
     // 1. Benchmark key extraction
     {
-        const iterations = 20;
+        const iterations = 10; // Reduced for faster CI
 
         // Signing key extraction
         const sign_extract_start = std.time.nanoTimestamp();
@@ -555,7 +555,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     // 2. Benchmark digital signature operations
     for (test_messages, 0..) |message, i| {
         const data_size_kb = @as(f64, @floatFromInt(message.len)) / 1024.0;
-        const iterations: u32 = if (i == 2) 5 else 15;
+        const iterations: u32 = if (i == 2) 2 else 5; // Reduced iterations for faster CI
 
         // Signature creation
         {
@@ -613,7 +613,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Encryption/Decryption operations
         {
-            const enc_iterations: u32 = if (i == 2) 3 else 10;
+            const enc_iterations: u32 = if (i == 2) 1 else 3; // Reduced for faster CI
 
             // Encryption
             const encrypt_start = std.time.nanoTimestamp();
