@@ -237,6 +237,10 @@ zig build --verbose
 # Profile test execution
 time zig test src/test.zig
 
+# Profile specific named_regex test
+time zig test src/test  --test-filter "named_regex"
+```
+
 # Check for infinite loops (should complete in <5 minutes)
 timeout 300 zig test src/test.zig
 ```
