@@ -115,61 +115,35 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
         return HashError.InvalidInput;
     }
 
-    // Step 1: Use iterative hashing until result is in valid range
-    // Start with a deterministic seed based on input data
-    var seed_hasher = SM3.init(.{});
-    seed_hasher.update(message);
-    seed_hasher.update(additional_data);
-    seed_hasher.update("SM9H2_SEED");
-    var seed: [32]u8 = undefined;
-    seed_hasher.final(&seed);
+    // Step 1: Prepare input according to GM/T 0044-2016
+    var hasher = SM3.init(.{});
 
-    // Convert seed to starting counter (deterministic)
-    const starting_counter = (@as(u32, seed[0]) << 24) | (@as(u32, seed[1]) << 16) | (@as(u32, seed[2]) << 8) | seed[3];
+    // Step 2: Hash message data
+    hasher.update(message);
 
-    var counter: u32 = starting_counter;
+    // Step 3: Hash additional data (e.g., w value)
+    hasher.update(additional_data);
+
+    // Step 4: Add domain separation for H2
+    const h2_suffix = "SM9H2";
+    hasher.update(h2_suffix);
+
+    // Step 5: Compute hash
     var result: [32]u8 = undefined;
-    const max_attempts: u32 = 256;
-    var attempts: u32 = 0;
+    hasher.final(&result);
 
-    while (attempts < max_attempts) : (attempts += 1) {
-        // Step 2: Prepare input according to GM/T 0044-2016
-        var hasher = SM3.init(.{});
+    // Step 6: Reduce modulo order to ensure result is in range [0, N-1]
+    const reduced = bigint.mod(result, order) catch |err| switch (err) {
+        bigint.BigIntError.InvalidModulus => return error.HashComputationFailed,
+        else => return error.HashComputationFailed,
+    };
 
-        // Step 3: Hash message data
-        hasher.update(message);
-
-        // Step 4: Hash additional data (e.g., w value)
-        hasher.update(additional_data);
-
-        // Step 5: Add domain separation for H2
-        const h2_suffix = "SM9H2";
-        hasher.update(h2_suffix);
-
-        // Step 6: Add counter to ensure we can find a valid value
-        const counter_bytes = [4]u8{
-            @as(u8, @intCast((counter >> 24) & 0xFF)),
-            @as(u8, @intCast((counter >> 16) & 0xFF)),
-            @as(u8, @intCast((counter >> 8) & 0xFF)),
-            @as(u8, @intCast(counter & 0xFF)),
-        };
-        hasher.update(&counter_bytes);
-
-        // Step 7: Compute hash
-        hasher.final(&result);
-
-        // Step 8: Check if result is in valid range [1, N-1]
-        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
-            return result;
-        }
-
-        // Try next counter value (deterministic progression)
-        counter = counter +% 1; // Use wrapping arithmetic
+    // Step 7: If result is zero, return 1 to ensure result is in range [1, N-1]
+    if (bigint.isZero(reduced)) {
+        return bigint.fromU64(1);
     }
 
-    // If we couldn't find a valid value after max_attempts, create a fallback
-    // This should be extremely rare in practice
-    return error.HashComputationFailed;
+    return reduced;
 }
 
 /// SM9 Key Derivation Function (KDF)

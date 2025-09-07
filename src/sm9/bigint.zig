@@ -251,9 +251,41 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return a;
     }
 
+    // For small moduli like those used in tests, we can use a simple but more efficient approach
+    // Check if m is small enough to convert to u64 for faster arithmetic
+    var m_u64: u64 = 0;
+    var can_use_u64 = true;
+
+    // Check if m fits in u64 (first 24 bytes must be zero)
+    for (m[0..24]) |byte| {
+        if (byte != 0) {
+            can_use_u64 = false;
+            break;
+        }
+    }
+
+    if (can_use_u64) {
+        // Convert m to u64
+        m_u64 = (@as(u64, m[24]) << 56) | (@as(u64, m[25]) << 48) | (@as(u64, m[26]) << 40) | (@as(u64, m[27]) << 32) |
+            (@as(u64, m[28]) << 24) | (@as(u64, m[29]) << 16) | (@as(u64, m[30]) << 8) | @as(u64, m[31]);
+
+        if (m_u64 > 0) {
+            // Use efficient u64 modular arithmetic
+            var result_u64: u64 = 0;
+
+            // Process a from most significant to least significant byte
+            for (a) |byte| {
+                result_u64 = (result_u64 * 256 + @as(u64, byte)) % m_u64;
+            }
+
+            return fromU64(result_u64);
+        }
+    }
+
+    // Fallback to subtraction method for large moduli
     var result = a;
     var iterations: u32 = 0;
-    const max_iterations: u32 = 512; // Generous limit for 256-bit numbers
+    const max_iterations: u32 = 512;
 
     while (!lessThan(result, m) and iterations < max_iterations) {
         const sub_result = sub(result, m);
