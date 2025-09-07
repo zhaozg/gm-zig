@@ -100,7 +100,7 @@ pub const SignUserPrivateKey = struct {
         // Step 4: CRITICAL FIX - Implement proper SM9 key extraction per GM/T 0044-2016
         // Compute ds_A = (1/(s + H1(ID_A, hid))) * P1
         // This is the actual SM9 private key extraction algorithm
-        
+
         // Compute t1_inv = (1/t1) mod N
         const t1_inv = bigint.invMod(t1, system_params.N) catch {
             // If modular inverse fails, retry with modified ID approach
@@ -125,13 +125,13 @@ pub const SignUserPrivateKey = struct {
                         retry_count += 1;
                         continue;
                     };
-                    
+
                     // Success with modified ID - compute ds_A = t1_inv * P1
                     const curve = @import("curve.zig");
                     const P1_generator = curve.CurveUtils.getG1Generator(system_params);
                     const ds_A_point = curve.CurveUtils.scalarMultiplyG1(P1_generator, t1_inv_retry, system_params);
                     const ds_A_compressed = ds_A_point.compress();
-                    
+
                     return SignUserPrivateKey{
                         .id = user_id, // Keep original ID for compatibility
                         .key = ds_A_compressed,
@@ -142,12 +142,12 @@ pub const SignUserPrivateKey = struct {
             }
             return KeyExtractionError.KeyGenerationFailed;
         };
-        
+
         // Step 5: Compute ds_A = t1_inv * P1 (proper elliptic curve scalar multiplication)
         const curve = @import("curve.zig");
         const P1_generator = curve.CurveUtils.getG1Generator(system_params);
         const ds_A_point = curve.CurveUtils.scalarMultiplyG1(P1_generator, t1_inv, system_params);
-        
+
         // Convert to compressed format for storage
         const ds_A_compressed = ds_A_point.compress();
 
@@ -280,7 +280,7 @@ pub const EncryptUserPrivateKey = struct {
         // Step 4: CRITICAL FIX - Implement proper SM9 encryption key extraction per GM/T 0044-2016
         // Compute de_A = (1/(s + H1(ID_A, hid))) * P2
         // This is the actual SM9 encryption private key extraction algorithm
-        
+
         // Compute t2_inv = (1/t2) mod N
         const t2_inv = bigint.invMod(t2, system_params.N) catch {
             // If modular inverse fails, retry with modified ID approach
@@ -305,13 +305,13 @@ pub const EncryptUserPrivateKey = struct {
                         retry_count += 1;
                         continue;
                     };
-                    
+
                     // Success with modified ID - compute de_A = t2_inv * P2
                     const curve = @import("curve.zig");
                     const P2_generator = curve.CurveUtils.getG2Generator(system_params);
                     const de_A_point = curve.CurveUtils.scalarMultiplyG2(P2_generator, t2_inv_retry, system_params);
                     const de_A_uncompressed = de_A_point.compress();
-                    
+
                     return EncryptUserPrivateKey{
                         .id = user_id, // Keep original ID for compatibility
                         .key = de_A_uncompressed,
@@ -322,12 +322,12 @@ pub const EncryptUserPrivateKey = struct {
             }
             return KeyExtractionError.KeyGenerationFailed;
         };
-        
+
         // Step 5: Compute de_A = t2_inv * P2 (proper elliptic curve scalar multiplication)
         const curve = @import("curve.zig");
         const P2_generator = curve.CurveUtils.getG2Generator(system_params);
         const de_A_point = curve.CurveUtils.scalarMultiplyG2(P2_generator, t2_inv, system_params);
-        
+
         // Convert to uncompressed format for storage (G2 points)
         const de_A_uncompressed = de_A_point.compress();
 

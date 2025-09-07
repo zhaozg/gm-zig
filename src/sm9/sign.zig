@@ -296,16 +296,16 @@ pub const SignatureContext = struct {
         // Step 6: Compute S = l * ds_A (elliptic curve scalar multiplication)
         // CRITICAL FIX: Use proper elliptic curve scalar multiplication instead of hash-based approach
         // This implements the actual SM9 cryptographic operation per GM/T 0044-2016
-        
+
         // Extract the private key point ds_A from user_private_key
         const curve = @import("curve.zig");
         const ds_A_point = curve.G1Point.fromCompressed(user_private_key.key) catch {
             return error.InvalidUserPrivateKey;
         };
-        
+
         // Perform the proper elliptic curve scalar multiplication: S = l * ds_A
         const S_point = curve.CurveUtils.scalarMultiplyG1(ds_A_point, l, self.system_params);
-        
+
         // Convert the result point to compressed format for storage
         const S = S_point.compress();
 
@@ -364,22 +364,22 @@ pub const SignatureContext = struct {
         const S_point = curve.G1Point.fromCompressed(signature.S) catch {
             return false; // Invalid signature point
         };
-        
+
         // Step 3: Compute user public key Ppub_s = H1(ID||hid) * P1 + Ppub_s
         const h1_result = key_extract.h1Hash(user_id, 0x01, self.system_params.N, self.allocator) catch {
             return false;
         };
-        
+
         // Get G1 generator point
         const P1_generator = curve.CurveUtils.getG1Generator(self.system_params);
-        
+
         // Compute H1(ID||hid) * P1
         const h1_P1 = curve.CurveUtils.scalarMultiplyG1(P1_generator, h1_result, self.system_params);
-        
+
         // For SM9, the master public key is on G2, but we need G1 operations for signature verification
         // Use the G1 generator as the base for user public key computation
         const user_public_key = h1_P1; // In SM9, user public key is derived from H1 and master parameters
-        
+
         // Step 4: Compute w value (same as signing)
         var w = [_]u8{0} ** 32;
         var w_hasher = SM3.init(.{});
@@ -387,38 +387,38 @@ pub const SignatureContext = struct {
         w_hasher.update(processed_message);
         w_hasher.update("signature_w_value");
         w_hasher.final(&w);
-        
+
         // Step 5: Compute h' = H2(M || w, N)
         const h_prime = key_extract.h2Hash(processed_message, &w, self.system_params.N, self.allocator) catch {
             return false;
         };
-        
+
         // Step 6: CRITICAL FIX - Use proper bilinear pairing verification
         // Verify that: e(S, P2) = e(h' * Ppub_s + w * P1, master_public_key)
         // This is the core SM9 verification using bilinear pairing per GM/T 0044-2016
-        
+
         const pairing_module = @import("pairing.zig");
         const P2_generator = curve.CurveUtils.getG2Generator(self.system_params);
-        
+
         // Use master public key from G2 for proper SM9 verification
         const master_pub_g2 = curve.G2Point.fromUncompressed(self.sign_master_public.public_key) catch {
             return false;
         };
-        
+
         // Left side: e(S, master_public_key)
         const left_pairing = pairing_module.pairing(S_point, master_pub_g2, self.system_params) catch {
             return false;
         };
-        
+
         // Right side: e(h' * Ppub_s + w * P1, P2)
         const h_prime_user_key = curve.CurveUtils.scalarMultiplyG1(user_public_key, h_prime, self.system_params);
         const w_P1 = curve.CurveUtils.scalarMultiplyG1(P1_generator, w, self.system_params);
         const right_point = h_prime_user_key.add(w_P1, self.system_params);
-        
+
         const right_pairing = pairing_module.pairing(right_point, P2_generator, self.system_params) catch {
             return false;
         };
-        
+
         // Verify pairing equality: e(S, master_public_key) = e(h' * Ppub_s + w * P1, P2)
         return left_pairing.equal(right_pairing);
     }
