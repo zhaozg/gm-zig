@@ -318,7 +318,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         analysis: TrendAnalysis,
     }).init(allocator);
     defer trends_array.deinit();
-    
+
     var iterator = report.performance_trends.iterator();
     while (iterator.next()) |entry| {
         try trends_array.append(.{
@@ -326,7 +326,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
             .analysis = entry.value_ptr.*,
         });
     }
-    
+
     const json_data = struct {
         trends: @TypeOf(trends_array.items),
         summary: struct {
@@ -344,7 +344,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
             .stable = report.stable,
         },
     };
-    
+
     return try std.json.stringifyAlloc(allocator, json_data, .{});
 }
 
