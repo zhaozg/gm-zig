@@ -36,3 +36,27 @@ jobs:
 
     - name: Run build tests
       run: zig build test
+
+    - name: Run performance benchmarks
+      run: |
+        # Install jq for JSON processing
+        sudo apt-get update && sudo apt-get install -y jq
+        
+        # Run performance data collection
+        ./scripts/collect-performance-data.sh
+        
+        # Upload performance data as artifact
+        if [ -f .performance-data/latest-summary.json ]; then
+          echo "Performance data collected successfully"
+        else
+          echo "Failed to collect performance data"
+          exit 1
+        fi
+
+    - name: Upload performance data
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-data-${{ matrix.zig-version }}-${{ github.sha }}
+        path: .performance-data/
+        retention-days: 90

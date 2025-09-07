@@ -37,13 +37,14 @@ The library is designed with security, performance, and ease-of-use in mind, lev
   - Hardware acceleration ready
   - Padding support (PKCS#7)
 
-- **🆔 SM9 Identity-Based Cryptography** *(Complete Implementation)*
-  - Complete implementation following GM/T 0044-2016
-  - **Security-first approach** with constant-time operations
-  - Digital signature and verification algorithms
-  - Public key encryption and decryption algorithms
-  - Comprehensive key derivation and management
-  - Advanced point validation and security checks
+- **🆔 SM9 Identity-Based Cryptography** *(Functional Implementation - Enhancement Required)*
+  - **Current**: Functional implementation with simplified hash-based operations
+  - **Testing**: Complete implementation following GM/T 0044-2016 structure
+  - **Status**: Digital signature and verification algorithms (hash-based)
+  - **Status**: Public key encryption and decryption algorithms (hash-based)  
+  - **Status**: Comprehensive key derivation and management framework
+  - **Required**: Full elliptic curve scalar multiplication implementation
+  - **Required**: Complete bilinear pairing operations for cryptographic security
   - Core mathematical foundation (bigint, elliptic curves, pairings)
   - System parameter generation and key extraction framework
   - DER encoding support and standards compliance
@@ -61,12 +62,17 @@ The library is designed with security, performance, and ease-of-use in mind, lev
 - **SM2 Elliptic Curve Cryptography**: Complete implementation with digital signatures, key exchange, and encryption
 - **SM3 Cryptographic Hash Function**: Full standard compliance with streaming support
 - **SM4 Block Cipher**: Complete with all operation modes and padding schemes
-- **SM9 Identity-Based Cryptography**: Complete implementation with all algorithms and 100% test coverage
+
+### ⚠️ Requires Enhancement
+- **SM9 Identity-Based Cryptography**: **Functional implementation with simplified hash-based approach**
+  - Current: Fast hash operations (~7,000 ops/s) for testing and functionality validation
+  - Required: Complete elliptic curve scalar multiplication and bilinear pairing operations
+  - Status: GM/T 0044-2016 structure implemented, cryptographic core enhancement needed
 
 ### 🎯 Test Coverage Status
 - **Total Tests**: 219 tests (unified in `src/test.zig`)
 - **Success Rate**: 100% - All tests passing
-- **SM9 Achievement**: 145 tests covering complete algorithm suite (resolved all hanging/infinite loop issues)
+- **SM9 Coverage**: 145 tests covering algorithm structure and functionality
 - **Standards Compliance**: Full GM/T specifications adherence with official test vectors
 
 ## 🚀 Quick Start
@@ -532,13 +538,33 @@ This project is licensed under the terms specified in the LICENSE file. Please r
 
 *For detailed implementation notes and advanced usage examples, see [SM2_IMPLEMENTATION.md](SM2_IMPLEMENTATION.md) and [SM9_IMPLEMENTATION.md](SM9_IMPLEMENTATION.md). The current release provides production-ready implementations of all Chinese National Cryptographic Standards: SM2, SM3, SM4, and SM9.*
 
+## 🚨 Critical Priority Next Steps
+
+### **HIGHEST PRIORITY**: SM9 Cryptographic Implementation Enhancement
+
+**⚠️ CRITICAL LIMITATION**: The current SM9 implementation is **NOT doing actual cryptographic computation** - it's using a simplified hash-based approach instead of the proper elliptic curve scalar multiplication that should be done in SM9.
+
+**Current SM9 Status**:
+- SM9 Digital Signatures: ~7,000 ops/s (using simplified hash operations)
+- SM2 Digital Signatures: ~18 ops/s (full elliptic curve cryptographic implementation)
+- **385x performance difference** reflects SM9's simplified implementation vs SM2's complete cryptographic operations
+
+**Required Action**: Replace SM9's current hash-based approach with proper:
+- Elliptic curve scalar multiplication for signature generation
+- Bilinear pairing operations for verification
+- Complete identity-based cryptographic computations per GM/T 0044-2016
+
+**Impact**: SM9 functionality works for testing but lacks full cryptographic security until proper implementation is completed.
+
+---
+
 ## 📈 Recent Achievements (September 2025)
 
-**Commit 50ddd11** - Complete Implementation Milestone:
+**Commit 50ddd11** - Implementation Milestone with Performance Monitoring:
 - ✅ **Perfect Test Coverage**: Achieved 100% test pass rate (219/219 tests)
 - ✅ **Code Quality**: 100% code formatting compliance with `zig fmt --check`
-- ✅ **Feature Complete**: All SM9 TODO items implemented and verified
-- ✅ **Production Ready**: Zero remaining implementation gaps across all algorithms
+- ✅ **Performance Monitoring**: Complete CI-based performance monitoring system
+- ✅ **Algorithm Coverage**: SM2, SM3, SM4 production-ready; **SM9 requires enhancement**
 - ✅ **Documentation**: Complete technical documentation and AI agent guidelines
 
-This release represents the completion of all planned features for the GM-Zig cryptographic library, delivering enterprise-grade Chinese National Cryptographic Standards implementation.
+This release establishes comprehensive performance monitoring and identifies the critical SM9 enhancement requirement for complete cryptographic implementation.
