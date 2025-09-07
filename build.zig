@@ -88,4 +88,23 @@ pub fn build(b: *std.Build) void {
 
     const benchmark_step = b.step("benchmark", "Run performance benchmarks");
     benchmark_step.dependOn(&benchmark_cmd.step);
+
+    // Add performance analysis tool
+    const analyze_mod = b.createModule(.{
+        .root_source_file = b.path("src/analyze_performance.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const analyze_exe = b.addExecutable(.{
+        .name = "analyze-performance",
+        .root_module = analyze_mod,
+    });
+    b.installArtifact(analyze_exe);
+
+    const analyze_cmd = b.addRunArtifact(analyze_exe);
+    analyze_cmd.step.dependOn(b.getInstallStep());
+
+    const analyze_step = b.step("analyze", "Analyze performance data");
+    analyze_step.dependOn(&analyze_cmd.step);
 }

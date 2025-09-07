@@ -77,7 +77,7 @@ echo "Performance data saved to: $JSON_FILE"
 # Extract key performance metrics for CI display
 echo ""
 echo "=== Performance Summary ==="
-echo "$BENCHMARK_JSON" | jq -r '.[] | "\(.algorithm) \(.operation): \(.data_size_kb) KB -> \(.throughput_mb_s | tonumber | . * 100 | round / 100) MB/s"'
+echo "$BENCHMARK_JSON" | jq -r '.[] | "\(.algorithm) \(.operation): \(.data_size_kb) KB -> \(.performance_value | tonumber | . * 100 | round / 100) \(.performance_unit)"'
 
 # If we have historical data, show comparison
 if [[ -f "$HISTORY_FILE" ]] && [[ $(wc -l < "$HISTORY_FILE") -gt 1 ]]; then
@@ -95,7 +95,7 @@ if [[ -f "$HISTORY_FILE" ]] && [[ $(wc -l < "$HISTORY_FILE") -gt 1 ]]; then
         $current[] | . as $curr |
         ($previous[] | select(.algorithm == $curr.algorithm and .operation == $curr.operation)) as $prev |
         if $prev then
-            (($curr.throughput_mb_s - $prev.throughput_mb_s) / $prev.throughput_mb_s * 100) as $change |
+            (($curr.performance_value - $prev.performance_value) / $prev.performance_value * 100) as $change |
             "\($curr.algorithm) \($curr.operation) (\($curr.data_size_kb) KB): \($change | . * 100 | round / 100)% change"
         else
             "\($curr.algorithm) \($curr.operation) (\($curr.data_size_kb) KB): NEW"
@@ -111,3 +111,8 @@ fi
 
 echo ""
 echo "Performance data collection completed successfully!"
+echo ""
+echo "To analyze performance trends, run:"
+echo "  zig build analyze                    # Generate text report"
+echo "  zig build analyze -- --format json  # Generate JSON report"
+echo "  ./zig-out/bin/analyze-performance --help  # See all options"
