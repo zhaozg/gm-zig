@@ -24,9 +24,6 @@ jobs:
     - name: Verify Zig installation
       run: zig version
 
-    - name: Check code format
-      run: zig fmt --check build.zig src/
-
     - name: Run tests
       run: |
         zig test src/test.zig
@@ -41,10 +38,10 @@ jobs:
       run: |
         # Install jq for JSON processing
         sudo apt-get update && sudo apt-get install -y jq
-        
+
         # Run performance data collection
         ./scripts/collect-performance-data.sh
-        
+
         # Upload performance data as artifact
         if [ -f .performance-data/latest-summary.json ]; then
           echo "Performance data collected successfully"
@@ -52,6 +49,9 @@ jobs:
           echo "Failed to collect performance data"
           exit 1
         fi
+
+    - name: Check code format
+      run: zig fmt --check build.zig src/
 
     - name: Upload performance data
       uses: actions/upload-artifact@v4
