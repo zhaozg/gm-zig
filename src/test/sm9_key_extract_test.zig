@@ -45,13 +45,18 @@ test "SM9 encryption user key extraction" {
 }
 
 test "SM9 user public key derivation for signature" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const system = sm9.params.SM9System.init();
     const user_id = "alice@example.com";
 
-    const public_key = sm9.key_extract.UserPublicKey.deriveForSignature(
+    const public_key = try sm9.key_extract.UserPublicKey.deriveForSignature(
         user_id,
         system.params,
         system.sign_master,
+        allocator,
     );
 
     try testing.expect(public_key.validate(system.params));
@@ -60,13 +65,18 @@ test "SM9 user public key derivation for signature" {
 }
 
 test "SM9 user public key derivation for encryption" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const system = sm9.params.SM9System.init();
     const user_id = "bob@example.com";
 
-    const public_key = sm9.key_extract.UserPublicKey.deriveForEncryption(
+    const public_key = try sm9.key_extract.UserPublicKey.deriveForEncryption(
         user_id,
         system.params,
         system.encrypt_master,
+        allocator,
     );
 
     try testing.expect(public_key.validate(system.params));
@@ -93,10 +103,10 @@ test "SM9 key extraction context" {
     try testing.expect(encrypt_key.validate(system.params));
 
     // Test public key derivation
-    const sign_public = context.deriveSignPublicKey(user_id);
+    const sign_public = try context.deriveSignPublicKey(user_id);
     try testing.expect(sign_public.validate(system.params));
 
-    const encrypt_public = context.deriveEncryptPublicKey(user_id);
+    const encrypt_public = try context.deriveEncryptPublicKey(user_id);
     try testing.expect(encrypt_public.validate(system.params));
 }
 

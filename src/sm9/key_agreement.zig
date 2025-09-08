@@ -208,11 +208,18 @@ pub const KeyAgreementContext = struct {
         }
 
         // Step 2: Derive peer's public key
+        var buffer: [1024]u8 = undefined;
+        var fba = std.heap.FixedBufferAllocator.init(&buffer);
+        const temp_allocator = fba.allocator();
+        
         const peer_public_key = key_extract.UserPublicKey.deriveForSignature(
             peer_user_id,
             self.system_params,
             self.sign_master_public,
-        );
+            temp_allocator,
+        ) catch {
+            return KeyAgreementError.InvalidPublicKey;
+        };
 
         if (!peer_public_key.validate(self.system_params)) {
             return KeyAgreementError.InvalidPublicKey;
@@ -237,11 +244,18 @@ pub const KeyAgreementContext = struct {
         }
 
         // Get both public keys (both parties can derive both)
+        var buffer2: [1024]u8 = undefined;
+        var fba2 = std.heap.FixedBufferAllocator.init(&buffer2);
+        const temp_allocator2 = fba2.allocator();
+        
         const my_public_key = key_extract.UserPublicKey.deriveForSignature(
             my_user_id,
             self.system_params,
             self.sign_master_public,
-        );
+            temp_allocator2,
+        ) catch {
+            return KeyAgreementError.InvalidPublicKey;
+        };
 
         // Add both public keys in consistent order
         if (std.mem.lessThan(u8, my_user_id, peer_user_id)) {

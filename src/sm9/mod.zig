@@ -104,13 +104,13 @@ pub const SM9Context = struct {
     }
 
     /// Derive user public key for signature
-    pub fn deriveSignPublicKey(self: SM9Context, user_id: []const u8) UserPublicKey {
-        return self.key_extraction.deriveSignPublicKey(user_id);
+    pub fn deriveSignPublicKey(self: SM9Context, user_id: []const u8) !UserPublicKey {
+        return try self.key_extraction.deriveSignPublicKey(user_id);
     }
 
     /// Derive user public key for encryption
-    pub fn deriveEncryptPublicKey(self: SM9Context, user_id: []const u8) UserPublicKey {
-        return self.key_extraction.deriveEncryptPublicKey(user_id);
+    pub fn deriveEncryptPublicKey(self: SM9Context, user_id: []const u8) !UserPublicKey {
+        return try self.key_extraction.deriveEncryptPublicKey(user_id);
     }
 
     /// Sign message with user private key
