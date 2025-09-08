@@ -263,7 +263,7 @@ fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         std.ArrayList(u8){}
     else
         std.ArrayList(u8).init(allocator);
-
+    
     if (isZig015OrNewer) {
         defer output.deinit(allocator);
     } else {
@@ -365,7 +365,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
             algorithm_operation: []const u8,
             analysis: TrendAnalysis,
         }).init(allocator);
-
+    
     if (isZig015OrNewer) {
         defer trends_array.deinit(allocator);
     } else {
@@ -410,7 +410,7 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
         std.ArrayList(u8){}
     else
         std.ArrayList(u8).init(allocator);
-
+        
     if (isZig015OrNewer) {
         defer output.deinit(allocator);
     } else {
