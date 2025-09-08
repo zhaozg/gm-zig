@@ -153,3 +153,58 @@ gm-zig/
 6. Before committing: Run CI commands locally to ensure they pass
 
 Remember: This is a cryptographic library implementing Chinese national standards. Security and correctness are paramount. Always run complete validation scenarios after making changes.
+
+## Enhanced Development Environment
+
+### Model Context Protocol (MCP) Configuration
+The repository includes MCP server configurations (`.github/mcp-config.json`) that provide enhanced context about:
+- Chinese National Cryptographic Standards (GM/T) algorithms
+- Security-critical code patterns and constant-time implementations
+- Performance optimization techniques specific to cryptographic operations
+- Zig language patterns for memory-safe cryptographic code
+
+### Automated Development Setup
+Use the automated setup script to configure your development environment:
+```bash
+./scripts/setup-dev-env.sh
+```
+
+This script automatically:
+- Verifies Zig installation and compatibility
+- Sets up development aliases and git hooks
+- Establishes performance baselines
+- Configures debugging and testing environment
+
+### VS Code Integration
+Complete VS Code workspace configuration is available in `.vscode/`:
+- **Workspace**: `.vscode/gm-zig.code-workspace` - Complete project workspace
+- **Settings**: Optimized for Zig development with proper formatting and extensions
+- **Tasks**: Pre-configured build, test, and validation tasks
+- **Debugging**: Ready-to-use launch configurations for library and tests
+- **Extensions**: Curated list of essential extensions for cryptographic development
+
+### Development Aliases
+After running the setup script, use these convenient commands:
+```bash
+gmzig-build         # Standard build (zig build)
+gmzig-build-fast    # Optimized build (zig build -Doptimize=ReleaseFast)
+gmzig-test          # Run all tests (zig build test)
+gmzig-run           # Run demo (zig build run)
+gmzig-validate      # Full validation pipeline
+gmzig-fmt           # Format code (zig fmt build.zig src/)
+gmzig-fmt-check     # Check formatting (zig fmt --check build.zig src/)
+gmzig-perf          # Run performance benchmarks
+gmzig-clean         # Clean build artifacts
+```
+
+### Enhanced Copilot Integration
+The MCP configuration enables Copilot to provide context-aware suggestions for:
+- **Cryptographic Security**: Constant-time implementations, secure memory handling
+- **Algorithm Patterns**: SM2/SM3/SM4/SM9 specific implementation patterns  
+- **Performance Optimization**: Memory-efficient algorithms, Zig-specific optimizations
+- **Error Handling**: Robust error patterns for cryptographic operations
+- **Testing Patterns**: Security-focused test implementations
+
+### Additional Documentation
+- `.github/DEVELOPMENT_GUIDE.md` - Enhanced development guide with Copilot integration
+- `.github/mcp-config.json` - MCP server configuration for enhanced AI context
