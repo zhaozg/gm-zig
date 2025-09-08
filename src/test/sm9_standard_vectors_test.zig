@@ -118,7 +118,7 @@ test "SM9 key extraction standard test vectors" {
         "Bob",
         "alice@example.org",
         "bob@example.org",
-        "2012年测试向量", // Chinese characters for comprehensive testing
+        "2012年测试向量", // Chinese: "2012 test vector" - for comprehensive Unicode testing
     };
 
     for (test_ids) |user_id| {
@@ -182,8 +182,8 @@ test "SM9 encryption standard test vectors" {
         message: []const u8,
     }{
         .{ .user_id = "Bob", .message = "encryption standard" },
-        .{ .user_id = "alice@example.org", .message = "2012年测试向量" },
-        .{ .user_id = "测试用户@example.com", .message = "Chinese test message 中文测试消息" },
+        .{ .user_id = "alice@example.org", .message = "2012年测试向量" }, // Chinese: "2012 test vector"
+        .{ .user_id = "测试用户@example.com", .message = "Chinese test message 中文测试消息" }, // Chinese user ID and mixed language message
     };
 
     for (test_cases) |test_case| {

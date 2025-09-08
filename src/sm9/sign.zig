@@ -9,12 +9,12 @@ const SM3 = @import("../sm3.zig").SM3;
 
 const builtin = @import("builtin");
 
-/// 编译时检测是否为 Zig 0.15 或更新版本
+/// Compile-time detection for Zig 0.15 or newer version
 pub const isZig015OrNewer = blk: {
-    // Zig 版本号结构: major.minor.patch
+    // Zig version structure: major.minor.patch
     const version = builtin.zig_version;
 
-    // 0.15.0 或更新版本
+    // 0.15.0 or newer version
     break :blk (version.major == 0 and version.minor >= 15);
 };
 

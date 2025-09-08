@@ -152,8 +152,8 @@ test "SM2 encryption error cases" {
     const ciphertext = try encryption.encrypt(allocator, message, public_key, .c1c3c2);
     defer ciphertext.deinit(allocator);
 
-    // 测试使用无效私钥（零私钥）
-    // 修正：期望 error.InvalidPrivateKey 而不是 error.IdentityElement
+    // Test using invalid private key (zero private key)
+    // Correction: expect error.InvalidPrivateKey instead of error.IdentityElement
     try testing.expectError(error.InvalidPrivateKey, encryption.decrypt(allocator, ciphertext, invalid_private));
 }
 

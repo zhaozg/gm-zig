@@ -7,7 +7,7 @@ const math = std.math;
 
 const SM2 = @import("../sm2/group.zig").SM2;
 
-// 辅助函数: 十六进制字符串转字节数组
+// Helper function: hex string to byte array
 fn hexToBytes(comptime hex_str: []const u8) [hex_str.len / 2]u8 {
     var result: [hex_str.len / 2]u8 = undefined;
     for (0..result.len) |i| {
@@ -18,29 +18,29 @@ fn hexToBytes(comptime hex_str: []const u8) [hex_str.len / 2]u8 {
     return result;
 }
 
-// 辅助函数: 十六进制字符串转Fe
+// Helper function: hex string to Fe
 fn hexToFe(comptime hex_str: []const u8, endian: std.builtin.Endian) SM2.Fe {
     const bytes = hexToBytes(hex_str);
     return SM2.Fe.fromBytes(bytes, endian) catch unreachable;
 }
 
-// SM2 GMT 标准测试向量
+// SM2 GMT standard test vectors
 const test_vectors = struct {
-    // 素数 p
+    // Prime p
     const p = "FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF";
 
-    // 曲线参数 a, b
+    // Curve parameters a, b
     const a = "FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC";
     const b = "28E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93";
 
-    // 基点 G
+    // Base point G
     const Gx = "32C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7";
     const Gy = "BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0";
 
-    // 阶 n
+    // Order n
     const n = "FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123";
 
-    // 测试向量: k * G 的预期结果
+    // Test vectors: expected results for k * G
     const k1 = "0000000000000000000000000000000000000000000000000000000000000001";
     const P1x = "32C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7";
     const P1y = "BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0";
@@ -53,7 +53,7 @@ const test_vectors = struct {
     const P3x = "32C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7";
     const P3y = "43C8C95D0F8B42BD32D1FADBBF1A31744FF0F761A5B7D9ABE3946B5E675A04F5";
 
-    // 倍点测试向量
+    // Point doubling test vectors
     const double1x = "56CEFD60D7C87C000D58EF57FA73BA4D9C0DFA08C08A7331495C2E1DA3F2BD52";
     const double1y = "31B7E7E6CC8189F6687ACE086CD101D96E8ABE7377B8B50BD0D1A137F054F4E5";
 
@@ -61,7 +61,7 @@ const test_vectors = struct {
     const double2y = "02A8A31F7D1E4C1D6E8F0A0F1C4D8CEE9B19B9A6A0F8B1D9E6A0F8B1D9E6A0F8";
 };
 
-test "SM2: 倍点操作验证" {
+test "SM2: Point doubling operation verification" {
     const base = SM2.basePoint;
     const double1 = base.dbl();
     const k2: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{2};
@@ -69,88 +69,88 @@ test "SM2: 倍点操作验证" {
     try testing.expect(double1.equivalent(p2));
 }
 
-test "SM2: 点加操作验证" {
+test "SM2: Point addition operation verification" {
     const base = SM2.basePoint;
     const sum1 = base.add(base);
     const double = base.dbl();
     try testing.expect(sum1.equivalent(double));
 }
 
-test "SM2: 点减操作验证" {
+test "SM2: Point subtraction operation verification" {
     const base = SM2.basePoint;
     const double = base.dbl();
     const sub1 = double.sub(base);
     try testing.expect(sub1.equivalent(base));
 }
 
-test "SM2: 混合点加操作验证" {
+test "SM2: Mixed point addition operation verification" {
     const base = SM2.basePoint;
     const base_affine = base.affineCoordinates();
 
-    // 计算 G + G (使用混合加法)
+    // Compute G + G (using mixed addition)
     const sum1 = base.addMixed(base_affine);
 
-    // 计算 2G (通过倍点)
+    // Compute 2G (via point doubling)
     const double = base.dbl();
 
     // 验证结果相同
     try testing.expect(sum1.equivalent(double));
 }
 
-test "SM2: 混合点减操作验证" {
+test "SM2: Mixed point subtraction operation verification" {
     const base = SM2.basePoint;
     const base_affine = base.affineCoordinates();
     const double = base.dbl();
 
-    // 计算 2G - G = G
+    // Compute 2G - G = G
     const sub = double.subMixed(base_affine);
     try testing.expect(sub.equivalent(base));
 }
 
-test "SM2: 中性元素性质验证" {
+test "SM2: Neutral element property verification" {
     const identity = SM2.identityElement;
     const base = SM2.basePoint;
 
-    // 验证 P + 0 = P
+    // Verify P + 0 = P
     const sum1 = base.add(identity);
     try testing.expect(sum1.equivalent(base));
 
-    // 验证 0 + P = P
+    // Verify 0 + P = P
     const sum2 = identity.add(base);
     try testing.expect(sum2.equivalent(base));
 
-    // 验证 P - P = 0
+    // Verify P - P = 0
     const sub = base.sub(base);
     try testing.expect(sub.equivalent(identity));
 
-    // 验证 0 的仿射坐标是 (0,0)
+    // Verify the affine coordinates of 0 are (0,0)
     const affine = identity.affineCoordinates();
     try testing.expect(affine.x.isZero());
     try testing.expect(affine.y.isZero());
 }
 
-test "SM2: 负操作验证" {
+test "SM2: Negation operation verification" {
     const base = SM2.basePoint;
 
-    // 计算 -P
+    // Compute -P
     const neg = base.neg();
 
-    // 验证 P + (-P) = 0
+    // Verify P + (-P) = 0
     const sum = base.add(neg);
     try testing.expectError(error.IdentityElement, sum.rejectIdentity());
 
-    // 验证仿射坐标y值取反
+    // Verify affine coordinate y value is negated
     const base_affine = base.affineCoordinates();
     const neg_affine = neg.affineCoordinates();
     try testing.expect(neg_affine.x.equivalent(base_affine.x));
     try testing.expect(neg_affine.y.equivalent(base_affine.y.neg()));
 }
 
-test "SM2: 标量乘法边界情况" {
-    // 阶 n (大端序)
+test "SM2: Scalar multiplication boundary cases" {
+    // Order n (big endian)
     const n_bytes = hexToBytes(test_vectors.n);
 
-    // 测试 n * G = 0
+    // Test n * G = 0
     const result1 = SM2.basePoint.mul(n_bytes, .big);
     try testing.expectError(error.IdentityElement, result1);
 
@@ -172,7 +172,7 @@ test "SM2: 标量乘法边界情况" {
     try testing.expect(result2.equivalent(SM2.basePoint));
 }
 
-test "SM2: 无效点编码处理" {
+test "SM2: Invalid point encoding handling" {
     // 创建无效点 (不在曲线上)
     const invalid_point = SM2{
         .x = SM2.Fe.one,
@@ -190,7 +190,7 @@ test "SM2: 无效点编码处理" {
     try testing.expectError(error.NonCanonical, SM2.fromSec1(&invalid_sec1));
 }
 
-test "SM2: 验证基点在曲线上" {
+test "SM2: Verify base point is on curve" {
     const base_affine = SM2.basePoint.affineCoordinates();
     const x3 = base_affine.x.sq().mul(base_affine.x);
     const ax = SM2.A.mul(base_affine.x);
@@ -199,7 +199,7 @@ test "SM2: 验证基点在曲线上" {
     try testing.expect(left.equivalent(right));
 }
 
-test "SM2: 条件选择(CMOV)验证" {
+test "SM2: Conditional selection (CMOV) verification" {
     var p1 = SM2.basePoint;
     const p2 = SM2.basePoint.dbl();
 
@@ -212,7 +212,7 @@ test "SM2: 条件选择(CMOV)验证" {
     try testing.expect(p1.equivalent(p2));
 }
 
-test "SM2: 公钥标量乘法验证" {
+test "SM2: Public key scalar multiplication verification" {
     const k = [_]u8{0x03} ** 32;
 
     // 常规乘法
@@ -225,7 +225,7 @@ test "SM2: 公钥标量乘法验证" {
     try testing.expect(p1.equivalent(p2));
 }
 
-test "SM2: ECDH 密钥交换" {
+test "SM2: ECDH key exchange" {
     const dha = SM2.scalar.random(.little);
     const dhb = SM2.scalar.random(.little);
 
@@ -238,7 +238,7 @@ test "SM2: ECDH 密钥交换" {
     try testing.expect(shareda.equivalent(sharedb));
 }
 
-test "SM2: 从仿射坐标创建点" {
+test "SM2: Create point from affine coordinates" {
     // 国标定义的基点坐标
     const x = hexToFe(test_vectors.Gx, .big);
     const y = hexToFe(test_vectors.Gy, .big);
@@ -250,14 +250,14 @@ test "SM2: 从仿射坐标创建点" {
     try testing.expect(p.equivalent(SM2.basePoint));
 }
 
-test "SM2: SEC1 压缩格式编码/解码" {
+test "SM2: SEC1 compressed format encoding/decoding" {
     const p = SM2.random();
     const s = p.toCompressedSec1();
     const q = try SM2.fromSec1(&s);
     try testing.expect(p.equivalent(q));
 }
 
-test "SM2: SEC1 非压缩格式编码/解码" {
+test "SM2: SEC1 uncompressed format encoding/decoding" {
     // 生成随机点
     const p = SM2.random();
 
@@ -271,7 +271,7 @@ test "SM2: SEC1 非压缩格式编码/解码" {
     try testing.expect(p.equivalent(q));
 }
 
-test "SM2: 标量为零时得到中性元素" {
+test "SM2: Zero scalar yields neutral element" {
     // 零标量
     const zero_scalar = [_]u8{0} ** 32;
 
@@ -282,7 +282,7 @@ test "SM2: 标量为零时得到中性元素" {
     try testing.expectError(error.IdentityElement, result);
 }
 
-test "SM2: 非规范编码错误处理" {
+test "SM2: Non-canonical encoding error handling" {
     // 创建非规范编码 (全FF)
     const non_canonical = [_]u8{0xff} ** 32;
 
@@ -293,7 +293,7 @@ test "SM2: 非规范编码错误处理" {
     try testing.expectError(error.NonCanonical, result);
 }
 
-test "SM2: 中性元素编码/解码" {
+test "SM2: Neutral element encoding/decoding" {
     // 中性元素
     const identity = SM2.identityElement;
 
@@ -310,7 +310,7 @@ test "SM2: 中性元素编码/解码" {
     try testing.expect(p.equivalent(identity));
 }
 
-test "SM2: 双基标量乘法" {
+test "SM2: Dual-base scalar multiplication" {
     // 两个标量
     const s1 = [_]u8{0x01} ** 32;
     const s2 = [_]u8{0x02} ** 32;
@@ -329,7 +329,7 @@ test "SM2: 双基标量乘法" {
     try testing.expect(pr1.equivalent(pr2));
 }
 
-test "SM2: 双基标量乘法 (大标量)" {
+test "SM2: Dual-base scalar multiplication (large scalars)" {
     // 两个大标量
     const s1 = [_]u8{0xee} ** 32;
     const s2 = [_]u8{0xdd} ** 32;
@@ -348,7 +348,7 @@ test "SM2: 双基标量乘法 (大标量)" {
     try testing.expect(pr1.equivalent(pr2));
 }
 
-test "SM2: 标量奇偶性" {
+test "SM2: Scalar parity" {
     // 创建标量
     const zero = SM2.scalar.Scalar.zero;
     const one = SM2.scalar.Scalar.one;
@@ -360,7 +360,7 @@ test "SM2: 标量奇偶性" {
     try testing.expect(!two.isOdd());
 }
 
-test "SM2: 随机点曲线验证" {
+test "SM2: Random point curve verification" {
     // 生成随机点
     const point = SM2.random();
     try point.rejectIdentity();
@@ -380,7 +380,7 @@ test "SM2: 随机点曲线验证" {
     try testing.expect(left.equivalent(right));
 }
 
-test "SM2: Y坐标恢复" {
+test "SM2: Y coordinate recovery" {
     // 获取基点仿射坐标
     const base = SM2.basePoint;
     const affine = base.affineCoordinates();
@@ -392,7 +392,7 @@ test "SM2: Y坐标恢复" {
     try testing.expect(recovered_y.equivalent(affine.y));
 }
 
-test "SM2: 点加验证" {
+test "SM2: Point addition verification" {
     const base = SM2.basePoint;
 
     // 计算 2G (点加倍)
