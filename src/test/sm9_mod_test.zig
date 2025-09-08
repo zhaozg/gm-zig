@@ -40,8 +40,8 @@ test "SM9 complete workflow" {
     const bob_encrypt_key = try context.extractEncryptKey(bob_id);
 
     // Derive public keys
-    const alice_public = context.deriveSignPublicKey(alice_id);
-    const bob_public = context.deriveEncryptPublicKey(bob_id);
+    const alice_public = try context.deriveSignPublicKey(alice_id);
+    const bob_public = try context.deriveEncryptPublicKey(bob_id);
 
     try testing.expect(alice_public.validate(context.system.params));
     try testing.expect(bob_public.validate(context.system.params));

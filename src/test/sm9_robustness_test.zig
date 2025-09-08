@@ -58,6 +58,10 @@ test "SM9 key extraction mathematical robustness" {
 
 // Test public key derivation robustness
 test "SM9 public key derivation robustness" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
     const system = sm9.params.SM9System.init();
 
     const test_users = [_][]const u8{
@@ -69,10 +73,11 @@ test "SM9 public key derivation robustness" {
 
     for (test_users) |user_id| {
         // Test signature public key derivation
-        const sign_public = sm9.key_extract.UserPublicKey.deriveForSignature(
+        const sign_public = try sm9.key_extract.UserPublicKey.deriveForSignature(
             user_id,
             system.params,
             system.sign_master,
+            allocator,
         );
 
         try testing.expect(sign_public.validate(system.params));
@@ -80,18 +85,20 @@ test "SM9 public key derivation robustness" {
         try testing.expectEqualStrings(user_id, sign_public.id);
 
         // Verify public key is deterministic
-        const sign_public2 = sm9.key_extract.UserPublicKey.deriveForSignature(
+        const sign_public2 = try sm9.key_extract.UserPublicKey.deriveForSignature(
             user_id,
             system.params,
             system.sign_master,
+            allocator,
         );
         try testing.expectEqualSlices(u8, &sign_public.point, &sign_public2.point);
 
         // Test encryption public key derivation
-        const encrypt_public = sm9.key_extract.UserPublicKey.deriveForEncryption(
+        const encrypt_public = try sm9.key_extract.UserPublicKey.deriveForEncryption(
             user_id,
             system.params,
             system.encrypt_master,
+            allocator,
         );
 
         try testing.expect(encrypt_public.validate(system.params));
@@ -99,10 +106,11 @@ test "SM9 public key derivation robustness" {
         try testing.expectEqualStrings(user_id, encrypt_public.id);
 
         // Verify encryption public key is deterministic
-        const encrypt_public2 = sm9.key_extract.UserPublicKey.deriveForEncryption(
+        const encrypt_public2 = try sm9.key_extract.UserPublicKey.deriveForEncryption(
             user_id,
             system.params,
             system.encrypt_master,
+            allocator,
         );
         try testing.expectEqualSlices(u8, &encrypt_public.point, &encrypt_public2.point);
     }

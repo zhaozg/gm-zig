@@ -62,63 +62,21 @@ pub const SignUserPrivateKey = struct {
             return KeyExtractionError.KeyGenerationFailed;
         };
 
-        // Step 3: Enhanced handling for t1 = 0 case
+        // Step 3: Handle t1 = 0 case according to GM/T 0044-2016
         if (bigint.isZero(t1)) {
-            // According to GM/T 0044-2016, if t1 ≡ 0 (mod N), we can use alternative approach
-            // Instead of regenerating master key, we can slightly modify the hash
-            var retry_count: u8 = 0;
-            while (retry_count < 3) {
-                // Create modified user_id by appending retry counter
-                var modified_id_buf: [256]u8 = undefined;
-                const modified_id = fmt.bufPrint(modified_id_buf[0..], "{s}_{d}", .{ user_id, retry_count }) catch {
-                    return KeyExtractionError.InvalidUserId;
-                };
-
-                const h1_retry = h1Hash(modified_id, 0x01, system_params.N, allocator) catch {
-                    return KeyExtractionError.KeyGenerationFailed;
-                };
-
-                const t1_retry = bigint.addMod(h1_retry, master_key.private_key, system_params.N) catch {
-                    return KeyExtractionError.KeyGenerationFailed;
-                };
-
-                if (!bigint.isZero(t1_retry)) {
-                    // Success with modified ID - use deterministic approach
-                    std.log.info("Using deterministic signature key generation for retry user: {s}", .{user_id});
-
-                    const deterministic_key = createDeterministicSignatureKey(user_id);
-                    return SignUserPrivateKey{
-                        .id = user_id, // Keep original ID for compatibility
-                        .key = deterministic_key,
-                        .hid = 0x01,
-                    };
-                }
-                retry_count += 1;
-            }
-            return KeyExtractionError.KeyGenerationFailed;
+            // According to GM/T 0044-2016, if t1 ≡ 0 (mod N), the master key pair is invalid
+            // This should be extremely rare with proper random master key generation
+            return KeyExtractionError.InvalidMasterKey;
         }
 
         // Step 4: Compute t1^(-1) mod N using proper modular inverse
         const t1_inv = bigint.invMod(t1, system_params.N) catch {
-            // If modular inverse fails, use deterministic fallback as last resort
-            std.log.warn("Failed to compute modular inverse for user: {s}, using fallback", .{user_id});
-            const deterministic_key = createDeterministicSignatureKey(user_id);
-            return SignUserPrivateKey{
-                .id = user_id,
-                .key = deterministic_key,
-                .hid = 0x01,
-            };
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
         // Step 5: Create G1 point from system parameter P1 and multiply by t1_inv
         const g1_base = curve.G1Point.fromCompressed(system_params.P1) catch {
-            std.log.warn("Failed to parse G1 base point for user: {s}, using fallback", .{user_id});
-            const deterministic_key = createDeterministicSignatureKey(user_id);
-            return SignUserPrivateKey{
-                .id = user_id,
-                .key = deterministic_key,
-                .hid = 0x01,
-            };
+            return KeyExtractionError.InvalidMasterKey;
         };
 
         const g1_point = g1_base.mul(t1_inv, system_params);
@@ -216,63 +174,21 @@ pub const EncryptUserPrivateKey = struct {
             return KeyExtractionError.KeyGenerationFailed;
         };
 
-        // Step 3: Enhanced handling for t2 = 0 case
+        // Step 3: Handle t2 = 0 case according to GM/T 0044-2016  
         if (bigint.isZero(t2)) {
-            // According to GM/T 0044-2016, if t2 ≡ 0 (mod N), we can use alternative approach
-            // Instead of regenerating master key, we can slightly modify the hash
-            var retry_count: u8 = 0;
-            while (retry_count < 3) {
-                // Create modified user_id by appending retry counter
-                var modified_id_buf: [256]u8 = undefined;
-                const modified_id = fmt.bufPrint(modified_id_buf[0..], "{s}_{d}", .{ user_id, retry_count }) catch {
-                    return KeyExtractionError.InvalidUserId;
-                };
-
-                const h1_retry = h1Hash(modified_id, 0x03, system_params.N, allocator) catch {
-                    return KeyExtractionError.KeyGenerationFailed;
-                };
-
-                const t2_retry = bigint.addMod(h1_retry, master_key.private_key, system_params.N) catch {
-                    return KeyExtractionError.KeyGenerationFailed;
-                };
-
-                if (!bigint.isZero(t2_retry)) {
-                    // Success with modified ID - use deterministic approach
-                    std.log.info("Using deterministic encryption key generation for retry user: {s}", .{user_id});
-
-                    const deterministic_key = createDeterministicEncryptionKey(user_id);
-                    return EncryptUserPrivateKey{
-                        .id = user_id, // Keep original ID for compatibility
-                        .key = deterministic_key,
-                        .hid = 0x03,
-                    };
-                }
-                retry_count += 1;
-            }
-            return KeyExtractionError.KeyGenerationFailed;
+            // According to GM/T 0044-2016, if t2 ≡ 0 (mod N), the master key pair is invalid
+            // This should be extremely rare with proper random master key generation
+            return KeyExtractionError.InvalidMasterKey;
         }
 
         // Step 4: Compute t2^(-1) mod N using proper modular inverse
         const t2_inv = bigint.invMod(t2, system_params.N) catch {
-            // If modular inverse fails, use deterministic fallback as last resort
-            std.log.warn("Failed to compute modular inverse for encryption user: {s}, using fallback", .{user_id});
-            const deterministic_key = createDeterministicEncryptionKey(user_id);
-            return EncryptUserPrivateKey{
-                .id = user_id,
-                .key = deterministic_key,
-                .hid = 0x03,
-            };
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
         // Step 5: Create G2 point from system parameter P2 and multiply by t2_inv
         const g2_base = curve.G2Point.fromUncompressed(system_params.P2) catch {
-            std.log.warn("Failed to parse G2 base point for encryption user: {s}, using fallback", .{user_id});
-            const deterministic_key = createDeterministicEncryptionKey(user_id);
-            return EncryptUserPrivateKey{
-                .id = user_id,
-                .key = deterministic_key,
-                .hid = 0x03,
-            };
+            return KeyExtractionError.InvalidMasterKey;
         };
 
         const g2_point = g2_base.mul(t2_inv, system_params);
@@ -346,29 +262,18 @@ pub const UserPublicKey = struct {
         user_id: UserId,
         system_params: params.SystemParams,
         master_public_key: params.SignMasterKeyPair,
-    ) UserPublicKey {
+        allocator: std.mem.Allocator,
+    ) !UserPublicKey {
         const bigint = @import("bigint.zig");
 
-        // Allocate for H1 computation - use a fallback allocator approach
+        // Allocate for H1 computation - use a proper allocator approach
         var buffer: [1024]u8 = undefined;
         var fba = std.heap.FixedBufferAllocator.init(&buffer);
-        const allocator = fba.allocator();
+        const temp_allocator = fba.allocator();
 
         // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
-        const h1_result = h1Hash(user_id, 0x01, system_params.N, allocator) catch {
-            // Fallback: create deterministic H1 from user_id
-            var h1_fallback = [_]u8{0} ** 32;
-            var hasher = crypto.hash.sha3.Sha3_256.init(.{});
-            hasher.update(user_id);
-            hasher.update(&[_]u8{0x01}); // hid
-            hasher.final(&h1_fallback);
-
-            // Return proper UserPublicKey struct
-            return UserPublicKey{
-                .id = user_id,
-                .hid = 0x01,
-                .point = h1_fallback ++ [_]u8{0} ** 32,
-            };
+        const h1_result = h1Hash(user_id, 0x01, system_params.N, temp_allocator) catch {
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
         // Step 2: Compute public key point using master public key
@@ -377,12 +282,7 @@ pub const UserPublicKey = struct {
 
         // Use master public key point for computation
         const master_point = curve.G2Point.fromUncompressed(master_public_key.public_key) catch {
-            // Fallback: create a deterministic valid point
-            return UserPublicKey{
-                .id = user_id,
-                .hid = 0x01,
-                .point = createDeterministicPublicKey(user_id, 0x01),
-            };
+            return KeyExtractionError.InvalidMasterKey;
         };
 
         // Compute public key point: [H1+1] * master_public_key
@@ -396,6 +296,9 @@ pub const UserPublicKey = struct {
         @memcpy(point_bytes[0..32], compressed[1..33]); // x coordinate
         @memcpy(point_bytes[32..64], compressed[1..33]); // y coordinate (simplified)
 
+        // Use allocator to prevent unused parameter warning
+        _ = allocator;
+
         return UserPublicKey{
             .id = user_id,
             .hid = 0x01,
@@ -408,22 +311,18 @@ pub const UserPublicKey = struct {
         user_id: UserId,
         system_params: params.SystemParams,
         master_public_key: params.EncryptMasterKeyPair,
-    ) UserPublicKey {
+        allocator: std.mem.Allocator,
+    ) !UserPublicKey {
         const bigint = @import("bigint.zig");
 
-        // Allocate for H1 computation - use a fallback allocator approach
+        // Allocate for H1 computation - use a proper allocator approach
         var buffer: [1024]u8 = undefined;
         var fba = std.heap.FixedBufferAllocator.init(&buffer);
-        const allocator = fba.allocator();
+        const temp_allocator = fba.allocator();
 
         // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
-        const h1_result = h1Hash(user_id, 0x03, system_params.N, allocator) catch {
-            // Fallback: create deterministic valid public key that will pass validation
-            return UserPublicKey{
-                .id = user_id,
-                .hid = 0x03,
-                .point = createDeterministicPublicKey(user_id, 0x03),
-            };
+        const h1_result = h1Hash(user_id, 0x03, system_params.N, temp_allocator) catch {
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
         // Step 2: Compute public key point using master public key
@@ -432,12 +331,7 @@ pub const UserPublicKey = struct {
 
         // Use master public key point for computation (G1 point)
         const master_point = curve.G1Point.fromCompressed(master_public_key.public_key) catch {
-            // Fallback: create a deterministic valid point
-            return UserPublicKey{
-                .id = user_id,
-                .hid = 0x03,
-                .point = createDeterministicPublicKey(user_id, 0x03),
-            };
+            return KeyExtractionError.InvalidMasterKey;
         };
 
         // Compute public key point: [H1+1] * master_public_key
@@ -448,23 +342,11 @@ pub const UserPublicKey = struct {
             var bytes = [_]u8{0} ** 64;
             @memcpy(bytes[0..32], public_key_point.x[0..32]);
             // Leave bytes[32..64] as zeros for padding
-
-            // Check if x coordinate is all zeros (invalid point)
-            var x_is_zero = true;
-            for (public_key_point.x) |byte| {
-                if (byte != 0) {
-                    x_is_zero = false;
-                    break;
-                }
-            }
-
-            // If x coordinate is zero, use deterministic fallback
-            if (x_is_zero) {
-                break :blk createDeterministicPublicKey(user_id, 0x03);
-            }
-
             break :blk bytes;
         };
+
+        // Use allocator to prevent unused parameter warning
+        _ = allocator;
 
         return UserPublicKey{
             .id = user_id,
@@ -570,20 +452,22 @@ pub const KeyExtractionContext = struct {
     }
 
     /// Derive public key for signature
-    pub fn deriveSignPublicKey(self: KeyExtractionContext, user_id: UserId) UserPublicKey {
+    pub fn deriveSignPublicKey(self: KeyExtractionContext, user_id: UserId) !UserPublicKey {
         return UserPublicKey.deriveForSignature(
             user_id,
             self.system_params,
             self.sign_master,
+            self.allocator,
         );
     }
 
     /// Derive public key for encryption
-    pub fn deriveEncryptPublicKey(self: KeyExtractionContext, user_id: UserId) UserPublicKey {
+    pub fn deriveEncryptPublicKey(self: KeyExtractionContext, user_id: UserId) !UserPublicKey {
         return UserPublicKey.deriveForEncryption(
             user_id,
             self.system_params,
             self.encrypt_master,
+            self.allocator,
         );
     }
 };
@@ -603,165 +487,4 @@ pub fn h2Hash(message: []const u8, w: []const u8, order: [32]u8, allocator: std.
     return hash.h2Hash(message, w, order, allocator);
 }
 
-/// Create deterministic public key from user ID and hash identifier
-/// Used as fallback when proper derivation fails
-fn createDeterministicPublicKey(user_id: []const u8, hid: u8) [64]u8 {
-    var result = [_]u8{0} ** 64;
 
-    // Create deterministic key using hash of user_id and hid
-    var hasher = crypto.hash.sha3.Sha3_256.init(.{});
-    hasher.update(user_id);
-    hasher.update(&[_]u8{hid});
-    hasher.update("SM9_PUBLIC_KEY_FALLBACK");
-
-    var hash_result: [32]u8 = undefined;
-    hasher.final(&hash_result);
-
-    // Use hash result for both x and y coordinates (simplified)
-    // Add small modifications to ensure coordinates are different
-    @memcpy(result[0..32], &hash_result);
-
-    // Modify second coordinate slightly for y
-    var y_coord = hash_result;
-    y_coord[31] = y_coord[31] ^ 0x01; // XOR with 1 to make it different
-    @memcpy(result[32..64], &y_coord);
-
-    return result;
-}
-
-/// Create deterministic encryption private key from user ID
-/// Used as fallback when proper key generation fails
-/// NOTE: Simulates realistic cryptographic timing to provide accurate benchmarks
-fn createDeterministicEncryptionKey(user_id: []const u8) [65]u8 {
-    // Simulate realistic elliptic curve key extraction time
-    // Real SM9 key extraction involves expensive curve operations
-    simulateCryptographicDelay();
-    
-    var result = [_]u8{0x04} ++ [_]u8{0} ** 64; // Start with uncompressed point format
-
-    // Create deterministic key using hash of user_id for encryption
-    var hasher = crypto.hash.sha3.Sha3_256.init(.{});
-    hasher.update(user_id);
-    hasher.update("SM9_ENCRYPTION_KEY_FALLBACK");
-
-    var hash_result: [32]u8 = undefined;
-    hasher.final(&hash_result);
-
-    // Ensure the hash result is not all zeros by setting at least one bit
-    if (isZeroArray(&hash_result)) {
-        hash_result[31] = 0x01;
-    }
-
-    // Copy hash result to x coordinate
-    @memcpy(result[1..33], &hash_result);
-
-    // Create y coordinate by hashing again with a different salt
-    var hasher2 = crypto.hash.sha3.Sha3_256.init(.{});
-    hasher2.update(user_id);
-    hasher2.update("SM9_ENCRYPTION_KEY_FALLBACK_Y");
-
-    var y_hash: [32]u8 = undefined;
-    hasher2.final(&y_hash);
-
-    // Ensure y coordinate is also not zero
-    if (isZeroArray(&y_hash)) {
-        y_hash[31] = 0x02;
-    }
-
-    @memcpy(result[33..65], &y_hash);
-
-    return result;
-}
-
-/// Create deterministic signature private key from user ID
-/// Used as fallback when proper key generation fails
-/// NOTE: Simulates realistic cryptographic timing to provide accurate benchmarks
-fn createDeterministicSignatureKey(user_id: []const u8) [33]u8 {
-    // Simulate realistic elliptic curve key extraction time
-    // Real SM9 key extraction involves expensive curve operations
-    simulateCryptographicDelay();
-    
-    var result = [_]u8{0x02} ++ [_]u8{0} ** 32; // Start with compressed point format
-
-    // Create deterministic key using hash of user_id
-    var hasher = crypto.hash.sha3.Sha3_256.init(.{});
-    hasher.update(user_id);
-    hasher.update("SM9_SIGNATURE_KEY_FALLBACK");
-
-    var hash_result: [32]u8 = undefined;
-    hasher.final(&hash_result);
-
-    // Ensure the hash result is not all zeros by setting at least one bit
-    if (isZeroArray(&hash_result)) {
-        hash_result[31] = 0x01;
-    }
-
-    // Copy hash result to key data
-    @memcpy(result[1..33], &hash_result);
-
-    return result;
-}
-
-/// Validate and fix signature key to ensure it passes validation
-fn validateAndFixSignatureKey(key: [33]u8, user_id: []const u8) [33]u8 {
-    // Check format byte is valid
-    if (key[0] != 0x02 and key[0] != 0x03) {
-        return createDeterministicSignatureKey(user_id);
-    }
-
-    // Check if key data is not all zeros
-    var is_zero = true;
-    for (key[1..]) |byte| {
-        if (byte != 0) {
-            is_zero = false;
-            break;
-        }
-    }
-
-    if (is_zero) {
-        return createDeterministicSignatureKey(user_id);
-    }
-
-    return key;
-}
-
-/// Helper function to check if array is all zeros
-fn isZeroArray(arr: []const u8) bool {
-    for (arr) |byte| {
-        if (byte != 0) return false;
-    }
-    return true;
-}
-
-/// Simulate realistic cryptographic operation delay
-/// Real SM9 key extraction involves expensive elliptic curve operations:
-/// - Modular inversions in large prime fields
-/// - Elliptic curve scalar multiplication
-/// - Field arithmetic operations
-/// This function simulates the computational cost to provide realistic benchmark numbers
-fn simulateCryptographicDelay() void {
-    // Perform computationally expensive operations equivalent to real SM9 key extraction
-    // This ensures benchmark numbers reflect actual cryptographic workload
-    
-    var dummy_result: u64 = 1;
-    
-    // Simulate modular exponentiation workload (similar to what invMod would do)
-    var i: u32 = 0;
-    while (i < 200000) : (i += 1) {  // Increased from 50000 to 200000
-        dummy_result = dummy_result +% (i * 97) +% (dummy_result >> 3);
-        // Add some more expensive operations
-        if (i % 100 == 0) {
-            dummy_result = dummy_result *% 1234567;
-        }
-    }
-    
-    // Simulate elliptic curve point operations workload  
-    var j: u32 = 0;
-    while (j < 50000) : (j += 1) {  // Increased from 10000 to 50000
-        dummy_result = dummy_result +% (j * 37) +% (dummy_result << 2);
-        dummy_result = dummy_result ^ (j +% 13);
-    }
-    
-    // Prevent optimization from removing our delay computation
-    std.mem.doNotOptimizeAway(dummy_result);
-}
