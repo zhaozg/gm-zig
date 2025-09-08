@@ -272,58 +272,9 @@ pub const G1Point = struct {
     }
 
     /// Scalar multiplication: [k]P
-    /// Scalar multiplication: k * P for G1 points (simplified for testing)
+    /// Uses proper elliptic curve scalar multiplication
     pub fn mul(self: G1Point, scalar: [32]u8, curve_params: params.SystemParams) G1Point {
-        _ = curve_params; // Temporarily unused to avoid complex operations
-
-        if (self.isInfinity() or bigint.isZero(scalar)) {
-            return G1Point.infinity();
-        }
-
-        // For testing purposes, use a simplified approach that avoids complex bigint operations
-        // This prevents infinite loops while still providing a working implementation
-
-        // Check for scalar = 0 or 1 cases
-        const zero = [_]u8{0} ** 32;
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
-
-        if (bigint.equal(scalar, zero)) {
-            return G1Point.infinity();
-        }
-
-        if (bigint.equal(scalar, one)) {
-            return self;
-        }
-
-        // For small scalars (2, 3, etc.), use simple addition
-        const two = [_]u8{0} ** 31 ++ [_]u8{2};
-        const three = [_]u8{0} ** 31 ++ [_]u8{3};
-
-        if (bigint.equal(scalar, two)) {
-            // k=2: return 2*P
-            // Use a simplified doubling that doesn't use complex field operations
-            var result = self;
-            result.x[31] = result.x[31] ^ 0x01; // Simple transformation for testing
-            return result;
-        }
-
-        if (bigint.equal(scalar, three)) {
-            // k=3: return 3*P
-            // Use a simplified transformation
-            var result = self;
-            result.x[31] = result.x[31] ^ 0x02; // Different transformation for k=3
-            result.y[31] = result.y[31] ^ 0x01;
-            return result;
-        }
-
-        // For larger scalars, return a deterministic but simplified result
-        // This prevents infinite loops during testing while maintaining test validity
-        var result = self;
-        // Create a pseudo-multiplication result based on scalar and point
-        result.x[30] = result.x[30] ^ scalar[31];
-        result.y[30] = result.y[30] ^ scalar[30];
-
-        return result;
+        return CurveUtils.scalarMultiplyG1(self, scalar, curve_params);
     }
 
     /// Convert to affine coordinates
@@ -729,54 +680,9 @@ pub const G2Point = struct {
     }
 
     /// Scalar multiplication: [k]P
-    /// Scalar multiplication: k * P for G2 points (simplified for testing)
+    /// Uses proper elliptic curve scalar multiplication
     pub fn mul(self: G2Point, scalar: [32]u8, curve_params: params.SystemParams) G2Point {
-        _ = curve_params; // Temporarily unused to avoid complex operations
-
-        if (self.isInfinity() or bigint.isZero(scalar)) {
-            return G2Point.infinity();
-        }
-
-        // For testing purposes, use a simplified approach that avoids complex bigint operations
-        // This prevents infinite loops while still providing a working implementation
-
-        // Check for scalar = 0 or 1 cases
-        const zero = [_]u8{0} ** 32;
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
-
-        if (bigint.equal(scalar, zero)) {
-            return G2Point.infinity();
-        }
-
-        if (bigint.equal(scalar, one)) {
-            return self;
-        }
-
-        // For small scalars (2, 3, etc.), use simple transformations
-        const two = [_]u8{0} ** 31 ++ [_]u8{2};
-        const three = [_]u8{0} ** 31 ++ [_]u8{3};
-
-        if (bigint.equal(scalar, two)) {
-            // k=2: return 2*P
-            var result = self;
-            result.x[31] = result.x[31] ^ 0x01;
-            return result;
-        }
-
-        if (bigint.equal(scalar, three)) {
-            // k=3: return 3*P
-            var result = self;
-            result.x[31] = result.x[31] ^ 0x02;
-            result.y[31] = result.y[31] ^ 0x01;
-            return result;
-        }
-
-        // For larger scalars, return a deterministic but simplified result
-        var result = self;
-        result.x[30] = result.x[30] ^ scalar[31];
-        result.y[30] = result.y[30] ^ scalar[30];
-
-        return result;
+        return CurveUtils.scalarMultiplyG2(self, scalar, curve_params);
     }
 
     /// Validate G2 point with enhanced boundary condition handling
@@ -1099,7 +1005,7 @@ pub const CurveUtils = struct {
     }
 
     /// Complete elliptic curve scalar multiplication for G1
-    /// Implements double-and-add with Montgomery ladder for constant-time execution
+    /// Implements proper double-and-add algorithm following GM/T 0044-2016 standard
     pub fn scalarMultiplyG1(
         point: G1Point,
         scalar: [32]u8,
@@ -1109,41 +1015,71 @@ pub const CurveUtils = struct {
             return G1Point.infinity();
         }
 
-        // Use simplified but stable approach to avoid infinite loops
-        var result = G1Point.infinity();
-
-        // Calculate a simple hash-based result that's deterministic but avoids infinite loops
-        var hash_input: [64]u8 = undefined; // 32 bytes for point + 32 bytes for scalar
-        @memcpy(hash_input[0..32], &point.x);
-        @memcpy(hash_input[32..64], &scalar);
-
-        // Use SM3 hash to create deterministic result
-        var hasher = SM3.init(.{});
-        hasher.update(&hash_input);
-
-        var hash_result: [32]u8 = undefined;
-        hasher.final(&hash_result);
-
-        // Reduce hash results modulo q to ensure they're valid field elements
-        result.x = bigint.mod(hash_result, curve_params.q) catch hash_result;
-
-        // Create different y coordinate by XORing with scalar
-        var y_input: [32]u8 = undefined;
-        for (0..32) |i| {
-            y_input[i] = hash_result[i] ^ scalar[i];
+        // Handle scalar = 1 case
+        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        if (bigint.equal(scalar, one)) {
+            return point;
         }
-        result.y = bigint.mod(y_input, curve_params.q) catch y_input;
 
-        // Set Z to 1 for affine coordinates
-        result.z = [_]u8{0} ** 32;
-        result.z[31] = 1;
-        result.is_infinity = false;
+        // For scalar = 2, just double
+        const two = [_]u8{0} ** 31 ++ [_]u8{2};
+        if (bigint.equal(scalar, two)) {
+            return point.double(curve_params);
+        }
+
+        // For scalar = 3, double and add
+        const three = [_]u8{0} ** 31 ++ [_]u8{3};
+        if (bigint.equal(scalar, three)) {
+            const doubled = point.double(curve_params);
+            return doubled.add(point, curve_params);
+        }
+
+        // For larger scalars, use a simplified approach to avoid infinite loops
+        // This implementation prioritizes correctness over performance for now
+        
+        // Find the highest bit set in scalar to determine loop bounds
+        var highest_bit: i32 = -1;
+        var byte_idx: usize = 0;
+        while (byte_idx < 32) : (byte_idx += 1) {
+            const byte = scalar[byte_idx];
+            if (byte != 0) {
+                var bit_pos: u3 = 7;
+                while (true) {
+                    if ((byte >> bit_pos) & 1 == 1) {
+                        highest_bit = @as(i32, @intCast(byte_idx * 8 + (7 - bit_pos)));
+                    }
+                    if (bit_pos == 0) break;
+                    bit_pos -= 1;
+                }
+            }
+        }
+
+        if (highest_bit == -1) return G1Point.infinity();
+
+        // Start with point at the highest bit
+        var result = point;
+
+        // Process bits from highest-1 down to 0
+        var bit_index = highest_bit - 1;
+        while (bit_index >= 0) : (bit_index -= 1) {
+            const byte_index = @as(usize, @intCast(@divTrunc(bit_index, 8)));
+            const bit_pos = @as(u3, @intCast(7 - @mod(bit_index, 8)));
+            
+            const byte = scalar[byte_index];
+            const bit = (byte >> bit_pos) & 1;
+
+            result = result.double(curve_params);
+            
+            if (bit == 1) {
+                result = result.add(point, curve_params);
+            }
+        }
 
         return result;
     }
 
     /// Complete elliptic curve scalar multiplication for G2
-    /// Uses simplified but stable approach to avoid infinite loops
+    /// Implements proper double-and-add algorithm following GM/T 0044-2016 standard
     pub fn scalarMultiplyG2(
         point: G2Point,
         scalar: [32]u8,
@@ -1153,53 +1089,66 @@ pub const CurveUtils = struct {
             return G2Point.infinity();
         }
 
-        // Use a much simpler but stable approach
-        // Instead of complex double-and-add, use direct scalar-based transformation
-        var result = G2Point.infinity();
-
-        // Calculate a simple hash-based result that's deterministic but avoids infinite loops
-        var hash_input: [96]u8 = undefined; // 64 bytes for point + 32 bytes for scalar
-        @memcpy(hash_input[0..64], &point.x);
-        @memcpy(hash_input[64..96], &scalar);
-
-        // Use SM3 hash to create deterministic result
-        var hasher = SM3.init(.{});
-        hasher.update(&hash_input);
-
-        var hash_result: [32]u8 = undefined;
-        hasher.final(&hash_result);
-
-        // Create result point from hash, ensuring coordinates are in field
-        // For G2, we need 64-byte coordinates (Fp2 elements)
-        const x1_reduced = bigint.mod(hash_result, curve_params.q) catch hash_result;
-        var x2_input: [32]u8 = undefined;
-        for (0..32) |i| {
-            x2_input[i] = hash_result[i] ^ scalar[i];
+        // Handle scalar = 1 case
+        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        if (bigint.equal(scalar, one)) {
+            return point;
         }
-        const x2_reduced = bigint.mod(x2_input, curve_params.q) catch x2_input;
 
-        var y1_input: [32]u8 = undefined;
-        for (0..32) |i| {
-            y1_input[i] = hash_result[i] ^ 0xAA;
+        // For small scalars, handle them efficiently
+        const two = [_]u8{0} ** 31 ++ [_]u8{2};
+        if (bigint.equal(scalar, two)) {
+            return point.double(curve_params);
         }
-        const y1_reduced = bigint.mod(y1_input, curve_params.q) catch y1_input;
 
-        var y2_input: [32]u8 = undefined;
-        for (0..32) |i| {
-            y2_input[i] = hash_result[i] ^ 0x55;
+        // Implement proper binary scalar multiplication using sliding window method
+        // Find the most significant bit
+        var msb_found = false;
+        var msb_index: usize = 0;
+        
+        var byte_idx: usize = 0;
+        while (byte_idx < 32) : (byte_idx += 1) {
+            const byte = scalar[byte_idx];
+            if (byte != 0 and !msb_found) {
+                var bit_pos: u3 = 7;
+                while (true) {
+                    if ((byte >> bit_pos) & 1 == 1) {
+                        msb_index = byte_idx * 8 + (7 - bit_pos);
+                        msb_found = true;
+                        break;
+                    }
+                    if (bit_pos == 0) break;
+                    bit_pos -= 1;
+                }
+                if (msb_found) break;
+            }
         }
-        const y2_reduced = bigint.mod(y2_input, curve_params.q) catch y2_input;
 
-        // Copy reduced coordinates to result
-        @memcpy(result.x[0..32], &x1_reduced);
-        @memcpy(result.x[32..64], &x2_reduced);
-        @memcpy(result.y[0..32], &y1_reduced);
-        @memcpy(result.y[32..64], &y2_reduced);
+        if (!msb_found) return G2Point.infinity();
 
-        // Set z to non-zero for proper point representation
-        result.z = [_]u8{0} ** 64;
-        result.z[63] = 1; // Set z = (1, 0) in Fp2
-        result.is_infinity = false;
+        // Start with the point itself (for the MSB)
+        var result = point;
+
+        // Process remaining bits from MSB-1 down to 0
+        if (msb_index > 0) {
+            var i: usize = msb_index - 1;
+            while (true) {
+                const byte_index = i / 8;
+                const bit_pos = @as(u3, @intCast(7 - (i % 8)));
+                
+                const byte = scalar[byte_index];
+                const bit = (byte >> bit_pos) & 1;
+
+                result = result.double(curve_params);
+                
+                if (bit == 1) {
+                    result = result.add(point, curve_params);
+                }
+
+                if (i == 0) break;
+                i -= 1;
+            }
+        }
 
         return result;
     }
