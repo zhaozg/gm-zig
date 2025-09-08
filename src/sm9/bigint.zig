@@ -1079,7 +1079,7 @@ fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
             t[4-j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
             c = @as(u64, @intCast(prod >> 64));
         }
-        t[0] += c;
+        t[0] +%= c;
         
         // Reduction step: eliminate t[4] using Montgomery reduction
         const m = t[4] *% SM9_Q_PRIME_U64;
@@ -1090,7 +1090,7 @@ fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
             t[4-j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
             c = @as(u64, @intCast(prod >> 64));
         }
-        t[0] += c;
+        t[0] +%= c;
         
         // Shift right by one word
         for (0..4) |j| {
