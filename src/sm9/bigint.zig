@@ -206,16 +206,16 @@ pub fn shiftRight(a: BigInt) BigInt {
 }
 
 /// Modular multiplication: result = (a * b) mod m
-/// Optimized with u64-based arithmetic for significant performance improvement
+/// Optimized with Montgomery multiplication for SM9 prime field
 pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
 
-    // Check for SM9 prime modulus (most common case) and use optimized path
+    // Check for SM9 prime modulus and use Montgomery multiplication
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
     
     if (equal(m, sm9_q)) {
-        return mulModOptimized(a, b, m);
+        return montgomeryMulModSM9(a, b, m);
     }
 
     // For other moduli, use optimized u64-based algorithm
@@ -1050,4 +1050,115 @@ fn compare64(a: BigInt64, b: BigInt64) i32 {
 /// Check if u64 array is less than another
 fn lessThan64(a: BigInt64, b: BigInt64) bool {
     return compare64(a, b) < 0;
+}
+
+// ============================================================================
+// Montgomery multiplication for SM9 prime field optimization  
+// ============================================================================
+
+/// SM9 prime modulus q in u64 format
+const SM9_Q_U64: BigInt64 = [4]u64{
+    0xB640000002A3A6F1, 0xD603AB4FF58EC745, 0x21F2934B1A7AEEDB, 0xE56F9B27E351457D
+};
+
+/// Precomputed Montgomery parameters for SM9 prime q
+/// R = 2^256, N' = -q^(-1) mod R (precomputed)
+const SM9_Q_PRIME_U64: u64 = 0x87D20782E4866389; // -q^(-1) mod 2^64
+
+/// Montgomery multiplication for SM9 prime field
+/// Implements CIOS (Coarsely Integrated Operand Scanning) algorithm
+fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
+    var t: [5]u64 = [_]u64{0} ** 5;
+    
+    // CIOS algorithm for 4-word Montgomery multiplication
+    for (0..4) |i| {
+        // Multiplication step: t += a[i] * b
+        var c: u64 = 0;
+        for (0..4) |j| {
+            const prod = @as(u128, a[3-i]) * @as(u128, b[3-j]) + @as(u128, t[4-j]) + @as(u128, c);
+            t[4-j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
+            c = @as(u64, @intCast(prod >> 64));
+        }
+        t[0] += c;
+        
+        // Reduction step: eliminate t[4] using Montgomery reduction
+        const m = t[4] *% SM9_Q_PRIME_U64;
+        c = 0;
+        
+        for (0..4) |j| {
+            const prod = @as(u128, m) * @as(u128, SM9_Q_U64[3-j]) + @as(u128, t[4-j]) + @as(u128, c);
+            t[4-j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
+            c = @as(u64, @intCast(prod >> 64));
+        }
+        t[0] += c;
+        
+        // Shift right by one word
+        for (0..4) |j| {
+            t[4-j] = t[3-j];
+        }
+        t[0] = 0;
+    }
+    
+    // Final result is in t[1..4], but we need to check if >= q
+    var result: BigInt64 = [4]u64{ t[1], t[2], t[3], t[4] };
+    
+    // Final conditional subtraction: if result >= q, subtract q
+    if (!lessThan64(result, SM9_Q_U64)) {
+        result = sub64(result, SM9_Q_U64).result;
+    }
+    
+    return result;
+}
+
+/// Convert to Montgomery domain for SM9 prime field
+/// Computes a * R mod q where R = 2^256
+fn toMontgomerySM9(a: BigInt64) BigInt64 {
+    // R mod q (precomputed)
+    const R_MOD_Q: BigInt64 = [4]u64{
+        0x49BFFFFFFD5C590E, 0x29FC54AFFAA73CBA, 0xDE0D6CB4E5851124, 0x1A9101B0DE964382
+    };
+    
+    return montgomeryMulSM9(a, R_MOD_Q);
+}
+
+/// Convert from Montgomery domain for SM9 prime field  
+/// Computes a / R mod q where R = 2^256
+fn fromMontgomerySM9(a: BigInt64) BigInt64 {
+    const one: BigInt64 = [4]u64{ 0, 0, 0, 1 };
+    return montgomeryMulSM9(a, one);
+}
+
+/// Optimized Montgomery-based modular multiplication for SM9
+fn montgomeryMulModSM9(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
+    // Verify this is the SM9 prime
+    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+    if (!equal(m, sm9_q)) {
+        return mulModGeneral(a, b, m);
+    }
+    
+    // Convert inputs to u64 and Montgomery domain
+    const a64 = toU64Array(a);
+    const b64 = toU64Array(b);
+    
+    // Reduce inputs first
+    var a_red = a64;
+    var b_red = b64;
+    while (!lessThan64(a_red, SM9_Q_U64)) {
+        a_red = sub64(a_red, SM9_Q_U64).result;
+    }
+    while (!lessThan64(b_red, SM9_Q_U64)) {
+        b_red = sub64(b_red, SM9_Q_U64).result;
+    }
+    
+    // Convert to Montgomery domain
+    const a_mont = toMontgomerySM9(a_red);
+    const b_mont = toMontgomerySM9(b_red);
+    
+    // Perform Montgomery multiplication
+    const result_mont = montgomeryMulSM9(a_mont, b_mont);
+    
+    // Convert back from Montgomery domain
+    const result64 = fromMontgomerySM9(result_mont);
+    
+    return fromU64Array(result64);
 }
