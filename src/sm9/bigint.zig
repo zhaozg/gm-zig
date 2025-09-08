@@ -250,9 +250,9 @@ fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         return b_red; // 1 * b = b 
     }
     
-    // Use repeated addition for small b (up to 256)
+    // Use repeated addition for small b (up to 64 for performance)
     const b_small = toU32(b_red);
-    if (b_small <= 256 and equal(b_red, fromU32(b_small))) {
+    if (b_small <= 64 and equal(b_red, fromU32(b_small))) {
         var result = [_]u8{0} ** 32;
         for (0..b_small) |_| {
             result = addMod(result, a_red, m) catch return BigIntError.Overflow;
@@ -260,7 +260,7 @@ fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         return result;
     }
     
-    // For larger numbers, fall back to the u64 algorithm
+    // For larger numbers, fall back to the u64 algorithm  
     return mulModGeneral(a_red, b_red, m);
 }
 
