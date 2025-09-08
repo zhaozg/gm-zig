@@ -179,15 +179,15 @@ pub const G1Point = struct {
 
         // Use Jacobian projective coordinates for efficient doubling
         // Input: P = (X, Y, Z) representing (X/Z^2, Y/Z^3)
-        // Output: 2P = (X', Y', Z') 
-        
+        // Output: 2P = (X', Y', Z')
+
         const field_p = curve_params.q;
-        
+
         // Handle affine coordinates (Z = 1)
         const x = self.x;
         const y = self.y;
         var z = self.z;
-        
+
         // If point is in affine form, convert z to 1 in our representation
         const one = [_]u8{0} ** 31 ++ [_]u8{1};
         if (bigint.equal(z, [_]u8{0} ** 32)) {
@@ -203,22 +203,22 @@ pub const G1Point = struct {
 
         // Compute Y^2
         const y_squared = bigint.mulMod(y, y, field_p) catch return G1Point.infinity();
-        
+
         // Compute S = 4*X*Y^2
         const xy_squared = bigint.mulMod(x, y_squared, field_p) catch return G1Point.infinity();
         const two_xy_squared = bigint.addMod(xy_squared, xy_squared, field_p) catch return G1Point.infinity();
         const s = bigint.addMod(two_xy_squared, two_xy_squared, field_p) catch return G1Point.infinity();
-        
+
         // Compute M = 3*X^2 (since a=0 for BN curves)
         const x_squared = bigint.mulMod(x, x, field_p) catch return G1Point.infinity();
         const two_x_squared = bigint.addMod(x_squared, x_squared, field_p) catch return G1Point.infinity();
         const m = bigint.addMod(two_x_squared, x_squared, field_p) catch return G1Point.infinity();
-        
+
         // Compute X' = M^2 - 2*S
         const m_squared = bigint.mulMod(m, m, field_p) catch return G1Point.infinity();
         const two_s = bigint.addMod(s, s, field_p) catch return G1Point.infinity();
         const new_x = bigint.subMod(m_squared, two_s, field_p) catch return G1Point.infinity();
-        
+
         // Compute Y' = M*(S - X') - 8*Y^4
         const s_minus_x = bigint.subMod(s, new_x, field_p) catch return G1Point.infinity();
         const m_times_diff = bigint.mulMod(m, s_minus_x, field_p) catch return G1Point.infinity();
@@ -233,7 +233,7 @@ pub const G1Point = struct {
             return G1Point.infinity();
         };
         const new_y = bigint.subMod(m_times_diff, eight_y_fourth_final, field_p) catch return G1Point.infinity();
-        
+
         // Compute Z' = 2*Y*Z
         const yz = bigint.mulMod(y, z, field_p) catch return G1Point.infinity();
         const new_z = bigint.addMod(yz, yz, field_p) catch return G1Point.infinity();
@@ -254,18 +254,18 @@ pub const G1Point = struct {
         // Use mixed addition with Jacobian coordinates
         // P1 = (X1, Y1, Z1), P2 = (X2, Y2, Z2)
         const field_p = curve_params.q;
-        
+
         const x1 = self.x;
         const y1 = self.y;
         var z1 = self.z;
         const x2 = other.x;
         const y2 = other.y;
         var z2 = other.z;
-        
-        // Handle affine coordinates 
+
+        // Handle affine coordinates
         const one = [_]u8{0} ** 31 ++ [_]u8{1};
         const zero = [_]u8{0} ** 32;
-        
+
         if (bigint.equal(z1, zero)) z1 = one;
         if (bigint.equal(z2, zero)) z2 = one;
 
@@ -285,12 +285,12 @@ pub const G1Point = struct {
         if (bigint.equal(z2, one)) {
             return addMixedJacobianAffine(x1, y1, z1, x2, y2, field_p);
         }
-        
+
         // If P1 is affine, swap and use mixed addition
         if (bigint.equal(z1, one)) {
             return addMixedJacobianAffine(x2, y2, z2, x1, y1, field_p);
         }
-        
+
         // General Jacobian addition (both in projective form)
         return addJacobianJacobian(x1, y1, z1, x2, y2, z2, field_p);
     }
@@ -1089,7 +1089,7 @@ pub const CurveUtils = struct {
         // Find the most significant bit
         var msb_found = false;
         var msb_index: usize = 0;
-        
+
         var byte_idx: usize = 0;
         while (byte_idx < 32) : (byte_idx += 1) {
             const byte = scalar[byte_idx];
@@ -1119,12 +1119,12 @@ pub const CurveUtils = struct {
             while (true) {
                 const byte_index = i / 8;
                 const bit_pos = @as(u3, @intCast(7 - (i % 8)));
-                
+
                 const byte = scalar[byte_index];
                 const bit = (byte >> bit_pos) & 1;
 
                 result = result.double(curve_params);
-                
+
                 if (bit == 1) {
                     result = result.add(point, curve_params);
                 }
@@ -1266,17 +1266,17 @@ pub const CurveUtils = struct {
 fn addMixedJacobianAffine(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u8, field_p: [32]u8) G1Point {
     // Mixed addition algorithm optimized for P2 in affine form
     // This avoids many multiplications compared to general Jacobian addition
-    
+
     // Compute Z1^2 and Z1^3
     const z1_squared = bigint.mulMod(z1, z1, field_p) catch return G1Point.infinity();
     const z1_cubed = bigint.mulMod(z1_squared, z1, field_p) catch return G1Point.infinity();
-    
+
     // Compute U1 = X1, U2 = X2*Z1^2
     const u2_val = bigint.mulMod(x2, z1_squared, field_p) catch return G1Point.infinity();
-    
+
     // Compute S1 = Y1, S2 = Y2*Z1^3
     const s2 = bigint.mulMod(y2, z1_cubed, field_p) catch return G1Point.infinity();
-    
+
     // Check if points are equal: U1 == U2 and S1 == S2
     if (bigint.equal(x1, u2_val)) {
         if (bigint.equal(y1, s2)) {
@@ -1289,32 +1289,32 @@ fn addMixedJacobianAffine(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [3
             return G1Point.infinity();
         }
     }
-    
+
     // Compute H = U2 - U1, r = S2 - S1
     const h = bigint.subMod(u2_val, x1, field_p) catch return G1Point.infinity();
     const r = bigint.subMod(s2, y1, field_p) catch return G1Point.infinity();
-    
+
     // Compute H^2 and H^3
     const h_squared = bigint.mulMod(h, h, field_p) catch return G1Point.infinity();
     const h_cubed = bigint.mulMod(h_squared, h, field_p) catch return G1Point.infinity();
-    
+
     // Compute X3 = r^2 - H^3 - 2*U1*H^2
     const r_squared = bigint.mulMod(r, r, field_p) catch return G1Point.infinity();
     const u1_h_squared = bigint.mulMod(x1, h_squared, field_p) catch return G1Point.infinity();
     const two_u1_h_squared = bigint.addMod(u1_h_squared, u1_h_squared, field_p) catch return G1Point.infinity();
-    
+
     var x3 = bigint.subMod(r_squared, h_cubed, field_p) catch return G1Point.infinity();
     x3 = bigint.subMod(x3, two_u1_h_squared, field_p) catch return G1Point.infinity();
-    
+
     // Compute Y3 = r*(U1*H^2 - X3) - S1*H^3
     const u1_h_squared_minus_x3 = bigint.subMod(u1_h_squared, x3, field_p) catch return G1Point.infinity();
     const r_times_diff = bigint.mulMod(r, u1_h_squared_minus_x3, field_p) catch return G1Point.infinity();
     const s1_h_cubed = bigint.mulMod(y1, h_cubed, field_p) catch return G1Point.infinity();
     const y3 = bigint.subMod(r_times_diff, s1_h_cubed, field_p) catch return G1Point.infinity();
-    
+
     // Compute Z3 = Z1*H
     const z3 = bigint.mulMod(z1, h, field_p) catch return G1Point.infinity();
-    
+
     return G1Point{
         .x = x3,
         .y = y3,
@@ -1327,21 +1327,21 @@ fn addMixedJacobianAffine(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [3
 /// P1 = (X1, Y1, Z1), P2 = (X2, Y2, Z2) both in Jacobian coordinates
 fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u8, z2: [32]u8, field_p: [32]u8) G1Point {
     // General Jacobian addition algorithm
-    
+
     // Compute Z1^2, Z2^2, Z1^3, Z2^3
     const z1_squared = bigint.mulMod(z1, z1, field_p) catch return G1Point.infinity();
     const z2_squared = bigint.mulMod(z2, z2, field_p) catch return G1Point.infinity();
     const z1_cubed = bigint.mulMod(z1_squared, z1, field_p) catch return G1Point.infinity();
     const z2_cubed = bigint.mulMod(z2_squared, z2, field_p) catch return G1Point.infinity();
-    
+
     // Compute U1 = X1*Z2^2, U2 = X2*Z1^2
     const u1_val = bigint.mulMod(x1, z2_squared, field_p) catch return G1Point.infinity();
     const u2_val = bigint.mulMod(x2, z1_squared, field_p) catch return G1Point.infinity();
-    
+
     // Compute S1 = Y1*Z2^3, S2 = Y2*Z1^3
     const s1 = bigint.mulMod(y1, z2_cubed, field_p) catch return G1Point.infinity();
     const s2 = bigint.mulMod(y2, z1_cubed, field_p) catch return G1Point.infinity();
-    
+
     // Check if points are equal
     if (bigint.equal(u1_val, u2_val)) {
         if (bigint.equal(s1, s2)) {
@@ -1354,33 +1354,33 @@ fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u
             return G1Point.infinity();
         }
     }
-    
+
     // Compute H = U2 - U1, r = S2 - S1
     const h = bigint.subMod(u2_val, u1_val, field_p) catch return G1Point.infinity();
     const r = bigint.subMod(s2, s1, field_p) catch return G1Point.infinity();
-    
+
     // Compute H^2 and H^3
     const h_squared = bigint.mulMod(h, h, field_p) catch return G1Point.infinity();
     const h_cubed = bigint.mulMod(h_squared, h, field_p) catch return G1Point.infinity();
-    
+
     // Compute X3 = r^2 - H^3 - 2*U1*H^2
     const r_squared = bigint.mulMod(r, r, field_p) catch return G1Point.infinity();
     const u1_h_squared = bigint.mulMod(u1_val, h_squared, field_p) catch return G1Point.infinity();
     const two_u1_h_squared = bigint.addMod(u1_h_squared, u1_h_squared, field_p) catch return G1Point.infinity();
-    
+
     var x3 = bigint.subMod(r_squared, h_cubed, field_p) catch return G1Point.infinity();
     x3 = bigint.subMod(x3, two_u1_h_squared, field_p) catch return G1Point.infinity();
-    
+
     // Compute Y3 = r*(U1*H^2 - X3) - S1*H^3
     const u1_h_squared_minus_x3 = bigint.subMod(u1_h_squared, x3, field_p) catch return G1Point.infinity();
     const r_times_diff = bigint.mulMod(r, u1_h_squared_minus_x3, field_p) catch return G1Point.infinity();
     const s1_h_cubed = bigint.mulMod(s1, h_cubed, field_p) catch return G1Point.infinity();
     const y3 = bigint.subMod(r_times_diff, s1_h_cubed, field_p) catch return G1Point.infinity();
-    
+
     // Compute Z3 = Z1*Z2*H
     const z1_z2 = bigint.mulMod(z1, z2, field_p) catch return G1Point.infinity();
     const z3 = bigint.mulMod(z1_z2, h, field_p) catch return G1Point.infinity();
-    
+
     return G1Point{
         .x = x3,
         .y = y3,
@@ -1398,33 +1398,33 @@ fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u
 fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.SystemParams) G1Point {
     const window_size = 4; // 4-bit window gives 16 precomputed points
     const table_size = 1 << window_size; // 2^4 = 16
-    
+
     // Precompute table: [P, 2P, 3P, ..., 15P]
     var table: [table_size]G1Point = undefined;
     table[0] = G1Point.infinity(); // 0P = infinity
     table[1] = point; // 1P = P
-    
+
     // Compute odd multiples: 3P, 5P, 7P, ..., 15P
     for (1..(table_size / 2)) |i| {
         table[2 * i + 1] = table[2 * i - 1].add(table[2], curve_params);
     }
-    
+
     // Compute even multiples: 2P, 4P, 6P, ..., 14P
     table[2] = point.double(curve_params); // 2P
     for (2..(table_size / 2)) |i| {
         table[2 * i] = table[i].double(curve_params);
     }
-    
+
     // Find the most significant non-zero window
     var result = G1Point.infinity();
     var found_first = false;
-    
+
     // Process scalar in 4-bit windows from most significant to least significant
     var window_idx: i32 = 62; // 256 bits / 4 = 64 windows, indexed 0-63
     while (window_idx >= 0) : (window_idx -= 1) {
         const bit_offset = @as(u8, @intCast(window_idx * 4));
         const window_value = extractWindow(scalar, bit_offset, window_size);
-        
+
         if (!found_first) {
             if (window_value != 0) {
                 result = table[window_value];
@@ -1435,24 +1435,24 @@ fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.S
             for (0..window_size) |_| {
                 result = result.double(curve_params);
             }
-            
+
             // Add the windowed value
             if (window_value != 0) {
                 result = result.add(table[window_value], curve_params);
             }
         }
     }
-    
+
     return result;
 }
 
 /// Extract a window of bits from scalar starting at bit_offset
 fn extractWindow(scalar: [32]u8, bit_offset: u8, window_size: u8) u8 {
     if (bit_offset >= 256) return 0;
-    
+
     const byte_idx = bit_offset / 8;
     const bit_idx = bit_offset % 8;
-    
+
     // Handle case where window spans multiple bytes
     if (bit_idx + window_size <= 8) {
         // Window fits in single byte
@@ -1465,22 +1465,22 @@ fn extractWindow(scalar: [32]u8, bit_offset: u8, window_size: u8) u8 {
         var result: u8 = 0;
         var bits_remaining = window_size;
         var current_bit = bit_offset;
-        
+
         while (bits_remaining > 0 and current_bit < 256) {
             const curr_byte_idx = current_bit / 8;
             const curr_bit_idx = current_bit % 8;
             const curr_byte = scalar[31 - curr_byte_idx];
-            
+
             const bits_in_byte = @min(bits_remaining, 8 - curr_bit_idx);
             const shift = 8 - curr_bit_idx - bits_in_byte;
             const mask = (@as(u8, 1) << @intCast(bits_in_byte)) - 1;
             const extracted = (curr_byte >> @intCast(shift)) & mask;
-            
+
             result = (result << @intCast(bits_in_byte)) | extracted;
             bits_remaining -= bits_in_byte;
             current_bit += bits_in_byte;
         }
-        
+
         return result;
     }
 }

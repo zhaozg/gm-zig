@@ -211,7 +211,7 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
 
-    // Fast path for small values to avoid complex u64 array operations  
+    // Fast path for small values to avoid complex u64 array operations
     // Use much more restrictive thresholds to avoid interfering with SM9 field operations
     const small_threshold = fromU64(0xFF); // Only 8-bit values to be extra safe
     // Always disable fast path when using SM9 prime modulus
@@ -220,7 +220,7 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         return fastMulModSmall(a, b, m);
     }
 
-    // TEMPORARY: Disable Montgomery multiplication to isolate issue  
+    // TEMPORARY: Disable Montgomery multiplication to isolate issue
     // Check for SM9 prime modulus and use Montgomery multiplication
     // if (equal(m, sm9_q)) {
     //     return montgomeryMulModSM9(a, b, m);
@@ -236,20 +236,20 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
-    
+
     // Simple approach: multiply then mod
-    // First reduce inputs 
+    // First reduce inputs
     const a_red = mod(a, m) catch return BigIntError.InvalidModulus;
     const b_red = mod(b, m) catch return BigIntError.InvalidModulus;
-    
+
     // For small numbers or when one operand is 1, use direct computation
     if (equal(b_red, [_]u8{0} ** 31 ++ [_]u8{1})) {
         return a_red; // a * 1 = a
     }
     if (equal(a_red, [_]u8{0} ** 31 ++ [_]u8{1})) {
-        return b_red; // 1 * b = b 
+        return b_red; // 1 * b = b
     }
-    
+
     // Use repeated addition for small b (up to 64 for performance)
     const b_small = toU32(b_red);
     if (b_small <= 64 and equal(b_red, fromU32(b_small))) {
@@ -259,8 +259,8 @@ fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         }
         return result;
     }
-    
-    // For larger numbers, fall back to the u64 algorithm  
+
+    // For larger numbers, fall back to the u64 algorithm
     return mulModGeneral(a_red, b_red, m);
 }
 
@@ -270,13 +270,13 @@ fn mulModGeneral(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const a64 = toU64Array(a);
     const b64 = toU64Array(b);
     const m64 = toU64Array(m);
-    
+
     // Perform multiplication in u64 space (gives 512-bit result)
     const prod = mul64(a64, b64);
-    
+
     // Reduce modulo m using optimized reduction
     const result64 = reduce512Mod256(prod, m64);
-    
+
     return fromU64Array(result64);
 }
 
@@ -292,10 +292,10 @@ fn mulModOptimized(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const a64 = toU64Array(a_mod);
     const b64 = toU64Array(b_mod);
     const m64 = toU64Array(m);
-    
+
     const prod = mul64(a64, b64);
     const result64 = reduce512Mod256(prod, m64);
-    
+
     return fromU64Array(result64);
 }
 
@@ -304,29 +304,29 @@ fn reduce512Mod256(a: [8]u64, m: BigInt64) BigInt64 {
     // Convert 512-bit result to two 256-bit parts: high and low
     var high: BigInt64 = undefined;
     var low: BigInt64 = undefined;
-    
+
     for (0..4) |i| {
         high[i] = a[i];
         low[i] = a[i + 4];
     }
-    
+
     // Perform reduction: result = (high * 2^256 + low) mod m
     // This is simplified Barrett-like reduction for 512->256 bit case
     var result = low;
-    
+
     // Reduce high part by repeated subtraction (optimized for up to 256 iterations)
     var iterations: u32 = 0;
     const max_iterations: u32 = 256;
-    
+
     while (!isZero64(high) and iterations < max_iterations) {
         // Find the position to subtract m from high
         const high_bits = countBits64(high);
         const m_bits = countBits64(m);
-        
+
         if (high_bits >= m_bits) {
             const shift_count = high_bits - m_bits;
             const shifted_m = shiftLeft64(m, @intCast(shift_count));
-            
+
             if (!lessThan64(high, shifted_m)) {
                 high = sub64(high, shifted_m).result;
             } else {
@@ -341,26 +341,26 @@ fn reduce512Mod256(a: [8]u64, m: BigInt64) BigInt64 {
         } else {
             break;
         }
-        
+
         iterations += 1;
     }
-    
+
     // Add remaining high part to result and reduce
     if (!isZero64(high)) {
         const add_result = add64(result, high);
         result = add_result.result;
-        
+
         // Final reduction if needed
         while (!lessThan64(result, m)) {
             result = sub64(result, m).result;
         }
     }
-    
+
     // Final check and reduction
     while (!lessThan64(result, m)) {
         result = sub64(result, m).result;
     }
-    
+
     return result;
 }
 
@@ -388,22 +388,22 @@ fn countBits64(a: BigInt64) u32 {
 fn shiftLeft64(a: BigInt64, shift: u32) BigInt64 {
     if (shift == 0) return a;
     if (shift >= 256) return [_]u64{0} ** 4;
-    
+
     var result: BigInt64 = [_]u64{0} ** 4;
     const word_shift = shift / 64;
     const bit_shift = shift % 64;
-    
+
     for (0..4) |i| {
         if (i + word_shift < 4) {
             result[i] = a[i + word_shift] << @intCast(bit_shift);
-            
+
             // Handle carry from next word
             if (bit_shift > 0 and (i + word_shift + 1) < 4) {
                 result[i] |= a[i + word_shift + 1] >> @intCast(64 - bit_shift);
             }
         }
     }
-    
+
     return result;
 }
 
@@ -419,7 +419,7 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
 
     // For SM9 prime modulus, use optimized reduction
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
-    
+
     if (equal(m, sm9_q)) {
         return modOptimized(a, m);
     }
@@ -463,20 +463,20 @@ fn modOptimized(a: BigInt, m: BigInt) BigIntError!BigInt {
     // Convert to u64 arrays for optimized arithmetic
     const a64 = toU64Array(a);
     const m64 = toU64Array(m);
-    
+
     var result64 = a64;
     var iterations: u32 = 0;
     const max_iterations: u32 = 512;
-    
+
     while (!lessThan64(result64, m64) and iterations < max_iterations) {
         result64 = sub64(result64, m64).result;
         iterations += 1;
     }
-    
+
     if (iterations >= max_iterations) {
         return BigIntError.InvalidModulus;
     }
-    
+
     return fromU64Array(result64);
 }
 
@@ -485,7 +485,7 @@ fn modGeneral(a: BigInt, m: BigInt) BigIntError!BigInt {
     // Convert to u64 arrays
     const a64 = toU64Array(a);
     const m64 = toU64Array(m);
-    
+
     var result64 = a64;
     var iterations: u32 = 0;
     const max_iterations: u32 = 512;
@@ -494,12 +494,12 @@ fn modGeneral(a: BigInt, m: BigInt) BigIntError!BigInt {
         // Use optimized binary search approach for large differences
         const a_bits = countBits64(result64);
         const m_bits = countBits64(m64);
-        
+
         if (a_bits > m_bits) {
             // Try to subtract a shifted version of m to reduce faster
             const shift_count = a_bits - m_bits;
             const shifted_m = shiftLeft64(m64, shift_count);
-            
+
             if (!lessThan64(result64, shifted_m)) {
                 result64 = sub64(result64, shifted_m).result;
             } else if (shift_count > 0) {
@@ -517,7 +517,7 @@ fn modGeneral(a: BigInt, m: BigInt) BigIntError!BigInt {
         } else {
             result64 = sub64(result64, m64).result;
         }
-        
+
         iterations += 1;
     }
 
@@ -634,7 +634,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
 
     // Fast path for small values to prevent hanging (fixes CI timeouts)
     // Use much more restrictive thresholds to avoid interfering with SM9 field operations
-    const small_threshold = fromU64(0xFF); // Only 8-bit values to be extra safe  
+    const small_threshold = fromU64(0xFF); // Only 8-bit values to be extra safe
     if (!equal(m, sm9_q) and lessThan(a_reduced, small_threshold) and lessThan(m, small_threshold)) {
         return fastInvModSmall(a_reduced, m);
     }
@@ -792,18 +792,18 @@ fn binaryExtendedGcd(a: BigInt, m: BigInt) BigIntError!BigInt {
     return BigIntError.NotInvertible;
 }
 
-/// Fast modular multiplication for small values 
+/// Fast modular multiplication for small values
 /// Optimized for values that fit in 16 bits to prevent errors in complex u64 operations
 fn fastMulModSmall(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const a_val = @as(u32, toU32(a));
     const b_val = @as(u32, toU32(b));
     const m_val = @as(u32, toU32(m));
-    
+
     if (m_val == 0) return BigIntError.InvalidModulus;
-    
+
     const product = a_val * b_val;
     const result = product % m_val;
-    
+
     return fromU32(result);
 }
 
@@ -813,41 +813,41 @@ fn fastInvModSmall(a: BigInt, m: BigInt) BigIntError!BigInt {
     // Convert to 32-bit values for efficient computation
     const a_val = toU32(a);
     const m_val = toU32(m);
-    
+
     if (a_val == 0 or m_val == 0) return BigIntError.NotInvertible;
     if (m_val == 1) return BigIntError.NotInvertible;
-    
+
     // Extended Euclidean algorithm for 32-bit values
     var old_r: i64 = @intCast(m_val);
     var r: i64 = @intCast(a_val);
     var old_s: i64 = 0;
     var s: i64 = 1;
-    
+
     while (r != 0) {
         const quotient = @divTrunc(old_r, r);
         const temp_r = r;
         r = old_r - quotient * r;
         old_r = temp_r;
-        
+
         const temp_s = s;
         s = old_s - quotient * s;
         old_s = temp_s;
     }
-    
+
     if (old_r > 1) return BigIntError.NotInvertible; // Not coprime
-    
+
     // Ensure positive result
     if (old_s < 0) {
         old_s += @intCast(m_val);
     }
-    
+
     return fromU32(@intCast(old_s));
 }
 
 /// Convert BigInt to u32 (assumes value fits in 32 bits)
 fn toU32(a: BigInt) u32 {
-    return (@as(u32, a[28]) << 24) | (@as(u32, a[29]) << 16) | 
-           (@as(u32, a[30]) << 8) | @as(u32, a[31]);
+    return (@as(u32, a[28]) << 24) | (@as(u32, a[29]) << 16) |
+        (@as(u32, a[30]) << 8) | @as(u32, a[31]);
 }
 
 /// Convert u32 to BigInt (compatible with fromU64 format)
@@ -1057,13 +1057,13 @@ fn toU64Array(a: BigInt) BigInt64 {
     for (0..4) |i| {
         const base = i * 8;
         result[3 - i] = (@as(u64, a[base]) << 56) |
-                        (@as(u64, a[base + 1]) << 48) |
-                        (@as(u64, a[base + 2]) << 40) |
-                        (@as(u64, a[base + 3]) << 32) |
-                        (@as(u64, a[base + 4]) << 24) |
-                        (@as(u64, a[base + 5]) << 16) |
-                        (@as(u64, a[base + 6]) << 8) |
-                        @as(u64, a[base + 7]);
+            (@as(u64, a[base + 1]) << 48) |
+            (@as(u64, a[base + 2]) << 40) |
+            (@as(u64, a[base + 3]) << 32) |
+            (@as(u64, a[base + 4]) << 24) |
+            (@as(u64, a[base + 5]) << 16) |
+            (@as(u64, a[base + 6]) << 8) |
+            @as(u64, a[base + 7]);
     }
     return result;
 }
@@ -1090,14 +1090,14 @@ fn fromU64Array(a: BigInt64) BigInt {
 fn add64(a: BigInt64, b: BigInt64) struct { result: BigInt64, carry: bool } {
     var result: BigInt64 = undefined;
     var carry: u64 = 0;
-    
+
     for (0..4) |i| {
         const idx = 3 - i; // Process from least significant
         const sum = @as(u128, a[idx]) + @as(u128, b[idx]) + @as(u128, carry);
         result[idx] = @as(u64, @intCast(sum & 0xFFFFFFFFFFFFFFFF));
         carry = @as(u64, @intCast(sum >> 64));
     }
-    
+
     return .{ .result = result, .carry = carry != 0 };
 }
 
@@ -1105,7 +1105,7 @@ fn add64(a: BigInt64, b: BigInt64) struct { result: BigInt64, carry: bool } {
 fn sub64(a: BigInt64, b: BigInt64) struct { result: BigInt64, borrow: bool } {
     var result: BigInt64 = undefined;
     var borrow: u64 = 0;
-    
+
     for (0..4) |i| {
         const idx = 3 - i; // Process from least significant
         const diff = @as(i128, a[idx]) - @as(i128, b[idx]) - @as(i128, borrow);
@@ -1117,26 +1117,26 @@ fn sub64(a: BigInt64, b: BigInt64) struct { result: BigInt64, borrow: bool } {
             borrow = 0;
         }
     }
-    
+
     return .{ .result = result, .borrow = borrow != 0 };
 }
 
 /// Optimized u64-based multiplication (returns 512-bit result)
 fn mul64(a: BigInt64, b: BigInt64) [8]u64 {
     var result = [_]u64{0} ** 8;
-    
+
     for (0..4) |i| {
         var carry: u64 = 0;
         for (0..4) |j| {
             const idx = 7 - i - j; // Correct indexing for big-endian
-            const prod = @as(u128, a[3 - i]) * @as(u128, b[3 - j]) + 
-                        @as(u128, result[idx]) + @as(u128, carry);
+            const prod = @as(u128, a[3 - i]) * @as(u128, b[3 - j]) +
+                @as(u128, result[idx]) + @as(u128, carry);
             result[idx] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
             carry = @as(u64, @intCast(prod >> 64));
         }
         if (i > 0) result[7 - i - 4] += carry; // Add remaining carry
     }
-    
+
     return result;
 }
 
@@ -1155,13 +1155,11 @@ fn lessThan64(a: BigInt64, b: BigInt64) bool {
 }
 
 // ============================================================================
-// Montgomery multiplication for SM9 prime field optimization  
+// Montgomery multiplication for SM9 prime field optimization
 // ============================================================================
 
 /// SM9 prime modulus q in u64 format
-const SM9_Q_U64: BigInt64 = [4]u64{
-    0xB640000002A3A6F1, 0xD603AB4FF58EC745, 0x21F2934B1A7AEEDB, 0xE56F9B27E351457D
-};
+const SM9_Q_U64: BigInt64 = [4]u64{ 0xB640000002A3A6F1, 0xD603AB4FF58EC745, 0x21F2934B1A7AEEDB, 0xE56F9B27E351457D };
 
 /// Precomputed Montgomery parameters for SM9 prime q
 /// R = 2^256, N' = -q^(-1) mod R (precomputed)
@@ -1171,44 +1169,44 @@ const SM9_Q_PRIME_U64: u64 = 0x87D20782E4866389; // -q^(-1) mod 2^64
 /// Implements CIOS (Coarsely Integrated Operand Scanning) algorithm
 fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
     var t: [5]u64 = [_]u64{0} ** 5;
-    
+
     // CIOS algorithm for 4-word Montgomery multiplication
     for (0..4) |i| {
         // Multiplication step: t += a[i] * b
         var c: u64 = 0;
         for (0..4) |j| {
-            const prod = @as(u128, a[3-i]) * @as(u128, b[3-j]) + @as(u128, t[4-j]) + @as(u128, c);
-            t[4-j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
+            const prod = @as(u128, a[3 - i]) * @as(u128, b[3 - j]) + @as(u128, t[4 - j]) + @as(u128, c);
+            t[4 - j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
             c = @as(u64, @intCast(prod >> 64));
         }
         t[0] +%= c;
-        
+
         // Reduction step: eliminate t[4] using Montgomery reduction
         const m = t[4] *% SM9_Q_PRIME_U64;
         c = 0;
-        
+
         for (0..4) |j| {
-            const prod = @as(u128, m) * @as(u128, SM9_Q_U64[3-j]) + @as(u128, t[4-j]) + @as(u128, c);
-            t[4-j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
+            const prod = @as(u128, m) * @as(u128, SM9_Q_U64[3 - j]) + @as(u128, t[4 - j]) + @as(u128, c);
+            t[4 - j] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
             c = @as(u64, @intCast(prod >> 64));
         }
         t[0] +%= c;
-        
+
         // Shift right by one word
         for (0..4) |j| {
-            t[4-j] = t[3-j];
+            t[4 - j] = t[3 - j];
         }
         t[0] = 0;
     }
-    
+
     // Final result is in t[1..4], but we need to check if >= q
     var result: BigInt64 = [4]u64{ t[1], t[2], t[3], t[4] };
-    
+
     // Final conditional subtraction: if result >= q, subtract q
     if (!lessThan64(result, SM9_Q_U64)) {
         result = sub64(result, SM9_Q_U64).result;
     }
-    
+
     return result;
 }
 
@@ -1216,14 +1214,12 @@ fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
 /// Computes a * R mod q where R = 2^256
 fn toMontgomerySM9(a: BigInt64) BigInt64 {
     // R mod q (precomputed)
-    const R_MOD_Q: BigInt64 = [4]u64{
-        0x49BFFFFFFD5C590E, 0x29FC54AFFAA73CBA, 0xDE0D6CB4E5851124, 0x1A9101B0DE964382
-    };
-    
+    const R_MOD_Q: BigInt64 = [4]u64{ 0x49BFFFFFFD5C590E, 0x29FC54AFFAA73CBA, 0xDE0D6CB4E5851124, 0x1A9101B0DE964382 };
+
     return montgomeryMulSM9(a, R_MOD_Q);
 }
 
-/// Convert from Montgomery domain for SM9 prime field  
+/// Convert from Montgomery domain for SM9 prime field
 /// Computes a / R mod q where R = 2^256
 fn fromMontgomerySM9(a: BigInt64) BigInt64 {
     const one: BigInt64 = [4]u64{ 0, 0, 0, 1 };
@@ -1237,11 +1233,11 @@ fn montgomeryMulModSM9(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (!equal(m, sm9_q)) {
         return mulModGeneral(a, b, m);
     }
-    
+
     // Convert inputs to u64 and Montgomery domain
     const a64 = toU64Array(a);
     const b64 = toU64Array(b);
-    
+
     // Reduce inputs first
     var a_red = a64;
     var b_red = b64;
@@ -1251,16 +1247,16 @@ fn montgomeryMulModSM9(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     while (!lessThan64(b_red, SM9_Q_U64)) {
         b_red = sub64(b_red, SM9_Q_U64).result;
     }
-    
+
     // Convert to Montgomery domain
     const a_mont = toMontgomerySM9(a_red);
     const b_mont = toMontgomerySM9(b_red);
-    
+
     // Perform Montgomery multiplication
     const result_mont = montgomeryMulSM9(a_mont, b_mont);
-    
+
     // Convert back from Montgomery domain
     const result64 = fromMontgomerySM9(result_mont);
-    
+
     return fromU64Array(result64);
 }

@@ -133,21 +133,22 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
     hasher.final(&result);
 
     // Step 6: Reduce modulo order to ensure result is in range [0, N-1]
-    // TEMPORARY: Manual reduction since bigint.mod has bugs
+    // For 256-bit values, at most a few subtractions should be needed
     var reduced = result;
     var iterations: u32 = 0;
-    while (!bigint.lessThan(reduced, order) and iterations < 1000) {
+    while (!bigint.lessThan(reduced, order) and iterations < 5) {
         const sub_result = bigint.sub(reduced, order);
         if (sub_result.borrow) {
-            // Underflow, we're done
-            break;
+            // Underflow, something is wrong with our logic
+            return error.HashComputationFailed;
         }
         reduced = sub_result.result;
         iterations += 1;
     }
-    
-    if (iterations >= 1000) {
-        // If it takes too many iterations, something is wrong
+
+    // If we still need more reductions, the input was much larger than the modulus
+    // This suggests the input is malformed or there's a bug
+    if (!bigint.lessThan(reduced, order)) {
         return error.HashComputationFailed;
     }
 
