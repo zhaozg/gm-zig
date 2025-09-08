@@ -133,10 +133,23 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
     hasher.final(&result);
 
     // Step 6: Reduce modulo order to ensure result is in range [0, N-1]
-    const reduced = bigint.mod(result, order) catch |err| switch (err) {
-        bigint.BigIntError.InvalidModulus => return error.HashComputationFailed,
-        else => return error.HashComputationFailed,
-    };
+    // TEMPORARY: Manual reduction since bigint.mod has bugs
+    var reduced = result;
+    var iterations: u32 = 0;
+    while (!bigint.lessThan(reduced, order) and iterations < 1000) {
+        const sub_result = bigint.sub(reduced, order);
+        if (sub_result.borrow) {
+            // Underflow, we're done
+            break;
+        }
+        reduced = sub_result.result;
+        iterations += 1;
+    }
+    
+    if (iterations >= 1000) {
+        // If it takes too many iterations, something is wrong
+        return error.HashComputationFailed;
+    }
 
     // Step 7: If result is zero, return 1 to ensure result is in range [1, N-1]
     if (bigint.isZero(reduced)) {
