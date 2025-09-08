@@ -206,44 +206,168 @@ pub fn shiftRight(a: BigInt) BigInt {
 }
 
 /// Modular multiplication: result = (a * b) mod m
-/// Uses simple double-and-add algorithm
-/// Modular multiplication: result = (a * b) mod m
-/// Optimized binary method for SM9 parameters
+/// Optimized with u64-based arithmetic for significant performance improvement
 pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
 
+    // Check for SM9 prime modulus (most common case) and use optimized path
+    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+    
+    if (equal(m, sm9_q)) {
+        return mulModOptimized(a, b, m);
+    }
+
+    // For other moduli, use optimized u64-based algorithm
+    return mulModGeneral(a, b, m);
+}
+
+/// Optimized modular multiplication for general case using u64 arithmetic
+fn mulModGeneral(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
+    // Convert to u64 arrays for optimized arithmetic
+    const a64 = toU64Array(a);
+    const b64 = toU64Array(b);
+    const m64 = toU64Array(m);
+    
+    // Perform multiplication in u64 space (gives 512-bit result)
+    const prod = mul64(a64, b64);
+    
+    // Reduce modulo m using optimized reduction
+    const result64 = reduce512Mod256(prod, m64);
+    
+    return fromU64Array(result64);
+}
+
+/// Optimized modular multiplication for SM9 prime field
+fn mulModOptimized(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     // Reduce inputs first to avoid overflow in intermediate calculations
     const a_mod = mod(a, m) catch return BigIntError.InvalidModulus;
     const b_mod = mod(b, m) catch return BigIntError.InvalidModulus;
 
     if (isZero(a_mod) or isZero(b_mod)) return [_]u8{0} ** 32;
 
-    var result = [_]u8{0} ** 32;
-    var base = a_mod;
+    // Use u64-based arithmetic for the core computation
+    const a64 = toU64Array(a_mod);
+    const b64 = toU64Array(b_mod);
+    const m64 = toU64Array(m);
+    
+    const prod = mul64(a64, b64);
+    const result64 = reduce512Mod256(prod, m64);
+    
+    return fromU64Array(result64);
+}
 
-    // Scan through bits of b from LSB to MSB
-    var bit_pos: u32 = 0;
-    while (bit_pos < 256) : (bit_pos += 1) {
-        const byte_idx = 31 - (bit_pos / 8);
-        const bit_shift = @as(u3, @intCast(bit_pos % 8));
-
-        // If bit is set in b, add current base to result
-        if ((b_mod[byte_idx] >> bit_shift) & 1 == 1) {
-            result = addMod(result, base, m) catch return BigIntError.InvalidModulus;
-        }
-
-        // Double the base for next bit position
-        base = addMod(base, base, m) catch return BigIntError.InvalidModulus;
-
-        // Early exit if base becomes zero (optimization)
-        if (isZero(base)) break;
+/// Reduce 512-bit number modulo 256-bit modulus using optimized algorithm
+fn reduce512Mod256(a: [8]u64, m: BigInt64) BigInt64 {
+    // Convert 512-bit result to two 256-bit parts: high and low
+    var high: BigInt64 = undefined;
+    var low: BigInt64 = undefined;
+    
+    for (0..4) |i| {
+        high[i] = a[i];
+        low[i] = a[i + 4];
     }
+    
+    // Perform reduction: result = (high * 2^256 + low) mod m
+    // This is simplified Barrett-like reduction for 512->256 bit case
+    var result = low;
+    
+    // Reduce high part by repeated subtraction (optimized for up to 256 iterations)
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 256;
+    
+    while (!isZero64(high) and iterations < max_iterations) {
+        // Find the position to subtract m from high
+        const high_bits = countBits64(high);
+        const m_bits = countBits64(m);
+        
+        if (high_bits >= m_bits) {
+            const shift_count = high_bits - m_bits;
+            const shifted_m = shiftLeft64(m, @intCast(shift_count));
+            
+            if (!lessThan64(high, shifted_m)) {
+                high = sub64(high, shifted_m).result;
+            } else {
+                // Shift by one less
+                if (shift_count > 0) {
+                    const shifted_m_less = shiftLeft64(m, @intCast(shift_count - 1));
+                    if (!lessThan64(high, shifted_m_less)) {
+                        high = sub64(high, shifted_m_less).result;
+                    }
+                }
+            }
+        } else {
+            break;
+        }
+        
+        iterations += 1;
+    }
+    
+    // Add remaining high part to result and reduce
+    if (!isZero64(high)) {
+        const add_result = add64(result, high);
+        result = add_result.result;
+        
+        // Final reduction if needed
+        while (!lessThan64(result, m)) {
+            result = sub64(result, m).result;
+        }
+    }
+    
+    // Final check and reduction
+    while (!lessThan64(result, m)) {
+        result = sub64(result, m).result;
+    }
+    
+    return result;
+}
 
+/// Check if u64 array is zero
+fn isZero64(a: BigInt64) bool {
+    for (a) |word| {
+        if (word != 0) return false;
+    }
+    return true;
+}
+
+/// Count significant bits in u64 array
+fn countBits64(a: BigInt64) u32 {
+    for (0..4) |i| {
+        if (a[i] != 0) {
+            const word = a[i];
+            const leading_zeros = @clz(word);
+            return @as(u32, @intCast(64 * (4 - i) - leading_zeros));
+        }
+    }
+    return 0;
+}
+
+/// Left shift u64 array by specified bits
+fn shiftLeft64(a: BigInt64, shift: u32) BigInt64 {
+    if (shift == 0) return a;
+    if (shift >= 256) return [_]u64{0} ** 4;
+    
+    var result: BigInt64 = [_]u64{0} ** 4;
+    const word_shift = shift / 64;
+    const bit_shift = shift % 64;
+    
+    for (0..4) |i| {
+        if (i + word_shift < 4) {
+            result[i] = a[i + word_shift] << @intCast(bit_shift);
+            
+            // Handle carry from next word
+            if (bit_shift > 0 and (i + word_shift + 1) < 4) {
+                result[i] |= a[i + word_shift + 1] >> @intCast(64 - bit_shift);
+            }
+        }
+    }
+    
     return result;
 }
 
 /// Basic modular reduction: result = a mod m
+/// Basic modular reduction: result = a mod m
+/// Optimized with u64-based arithmetic for better performance
 pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
 
@@ -251,8 +375,14 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return a;
     }
 
-    // For small moduli like those used in tests, we can use a simple but more efficient approach
-    // Check if m is small enough to convert to u64 for faster arithmetic
+    // For SM9 prime modulus, use optimized reduction
+    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+    
+    if (equal(m, sm9_q)) {
+        return modOptimized(a, m);
+    }
+
+    // For small moduli like those used in tests, use efficient u64 arithmetic
     var m_u64: u64 = 0;
     var can_use_u64 = true;
 
@@ -282,15 +412,70 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
         }
     }
 
-    // Fallback to subtraction method for large moduli
-    var result = a;
+    // For large moduli, use optimized u64-based subtraction method
+    return modGeneral(a, m);
+}
+
+/// Optimized modular reduction for SM9 prime field
+fn modOptimized(a: BigInt, m: BigInt) BigIntError!BigInt {
+    // Convert to u64 arrays for optimized arithmetic
+    const a64 = toU64Array(a);
+    const m64 = toU64Array(m);
+    
+    var result64 = a64;
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 512;
+    
+    while (!lessThan64(result64, m64) and iterations < max_iterations) {
+        result64 = sub64(result64, m64).result;
+        iterations += 1;
+    }
+    
+    if (iterations >= max_iterations) {
+        return BigIntError.InvalidModulus;
+    }
+    
+    return fromU64Array(result64);
+}
+
+/// General modular reduction using optimized u64 arithmetic
+fn modGeneral(a: BigInt, m: BigInt) BigIntError!BigInt {
+    // Convert to u64 arrays
+    const a64 = toU64Array(a);
+    const m64 = toU64Array(m);
+    
+    var result64 = a64;
     var iterations: u32 = 0;
     const max_iterations: u32 = 512;
 
-    while (!lessThan(result, m) and iterations < max_iterations) {
-        const sub_result = sub(result, m);
-        if (sub_result.borrow) break;
-        result = sub_result.result;
+    while (!lessThan64(result64, m64) and iterations < max_iterations) {
+        // Use optimized binary search approach for large differences
+        const a_bits = countBits64(result64);
+        const m_bits = countBits64(m64);
+        
+        if (a_bits > m_bits) {
+            // Try to subtract a shifted version of m to reduce faster
+            const shift_count = a_bits - m_bits;
+            const shifted_m = shiftLeft64(m64, shift_count);
+            
+            if (!lessThan64(result64, shifted_m)) {
+                result64 = sub64(result64, shifted_m).result;
+            } else if (shift_count > 0) {
+                // Try one bit less shift
+                const shifted_m_less = shiftLeft64(m64, shift_count - 1);
+                if (!lessThan64(result64, shifted_m_less)) {
+                    result64 = sub64(result64, shifted_m_less).result;
+                } else {
+                    // Fall back to single subtraction
+                    result64 = sub64(result64, m64).result;
+                }
+            } else {
+                result64 = sub64(result64, m64).result;
+            }
+        } else {
+            result64 = sub64(result64, m64).result;
+        }
+        
         iterations += 1;
     }
 
@@ -298,7 +483,7 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
         return BigIntError.InvalidModulus;
     }
 
-    return result;
+    return fromU64Array(result64);
 }
 
 /// Returns the modular inverse of a modulo m
@@ -755,4 +940,114 @@ pub fn toU64(a: BigInt) u64 {
     result |= @as(u64, a[31]);
 
     return result;
+}
+
+// ============================================================================
+// U64-based optimized operations for performance improvement
+// ============================================================================
+
+/// Internal u64 array representation for high-performance arithmetic
+const BigInt64 = [4]u64;
+
+/// Convert BigInt to u64 array for internal optimized operations
+fn toU64Array(a: BigInt) BigInt64 {
+    var result: BigInt64 = undefined;
+    for (0..4) |i| {
+        const base = i * 8;
+        result[3 - i] = (@as(u64, a[base]) << 56) |
+                        (@as(u64, a[base + 1]) << 48) |
+                        (@as(u64, a[base + 2]) << 40) |
+                        (@as(u64, a[base + 3]) << 32) |
+                        (@as(u64, a[base + 4]) << 24) |
+                        (@as(u64, a[base + 5]) << 16) |
+                        (@as(u64, a[base + 6]) << 8) |
+                        @as(u64, a[base + 7]);
+    }
+    return result;
+}
+
+/// Convert u64 array back to BigInt format
+fn fromU64Array(a: BigInt64) BigInt {
+    var result: BigInt = undefined;
+    for (0..4) |i| {
+        const base = i * 8;
+        const word = a[3 - i];
+        result[base] = @as(u8, @intCast((word >> 56) & 0xFF));
+        result[base + 1] = @as(u8, @intCast((word >> 48) & 0xFF));
+        result[base + 2] = @as(u8, @intCast((word >> 40) & 0xFF));
+        result[base + 3] = @as(u8, @intCast((word >> 32) & 0xFF));
+        result[base + 4] = @as(u8, @intCast((word >> 24) & 0xFF));
+        result[base + 5] = @as(u8, @intCast((word >> 16) & 0xFF));
+        result[base + 6] = @as(u8, @intCast((word >> 8) & 0xFF));
+        result[base + 7] = @as(u8, @intCast(word & 0xFF));
+    }
+    return result;
+}
+
+/// Optimized u64-based addition
+fn add64(a: BigInt64, b: BigInt64) struct { result: BigInt64, carry: bool } {
+    var result: BigInt64 = undefined;
+    var carry: u64 = 0;
+    
+    for (0..4) |i| {
+        const idx = 3 - i; // Process from least significant
+        const sum = @as(u128, a[idx]) + @as(u128, b[idx]) + @as(u128, carry);
+        result[idx] = @as(u64, @intCast(sum & 0xFFFFFFFFFFFFFFFF));
+        carry = @as(u64, @intCast(sum >> 64));
+    }
+    
+    return .{ .result = result, .carry = carry != 0 };
+}
+
+/// Optimized u64-based subtraction
+fn sub64(a: BigInt64, b: BigInt64) struct { result: BigInt64, borrow: bool } {
+    var result: BigInt64 = undefined;
+    var borrow: u64 = 0;
+    
+    for (0..4) |i| {
+        const idx = 3 - i; // Process from least significant
+        const diff = @as(i128, a[idx]) - @as(i128, b[idx]) - @as(i128, borrow);
+        if (diff < 0) {
+            result[idx] = @as(u64, @intCast(diff + (@as(i128, 1) << 64)));
+            borrow = 1;
+        } else {
+            result[idx] = @as(u64, @intCast(diff));
+            borrow = 0;
+        }
+    }
+    
+    return .{ .result = result, .borrow = borrow != 0 };
+}
+
+/// Optimized u64-based multiplication (returns 512-bit result)
+fn mul64(a: BigInt64, b: BigInt64) [8]u64 {
+    var result = [_]u64{0} ** 8;
+    
+    for (0..4) |i| {
+        var carry: u64 = 0;
+        for (0..4) |j| {
+            const idx = 7 - i - j; // Correct indexing for big-endian
+            const prod = @as(u128, a[3 - i]) * @as(u128, b[3 - j]) + 
+                        @as(u128, result[idx]) + @as(u128, carry);
+            result[idx] = @as(u64, @intCast(prod & 0xFFFFFFFFFFFFFFFF));
+            carry = @as(u64, @intCast(prod >> 64));
+        }
+        if (i > 0) result[7 - i - 4] += carry; // Add remaining carry
+    }
+    
+    return result;
+}
+
+/// Compare two u64 arrays
+fn compare64(a: BigInt64, b: BigInt64) i32 {
+    for (0..4) |i| {
+        if (a[i] > b[i]) return 1;
+        if (a[i] < b[i]) return -1;
+    }
+    return 0;
+}
+
+/// Check if u64 array is less than another
+fn lessThan64(a: BigInt64, b: BigInt64) bool {
+    return compare64(a, b) < 0;
 }
