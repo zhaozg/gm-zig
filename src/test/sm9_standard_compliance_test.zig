@@ -163,17 +163,23 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
 
     // Test point doubling
     const doubled = p1_point.double(system.params);
-    try testing.expect(doubled.validate(system.params) or doubled.isInfinity());
+    // Convert to affine coordinates for proper validation
+    const doubled_affine = doubled.toAffine(system.params);
+    try testing.expect(doubled_affine.validate(system.params) or doubled_affine.isInfinity());
 
     // Test point addition
-    const added = p1_point.add(doubled, system.params);
-    try testing.expect(added.validate(system.params) or added.isInfinity());
+    const added = p1_point.add(doubled_affine, system.params);
+    // Convert to affine coordinates for proper validation
+    const added_affine = added.toAffine(system.params);
+    try testing.expect(added_affine.validate(system.params) or added_affine.isInfinity());
 
     // Test scalar multiplication
     var scalar = [_]u8{0} ** 32;
     scalar[31] = 2; // Multiply by 2
     const multiplied = sm9.curve.CurveUtils.scalarMultiplyG1(p1_point, scalar, system.params);
-    try testing.expect(multiplied.validate(system.params) or multiplied.isInfinity());
+    // Convert to affine coordinates for proper validation
+    const multiplied_affine = multiplied.toAffine(system.params);
+    try testing.expect(multiplied_affine.validate(system.params) or multiplied_affine.isInfinity());
 }
 
 test "GM/T 0044-2016 - End-to-end signature compliance" {
