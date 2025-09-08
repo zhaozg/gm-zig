@@ -93,7 +93,7 @@ test "SM2: Mixed point addition operation verification" {
     // Compute 2G (via point doubling)
     const double = base.dbl();
 
-    // 验证结果相同
+    // Verify results are identical
     try testing.expect(sum1.equivalent(double));
 }
 
@@ -154,9 +154,9 @@ test "SM2: Scalar multiplication boundary cases" {
     const result1 = SM2.basePoint.mul(n_bytes, .big);
     try testing.expectError(error.IdentityElement, result1);
 
-    // 计算 n+1 (大整数加法)
+    // Compute n+1 (big integer addition)
     var n_plus_one: [32]u8 = n_bytes;
-    // 简单加1处理
+    // Simple add 1 handling
     var carry: u16 = 1;
     var i: usize = 31;
     while (i >= 0) : (i -= 1) {
@@ -167,26 +167,26 @@ test "SM2: Scalar multiplication boundary cases" {
         if (i == 0) break;
     }
 
-    // 测试 (n+1) * G = G
+    // Test (n+1) * G = G
     const result2 = try SM2.basePoint.mul(n_plus_one, .big);
     try testing.expect(result2.equivalent(SM2.basePoint));
 }
 
 test "SM2: Invalid point encoding handling" {
-    // 创建无效点 (不在曲线上)
+    // Create invalid point (not on curve)
     const invalid_point = SM2{
         .x = SM2.Fe.one,
         .y = SM2.Fe.one,
         .z = SM2.Fe.one,
     };
 
-    // 验证拒绝无效点
+    // Verify rejection of invalid point
     try testing.expectError(error.InvalidEncoding, SM2.fromAffineCoordinates(invalid_point.affineCoordinates()));
 
-    // 测试无效SEC1编码 (全FF)
+    // Test invalid SEC1 encoding (all FF)
     const invalid_sec1 = [_]u8{0x04} ++ [_]u8{0xFF} ** 64;
 
-    // 预期错误应为 NonCanonical
+    // Expected error should be NonCanonical
     try testing.expectError(error.NonCanonical, SM2.fromSec1(&invalid_sec1));
 }
 
