@@ -211,21 +211,57 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
 
-    // Fast path for small values to avoid complex u64 array operations
-    const small_threshold = fromU64(0xFFFF); // 16-bit values to avoid overflow in 32-bit multiply
-    // Disable fast path when using SM9 prime modulus to avoid field operation interference
+    // Fast path for small values to avoid complex u64 array operations  
+    // Use much more restrictive thresholds to avoid interfering with SM9 field operations
+    const small_threshold = fromU64(0xFF); // Only 8-bit values to be extra safe
+    // Always disable fast path when using SM9 prime modulus
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
     if (!equal(m, sm9_q) and lessThan(a, small_threshold) and lessThan(b, small_threshold) and lessThan(m, small_threshold)) {
         return fastMulModSmall(a, b, m);
     }
 
+    // TEMPORARY: Disable Montgomery multiplication to isolate issue  
     // Check for SM9 prime modulus and use Montgomery multiplication
-    if (equal(m, sm9_q)) {
-        return montgomeryMulModSM9(a, b, m);
-    }
+    // if (equal(m, sm9_q)) {
+    //     return montgomeryMulModSM9(a, b, m);
+    // }
 
-    // For other moduli, use optimized u64-based algorithm
-    return mulModGeneral(a, b, m);
+    // TEMPORARY: Use simplest possible implementation to fix correctness issues
+    // For other moduli, use the basic multiplication algorithm
+    return mulModBasic(a, b, m);
+}
+
+/// Basic modular multiplication using simple schoolbook algorithm
+/// Prioritizes correctness over performance for debugging
+fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
+    if (isZero(m)) return BigIntError.InvalidModulus;
+    if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
+    
+    // Simple approach: multiply then mod
+    // First reduce inputs 
+    const a_red = mod(a, m) catch return BigIntError.InvalidModulus;
+    const b_red = mod(b, m) catch return BigIntError.InvalidModulus;
+    
+    // For small numbers or when one operand is 1, use direct computation
+    if (equal(b_red, [_]u8{0} ** 31 ++ [_]u8{1})) {
+        return a_red; // a * 1 = a
+    }
+    if (equal(a_red, [_]u8{0} ** 31 ++ [_]u8{1})) {
+        return b_red; // 1 * b = b 
+    }
+    
+    // Use repeated addition for small b (up to 256)
+    const b_small = toU32(b_red);
+    if (b_small <= 256 and equal(b_red, fromU32(b_small))) {
+        var result = [_]u8{0} ** 32;
+        for (0..b_small) |_| {
+            result = addMod(result, a_red, m) catch return BigIntError.Overflow;
+        }
+        return result;
+    }
+    
+    // For larger numbers, fall back to the u64 algorithm
+    return mulModGeneral(a_red, b_red, m);
 }
 
 /// Optimized modular multiplication for general case using u64 arithmetic
@@ -597,9 +633,8 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
 
     // Fast path for small values to prevent hanging (fixes CI timeouts)
-    // Check if both values fit in 32 bits for efficient computation
-    // Disable fast path for SM9 prime field operations to avoid interference
-    const small_threshold = fromU64(0xFFFFFFFF); // 2^32 - 1
+    // Use much more restrictive thresholds to avoid interfering with SM9 field operations
+    const small_threshold = fromU64(0xFF); // Only 8-bit values to be extra safe  
     if (!equal(m, sm9_q) and lessThan(a_reduced, small_threshold) and lessThan(m, small_threshold)) {
         return fastInvModSmall(a_reduced, m);
     }
