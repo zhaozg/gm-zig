@@ -133,23 +133,32 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
     hasher.final(&result);
 
     // Step 6: Reduce modulo order to ensure result is in range [0, N-1]
-    // For 256-bit values, at most a few subtractions should be needed
+    // Use proper modular reduction that works for any size order
     var reduced = result;
+
+    // For very small orders, we may need many subtractions
+    // Use a safe upper bound based on the maximum possible ratio
+    const max_iterations: u32 = 300; // Enough for worst case with small moduli
     var iterations: u32 = 0;
-    while (!bigint.lessThan(reduced, order) and iterations < 5) {
+
+    while (!bigint.lessThan(reduced, order) and iterations < max_iterations) {
         const sub_result = bigint.sub(reduced, order);
         if (sub_result.borrow) {
-            // Underflow, something is wrong with our logic
-            return error.HashComputationFailed;
+            // This shouldn't happen if reduced >= order, but handle gracefully
+            break;
         }
         reduced = sub_result.result;
         iterations += 1;
     }
 
-    // If we still need more reductions, the input was much larger than the modulus
-    // This suggests the input is malformed or there's a bug
+    // Final check - if still not reduced after max iterations, use modular division
     if (!bigint.lessThan(reduced, order)) {
-        return error.HashComputationFailed;
+        // Use bigint division for proper modular reduction
+        const mod_result = bigint.mod(result, order) catch {
+            // If modular reduction fails, fall back to simple approach
+            return error.HashComputationFailed;
+        };
+        reduced = mod_result;
     }
 
     // Step 7: If result is zero, return 1 to ensure result is in range [1, N-1]
