@@ -213,13 +213,13 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 
     // Fast path for small values to avoid complex u64 array operations
     const small_threshold = fromU64(0xFFFF); // 16-bit values to avoid overflow in 32-bit multiply
-    if (lessThan(a, small_threshold) and lessThan(b, small_threshold) and lessThan(m, small_threshold)) {
+    // Disable fast path when using SM9 prime modulus to avoid field operation interference
+    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+    if (!equal(m, sm9_q) and lessThan(a, small_threshold) and lessThan(b, small_threshold) and lessThan(m, small_threshold)) {
         return fastMulModSmall(a, b, m);
     }
 
     // Check for SM9 prime modulus and use Montgomery multiplication
-    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
-    
     if (equal(m, sm9_q)) {
         return montgomeryMulModSM9(a, b, m);
     }
@@ -593,10 +593,14 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     const a_reduced = mod(a, m) catch return BigIntError.NotInvertible;
     if (isZero(a_reduced)) return BigIntError.NotInvertible;
 
+    // Define SM9 prime modulus q for multiple checks below
+    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+
     // Fast path for small values to prevent hanging (fixes CI timeouts)
     // Check if both values fit in 32 bits for efficient computation
+    // Disable fast path for SM9 prime field operations to avoid interference
     const small_threshold = fromU64(0xFFFFFFFF); // 2^32 - 1
-    if (lessThan(a_reduced, small_threshold) and lessThan(m, small_threshold)) {
+    if (!equal(m, sm9_q) and lessThan(a_reduced, small_threshold) and lessThan(m, small_threshold)) {
         return fastInvModSmall(a_reduced, m);
     }
 
@@ -607,10 +611,6 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
         // For SM9 group order (also prime), use optimized binary GCD instead of slow Fermat
         return binaryExtendedGcd(a_reduced, m);
     }
-
-    // Optimization: Check for the SM9 prime field modulus q (most common case)
-    // This is the prime field used in SM9 elliptic curve operations
-    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
 
     if (equal(m, sm9_q)) {
         // For SM9 prime field, use optimized binary GCD instead of slow Fermat
