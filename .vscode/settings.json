@@ -1,0 +1,50 @@
+{
+  "zig.zls.enable": true,
+  "zig.zls.enableInlayHints": true,
+  "zig.zls.enableSemanticTokens": true,
+  "zig.zls.path": "zls",
+  "zig.formatterPath": "zig",
+  "zig.buildOnSave": false,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "ziglang.vscode-zig",
+  "editor.rulers": [100],
+  "editor.insertSpaces": true,
+  "editor.tabSize": 4,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.associations": {
+    "*.zig": "zig",
+    "build.zig": "zig",
+    "build.zig.zon": "zig"
+  },
+  "search.exclude": {
+    "**/zig-cache/**": true,
+    "**/zig-out/**": true,
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/*.tar.xz": true
+  },
+  "files.exclude": {
+    "**/zig-cache": true,
+    "**/zig-out": true,
+    "**/*.tar.xz": true
+  },
+  "terminal.integrated.env.linux": {
+    "ZIG_VERSION": "0.15.1",
+    "GM_ZIG_DEV": "true",
+    "PATH": "/usr/local/bin:${env:PATH}"
+  },
+  "github.copilot.enable": {
+    "*": true,
+    "zig": true,
+    "markdown": true,
+    "json": true
+  },
+  "github.copilot.advanced": {
+    "contextWindow": 8192,
+    "enableAutoCompletions": true
+  },
+  "github.copilot-chat.welcomeMessage": "never",
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "intelephense.enabled": false
+}

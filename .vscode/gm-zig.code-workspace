@@ -1,0 +1,178 @@
+{
+  "folders": [
+    {
+      "name": "GM-Zig Cryptographic Library",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.zig": "zig",
+      "build.zig": "zig",
+      "build.zig.zon": "zig"
+    },
+    "zig.zls.enable": true,
+    "zig.zls.enableInlayHints": true,
+    "zig.zls.enableSemanticTokens": true,
+    "zig.formatterPath": "zig",
+    "zig.buildOnSave": false,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ziglang.vscode-zig",
+    "editor.rulers": [100],
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "search.exclude": {
+      "**/zig-cache/**": true,
+      "**/zig-out/**": true,
+      "**/.git/**": true,
+      "**/node_modules/**": true
+    },
+    "files.exclude": {
+      "**/zig-cache": true,
+      "**/zig-out": true,
+      "**/.git": true,
+      "**/node_modules": true,
+      "**/*.tar.xz": true
+    },
+    "terminal.integrated.env.linux": {
+      "ZIG_VERSION": "0.15.1",
+      "GM_ZIG_DEV": "true"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ziglang.vscode-zig",
+      "ms-vscode.hexeditor",
+      "ms-vscode.test-adapter-converter",
+      "github.copilot",
+      "github.copilot-chat",
+      "ms-vscode.vscode-json"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "zig: build",
+        "type": "shell",
+        "command": "zig",
+        "args": ["build"],
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": "$zig"
+      },
+      {
+        "label": "zig: build optimized",
+        "type": "shell",
+        "command": "zig",
+        "args": ["build", "-Doptimize=ReleaseFast"],
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": "$zig"
+      },
+      {
+        "label": "zig: test",
+        "type": "shell",
+        "command": "zig",
+        "args": ["build", "test"],
+        "group": {
+          "kind": "test",
+          "isDefault": true
+        },
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": "$zig"
+      },
+      {
+        "label": "zig: run demo",
+        "type": "shell",
+        "command": "zig",
+        "args": ["build", "run"],
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": "$zig"
+      },
+      {
+        "label": "zig: format check",
+        "type": "shell",
+        "command": "zig",
+        "args": ["fmt", "--check", "build.zig", "src/"],
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": "$zig"
+      },
+      {
+        "label": "zig: format",
+        "type": "shell",
+        "command": "zig",
+        "args": ["fmt", "build.zig", "src/"],
+        "group": "build",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        },
+        "problemMatcher": "$zig"
+      }
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug GM-Zig Demo",
+        "type": "gdb",
+        "request": "launch",
+        "program": "${workspaceFolder}/zig-out/bin/gm",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "externalConsole": false,
+        "preLaunchTask": "zig: build"
+      },
+      {
+        "name": "Debug GM-Zig Tests",
+        "type": "gdb",
+        "request": "launch",
+        "program": "${workspaceFolder}/zig-cache/o/*/test",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "externalConsole": false,
+        "preLaunchTask": "zig: test"
+      }
+    ]
+  }
+}

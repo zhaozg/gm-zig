@@ -1,0 +1,52 @@
+{
+  "mcpServers": {
+    "crypto-context": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "ALLOWED_DIRECTORIES": "/home/runner/work/gm-zig/gm-zig"
+      }
+    },
+    "zig-language": {
+      "command": "node",
+      "args": ["/usr/local/share/mcp-servers/zig-server.js"],
+      "env": {
+        "ZIG_VERSION": "0.15.1",
+        "PROJECT_TYPE": "cryptographic_library"
+      }
+    },
+    "documentation": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_BANK": "gm-zig-context"
+      }
+    }
+  },
+  "context": {
+    "projectType": "cryptographic_library",
+    "language": "zig",
+    "domain": "chinese_national_cryptographic_standards",
+    "algorithms": ["SM2", "SM3", "SM4", "SM9"],
+    "standards": ["GM/T 0003-2012", "GM/T 0004-2012", "GM/T 0002-2012", "GM/T 0044-2016"],
+    "securityLevel": "production_ready",
+    "performanceCritical": true,
+    "memoryManagement": "manual_allocation",
+    "testingFramework": "zig_builtin",
+    "buildSystem": "zig_build"
+  },
+  "codePatterns": {
+    "constantTime": {
+      "description": "Cryptographic operations must be constant-time to prevent timing attacks",
+      "patterns": ["constant_time_compare", "secure_zero", "timing_safe_arithmetic"]
+    },
+    "memoryManagement": {
+      "description": "Secure memory handling patterns",
+      "patterns": ["secure_memory_clear", "bounds_checking", "allocator_patterns"]
+    },
+    "errorHandling": {
+      "description": "Robust error handling for cryptographic operations",
+      "patterns": ["error_unions", "optional_types", "validation_chains"]
+    }
+  }
+}
