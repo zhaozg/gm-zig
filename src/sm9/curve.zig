@@ -1058,48 +1058,8 @@ pub const CurveUtils = struct {
             return doubled.add(point, curve_params);
         }
 
-        // For larger scalars, use a simplified approach to avoid infinite loops
-        // This implementation prioritizes correctness over performance for now
-        
-        // Find the highest bit set in scalar to determine loop bounds
-        var highest_bit: i32 = -1;
-        var byte_idx: usize = 0;
-        while (byte_idx < 32) : (byte_idx += 1) {
-            const byte = scalar[byte_idx];
-            if (byte != 0) {
-                var bit_pos: u3 = 7;
-                while (true) {
-                    if ((byte >> bit_pos) & 1 == 1) {
-                        highest_bit = @as(i32, @intCast(byte_idx * 8 + (7 - bit_pos)));
-                    }
-                    if (bit_pos == 0) break;
-                    bit_pos -= 1;
-                }
-            }
-        }
-
-        if (highest_bit == -1) return G1Point.infinity();
-
-        // Start with point at the highest bit
-        var result = point;
-
-        // Process bits from highest-1 down to 0
-        var bit_index = highest_bit - 1;
-        while (bit_index >= 0) : (bit_index -= 1) {
-            const byte_index = @as(usize, @intCast(@divTrunc(bit_index, 8)));
-            const bit_pos = @as(u3, @intCast(7 - @mod(bit_index, 8)));
-            
-            const byte = scalar[byte_index];
-            const bit = (byte >> bit_pos) & 1;
-
-            result = result.double(curve_params);
-            
-            if (bit == 1) {
-                result = result.add(point, curve_params);
-            }
-        }
-
-        return result;
+        // For larger scalars, use windowed NAF for optimal performance
+        return windowedScalarMultiply(point, scalar, curve_params);
     }
 
     /// Complete elliptic curve scalar multiplication for G2
@@ -1427,4 +1387,100 @@ fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u
         .z = z3,
         .is_infinity = false,
     };
+}
+
+// ============================================================================
+// Windowed scalar multiplication for optimized performance
+// ============================================================================
+
+/// Windowed scalar multiplication using precomputed points
+/// Window size of 4 provides good balance between memory and performance
+fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.SystemParams) G1Point {
+    const window_size = 4; // 4-bit window gives 16 precomputed points
+    const table_size = 1 << window_size; // 2^4 = 16
+    
+    // Precompute table: [P, 2P, 3P, ..., 15P]
+    var table: [table_size]G1Point = undefined;
+    table[0] = G1Point.infinity(); // 0P = infinity
+    table[1] = point; // 1P = P
+    
+    // Compute odd multiples: 3P, 5P, 7P, ..., 15P
+    for (1..(table_size / 2)) |i| {
+        table[2 * i + 1] = table[2 * i - 1].add(table[2], curve_params);
+    }
+    
+    // Compute even multiples: 2P, 4P, 6P, ..., 14P
+    table[2] = point.double(curve_params); // 2P
+    for (2..(table_size / 2)) |i| {
+        table[2 * i] = table[i].double(curve_params);
+    }
+    
+    // Find the most significant non-zero window
+    var result = G1Point.infinity();
+    var found_first = false;
+    
+    // Process scalar in 4-bit windows from most significant to least significant
+    var window_idx: i32 = 62; // 256 bits / 4 = 64 windows, indexed 0-63
+    while (window_idx >= 0) : (window_idx -= 1) {
+        const bit_offset = @as(u8, @intCast(window_idx * 4));
+        const window_value = extractWindow(scalar, bit_offset, window_size);
+        
+        if (!found_first) {
+            if (window_value != 0) {
+                result = table[window_value];
+                found_first = true;
+            }
+        } else {
+            // Double result 4 times (shift left by window_size bits)
+            for (0..window_size) |_| {
+                result = result.double(curve_params);
+            }
+            
+            // Add the windowed value
+            if (window_value != 0) {
+                result = result.add(table[window_value], curve_params);
+            }
+        }
+    }
+    
+    return result;
+}
+
+/// Extract a window of bits from scalar starting at bit_offset
+fn extractWindow(scalar: [32]u8, bit_offset: u8, window_size: u8) u8 {
+    if (bit_offset >= 256) return 0;
+    
+    const byte_idx = bit_offset / 8;
+    const bit_idx = bit_offset % 8;
+    
+    // Handle case where window spans multiple bytes
+    if (bit_idx + window_size <= 8) {
+        // Window fits in single byte
+        const byte = scalar[31 - byte_idx];
+        const shift = 8 - bit_idx - window_size;
+        const mask = (@as(u8, 1) << @intCast(window_size)) - 1;
+        return (byte >> @intCast(shift)) & mask;
+    } else {
+        // Window spans two bytes
+        var result: u8 = 0;
+        var bits_remaining = window_size;
+        var current_bit = bit_offset;
+        
+        while (bits_remaining > 0 and current_bit < 256) {
+            const curr_byte_idx = current_bit / 8;
+            const curr_bit_idx = current_bit % 8;
+            const curr_byte = scalar[31 - curr_byte_idx];
+            
+            const bits_in_byte = @min(bits_remaining, 8 - curr_bit_idx);
+            const shift = 8 - curr_bit_idx - bits_in_byte;
+            const mask = (@as(u8, 1) << @intCast(bits_in_byte)) - 1;
+            const extracted = (curr_byte >> @intCast(shift)) & mask;
+            
+            result = (result << @intCast(bits_in_byte)) | extracted;
+            bits_remaining -= bits_in_byte;
+            current_bit += bits_in_byte;
+        }
+        
+        return result;
+    }
 }
