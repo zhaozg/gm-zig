@@ -4,7 +4,7 @@ const fmt = std.fmt;
 const sm3 = @import("../sm3.zig");
 const SM3 = sm3.SM3;
 
-// 测试辅助函数
+// Test helper functions
 fn assertEqualHash(comptime Hasher: anytype, comptime expected_hex: *const [Hasher.digest_length * 2:0]u8, input: []const u8) !void {
     var h: [Hasher.digest_length]u8 = undefined;
     Hasher.hash(input, &h, .{});

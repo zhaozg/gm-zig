@@ -2,7 +2,7 @@ const std = @import("std");
 const sm4 = @import("../sm4.zig");
 const SM4 = sm4.SM4;
 
-// 测试向量 (GB/T 32907-2016)
+// Test vectors (GB/T 32907-2016)
 test "SM4 Known Answer Test" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -19,12 +19,12 @@ test "SM4 Known Answer Test" {
 
     const ctx = SM4.init(&key);
 
-    // 测试单块加密
+    // Test single block encryption
     var ciphertext: [16]u8 = undefined;
     ctx.encryptBlock(&plaintext, &ciphertext);
     try std.testing.expectEqualSlices(u8, &expected_ciphertext, &ciphertext);
 
-    // 测试单块解密
+    // Test single block decryption
     var decrypted: [16]u8 = undefined;
     ctx.decryptBlock(&ciphertext, &decrypted);
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
