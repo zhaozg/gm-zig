@@ -13,8 +13,6 @@ pub const MathError = error{
     PointNotOnCurve,
     /// Invalid point coordinates
     InvalidCoordinates,
-    /// Point decompression not fully implemented (security measure)
-    PointDecompressionNotImplemented,
 };
 
 /// SM9 Elliptic Curve Operations
@@ -71,7 +69,9 @@ pub const G1Point = struct {
 
     /// Create G1 point from compressed format (33 bytes)
     pub fn fromCompressed(compressed: [33]u8) !G1Point {
-        return fromCompressedWithMode(compressed, false);
+        // Use proper mathematical implementation with default system parameters
+        const system_params = params.SystemParams.init();
+        return fromCompressedWithParams(compressed, system_params);
     }
 
     /// Create G1 point from compressed format with system parameters
@@ -138,52 +138,10 @@ pub const G1Point = struct {
 
     /// Create G1 point from compressed format with test mode option
     pub fn fromCompressedWithMode(compressed: [33]u8, test_mode: bool) !G1Point {
-        // Handle infinity point (first byte 0x00)
-        if (compressed[0] == 0x00) {
-            return G1Point.infinity();
-        }
-
-        // Check for invalid all-zero input (but not infinity case)
-        var all_zero = true;
-        for (compressed) |byte| {
-            if (byte != 0) {
-                all_zero = false;
-                break;
-            }
-        }
-        if (all_zero) {
-            return error.InvalidPointFormat;
-        }
-
-        if (compressed[0] != 0x02 and compressed[0] != 0x03) {
-            return error.InvalidPointFormat;
-        }
-
-        // Extract x coordinate
-        var x: [32]u8 = undefined;
-        std.mem.copyForwards(u8, &x, compressed[1..33]);
-
-        // TEMPORARY FALLBACK: Create deterministic point for CI compatibility
-        // TODO P1: Implement proper modular square root calculation per GM/T 0044-2016
-        // This is a fallback implementation that allows tests to pass
-        // but should be replaced with cryptographically correct point decompression
-        
-        var y = x; // Start with x coordinate as base
-        
-        // Create deterministic y coordinate based on compression bit
-        if (compressed[0] == 0x03) {
-            // For 0x03 prefix, modify y to create different coordinate
-            y[31] = y[31] ^ 0x01;
-        }
-        
-        // Additional deterministic mixing to ensure distinct points
-        for (0..32) |i| {
-            y[i] = y[i] ^ x[(31 - i) % 32];
-        }
-        
-        // Fallback warning: This creates test-compatible points but lacks 
-        // cryptographic correctness until proper square root is implemented
-        return G1Point.affine(x, y);
+        // Always use proper mathematical implementation regardless of test mode
+        // Algorithm correctness takes priority over test compatibility
+        const system_params = params.SystemParams.init();
+        return fromCompressedWithParams(compressed, system_params);
     }
 
     /// Check if point is at infinity
@@ -463,31 +421,14 @@ pub const G1Point = struct {
 
     /// Create point from compressed format (33 bytes) - alternative implementation
     pub fn fromCompressedAlt(compressed: [33]u8) !G1Point {
-        if (compressed[0] == 0x00) {
-            return G1Point.infinity();
-        }
-
-        if (compressed[0] != 0x02 and compressed[0] != 0x03) {
-            return error.InvalidCompression;
-        }
-
-        var x: [32]u8 = undefined;
-        std.mem.copyForwards(u8, &x, compressed[1..]);
-
-        // For deterministic testing, generate y from x
-        var y = x;
-        // Make y different from x using compression flag
-        if (compressed[0] == 0x03) {
-            y[31] = y[31] ^ 0x01;
-        }
-
-        return G1Point.affine(x, y);
+        // Use the same correct mathematical implementation
+        const system_params = params.SystemParams.init();
+        return fromCompressedWithParams(compressed, system_params);
     }
 
     /// Decompress point from 33 bytes
     pub fn decompress(compressed: [33]u8, curve_params: params.SystemParams) !G1Point {
-        _ = curve_params;
-        return fromCompressed(compressed);
+        return fromCompressedWithParams(compressed, curve_params);
     }
 };
 
@@ -993,38 +934,8 @@ pub const CurveUtils = struct {
 
     /// Convert compressed G1 point to curve point
     pub fn fromCompressedG1(compressed: [33]u8, curve_params: params.SystemParams) !G1Point {
-        // Check compression format
-        if (compressed[0] != 0x02 and compressed[0] != 0x03) {
-            return error.InvalidCompression;
-        }
-
-        // Extract x coordinate
-        var x_coord = [_]u8{0} ** 32;
-        @memcpy(&x_coord, compressed[1..33]);
-
-        // For now, create a valid point using deterministic y coordinate
-        // In a full implementation, this would compute y from the curve equation
-        var y_coord = [_]u8{0} ** 32;
-
-        // Use SM3 hash to create deterministic y coordinate
-        var hasher = SM3.init(.{});
-        hasher.update(&x_coord);
-        hasher.update("G1_point_decompression");
-        hasher.final(&y_coord);
-
-        // Ensure y coordinate is in field (with safety limit)
-        var reduction_attempts: u32 = 0;
-        while (!bigint.lessThan(y_coord, curve_params.q) and reduction_attempts < 10) : (reduction_attempts += 1) {
-            // Reduce modulo q if necessary
-            const mod_result = bigint.mod(y_coord, curve_params.q) catch {
-                // If mod fails, use a fallback approach
-                y_coord[0] = 0; // Zero out most significant byte
-                break;
-            };
-            y_coord = mod_result;
-        }
-
-        return G1Point.affine(x_coord, y_coord);
+        // Use proper mathematical implementation
+        return G1Point.fromCompressedWithParams(compressed, curve_params);
     }
 
     /// Validate G2 point with enhanced security checks and boundary condition handling
