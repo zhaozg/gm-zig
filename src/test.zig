@@ -29,6 +29,7 @@ test {
     _ = @import("test/sm9_standard_vectors_test.zig"); // 7 standard test vector tests
     _ = @import("test/sm9_robustness_test.zig"); // 6 robustness tests
     _ = @import("test/sm9_standard_compliance_test.zig"); // 15 standard compliance tests
+    _ = @import("test/sm9_core_algorithms_test.zig"); // 3 core algorithm validation tests
 
     // GM/T 0044-2016 KDF Compliance tests
     _ = @import("test/kdf_compliance_test.zig"); // 3 KDF compliance tests
