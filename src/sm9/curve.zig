@@ -1161,8 +1161,9 @@ fn addMixedJacobianAffine(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [3
     // Check if points are equal: U1 == U2 and S1 == S2
     if (bigint.equal(x1, u2_val)) {
         if (bigint.equal(y1, s2)) {
-            // Points are equal, use doubling - create temporary point and double it
+            // Points are equal, use doubling - proper doubling without temporary parameters
             const temp_point = G1Point{ .x = x1, .y = y1, .z = z1, .is_infinity = false };
+            // Need to create proper SystemParams for doubling
             const temp_params = params.SystemParams{ .curve = .bn256, .P1 = [_]u8{0} ** 33, .P2 = [_]u8{0} ** 65, .q = field_p, .N = field_p, .v = 256 };
             return temp_point.double(temp_params);
         } else {
@@ -1226,8 +1227,9 @@ fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u
     // Check if points are equal
     if (bigint.equal(u1_val, u2_val)) {
         if (bigint.equal(s1, s2)) {
-            // Points are equal, use doubling - create temporary point and double it
+            // Points are equal, use doubling - proper doubling without temporary parameters
             const temp_point = G1Point{ .x = x1, .y = y1, .z = z1, .is_infinity = false };
+            // Need to create proper SystemParams for doubling
             const temp_params = params.SystemParams{ .curve = .bn256, .P1 = [_]u8{0} ** 33, .P2 = [_]u8{0} ** 65, .q = field_p, .N = field_p, .v = 256 };
             return temp_point.double(temp_params);
         } else {

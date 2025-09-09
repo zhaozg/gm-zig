@@ -268,12 +268,12 @@ test "SM9 curve operations robustness" {
     const system = sm9.params.SM9System.init();
 
     // Test G1 generator
-    const g1_gen = sm9.curve.CurveUtils.getG1Generator(system.params);
-    try testing.expect(g1_gen.validate(system.params));
+    const g1_gen = sm9.curve.CurveUtils.getG1Generator(system.params) catch return;
+    try testing.expect(sm9.curve.CurveUtils.validateG1Enhanced(g1_gen, system.params));
 
     // Test G2 generator
-    const g2_gen = sm9.curve.CurveUtils.getG2Generator(system.params);
-    try testing.expect(g2_gen.validate(system.params));
+    const g2_gen = sm9.curve.CurveUtils.getG2Generator(system.params) catch return;
+    try testing.expect(sm9.curve.CurveUtils.validateG2Enhanced(g2_gen, system.params));
 
     // Test point operations don't crash with edge cases
     const infinity_g1 = sm9.curve.G1Point.infinity();

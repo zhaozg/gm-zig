@@ -48,6 +48,7 @@ pub const FieldError = error{
     DivisionByZero,
     InvalidElement,
     Overflow,
+    RandomGenerationFailed,
 };
 
 /// Binary Extended Euclidean Algorithm for modular inverse
@@ -255,7 +256,7 @@ pub fn conditionalMove(dest: *FieldElement, src: FieldElement, condition: u8) vo
 
 /// Secure random field element generation
 /// Generates a uniformly random element in [0, p)
-pub fn randomFieldElement(p: FieldElement, rng: std.Random) FieldElement {
+pub fn randomFieldElement(p: FieldElement, rng: std.Random) FieldError!FieldElement {
     var result: FieldElement = undefined;
 
     // Generate random bytes and reduce modulo p
@@ -274,11 +275,7 @@ pub fn randomFieldElement(p: FieldElement, rng: std.Random) FieldElement {
         attempts += 1;
     }
 
-    // Fallback: simple modular reduction
-    // This is not perfectly uniform but prevents infinite loops
-    const mod_result = bigint.addMod(result, [_]u8{0} ** 32, p) catch {
-        return [_]u8{0} ** 32;
-    };
-
-    return mod_result;
+    // SECURITY: No fallback mechanisms - fail securely when random generation fails
+    // This indicates either poor entropy source or invalid field parameter
+    return FieldError.RandomGenerationFailed;
 }
