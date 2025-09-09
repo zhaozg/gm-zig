@@ -157,7 +157,7 @@ pub const SecureRandom = struct {
     /// Generate random field element in Fp
     pub fn randomFieldElement(self: *SecureRandom, p: bigint.BigInt) RandomError!bigint.BigInt {
         // Convert to FieldElement format for field operations
-        const p_bytes = bigint.toBytes(p);
+        const p_bytes = p;
         const field_result = field.randomFieldElement(p_bytes, self.prng.random()) catch |err| switch (err) {
             error.Overflow => return RandomError.GenerationFailure,
             error.DivisionByZero => return RandomError.GenerationFailure,
@@ -166,7 +166,7 @@ pub const SecureRandom = struct {
             error.InvalidElement => return RandomError.GenerationFailure,
             error.RandomGenerationFailed => return RandomError.GenerationFailure,
         };
-        return bigint.fromBytes(field_result);
+        return field_result;
     }
 
     /// Generate random scalar for elliptic curve operations
