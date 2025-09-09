@@ -12,6 +12,7 @@ pub const HashError = error{
     InvalidLength,
     HashComputationFailed,
     FieldElementGenerationFailed,
+    ModularReductionFailed,
 };
 
 /// SM9 H1 hash function for key derivation
@@ -281,21 +282,9 @@ pub fn hashToField(data: []const u8, field_order: [32]u8) [32]u8 {
     // GM/T 0044-2016 compliance: Proper modular reduction must succeed
     // If iterations exceed maximum, the field order is likely invalid
     if (field_reduction_iterations >= max_field_reduction_iterations) {
-        // Use bitwise reduction as final attempt
-        while (!bigint.lessThan(result, field_order)) {
-            // Right shift by 1 to reduce magnitude
-            var carry: u8 = 0;
-            for (0..32) |i| {
-                const new_carry = result[i] & 1;
-                result[i] = (result[i] >> 1) | (carry << 7);
-                carry = new_carry;
-            }
-            // Prevent infinite loop
-            if (bigint.isZero(result)) {
-                result[31] = 1;
-                break;
-            }
-        }
+        // SECURITY: No fallback mechanisms - fail securely when modular reduction cannot complete
+        // This indicates either invalid field order or computational error
+        return HashError.ModularReductionFailed;
     }
 
     return result;

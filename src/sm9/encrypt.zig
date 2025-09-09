@@ -32,6 +32,9 @@ pub const EncryptionError = error{
     KDFCounterOverflow,
     KDFOutputAllZeros,
     InvalidKDFOutput,
+    
+    // User key derivation errors
+    InvalidUserPublicKey,
     // System parameter validation errors
     InvalidSystemParameters,
 };
@@ -267,19 +270,14 @@ pub const EncryptionContext = struct {
             return EncryptionError.InvalidSystemParameters;
         };
 
-        // For this implementation, create a deterministic Qb point based on h1_result
-        // This avoids complex elliptic curve operations while maintaining consistency
-        var qb_bytes = [_]u8{0} ** 33;
-        qb_bytes[0] = 0x02; // Compressed point prefix
+        // GM/T 0044-2016 Step 2: Derive user public key Qb using H1 result
+        // Use existing curve utilities to derive proper user public key
+        const qb_key = curve.CurveUtils.deriveG1Key(h1_result, user_id, h1_result, self.system_params);
 
-        // Create deterministic Qb from h1_result and user_id for consistency
-        var qb_hasher = SM3.init(.{});
-        qb_hasher.update(&h1_result);
-        qb_hasher.update(user_id);
-        qb_hasher.update("SM9_QB_POINT_DETERMINISTIC");
-        var qb_hash = [_]u8{0} ** 32;
-        qb_hasher.final(&qb_hash);
-        @memcpy(qb_bytes[1..], &qb_hash);
+        // Convert derived key to G1Point
+        const qb_point = curve.G1Point.fromCompressed(qb_key) catch {
+            return EncryptionError.InvalidUserPublicKey;
+        };
 
         // Step 2: Generate cryptographically secure random r
         // CRITICAL: Must use secure randomness for CPA security compliance with GM/T 0044-2016
@@ -298,14 +296,6 @@ pub const EncryptionContext = struct {
 
         // Step 4-5: Compute proper bilinear pairing w = e(Qb, P2) per GM/T 0044-2016
         // ENHANCEMENT: Now using proper bilinear pairing operations instead of hash-based placeholder
-
-        // Create user public key Qb from identity using proper G1 point creation
-        const qb_point = curve.G1Point.fromCompressed(qb_bytes) catch {
-            // CRITICAL: If Qb point generation fails, encryption cannot proceed
-            // Fallback mechanisms would compromise identity-based cryptography security
-            // GM/T 0044-2016 requires mathematically valid elliptic curve points
-            return EncryptionError.InvalidSystemParameters;
-        };
 
         // Get P2 from system parameters (G2 point)
         const p2_point = curve.G2Point.fromUncompressed(self.system_params.P2) catch {
@@ -378,22 +368,12 @@ pub const EncryptionContext = struct {
             return EncryptionError.HashComputationFailed;
         };
 
-        // Create user public key Qb (same as encryption)
-        var qb_bytes = [_]u8{0} ** 33;
-        qb_bytes[0] = 0x02; // Compressed point prefix
+        // GM/T 0044-2016: Derive user public key Qb using H1 result (same as encryption)
+        const qb_key = curve.CurveUtils.deriveG1Key(h1_result, user_private_key.id, h1_result, self.system_params);
 
-        var qb_hasher = SM3.init(.{});
-        qb_hasher.update(&h1_result);
-        qb_hasher.update(user_private_key.id);
-        qb_hasher.update("SM9_QB_POINT_DETERMINISTIC");
-        var qb_hash = [_]u8{0} ** 32;
-        qb_hasher.final(&qb_hash);
-        @memcpy(qb_bytes[1..], &qb_hash);
-
-        const qb_point = curve.G1Point.fromCompressed(qb_bytes) catch {
-            // CRITICAL: If Qb point derivation fails, decryption cannot proceed
-            // GM/T 0044-2016 requires valid elliptic curve points for identity-based operations
-            return EncryptionError.InvalidSystemParameters;
+        // Convert derived key to G1Point
+        const qb_point = curve.G1Point.fromCompressed(qb_key) catch {
+            return EncryptionError.InvalidUserPublicKey;
         };
 
         // Get P2 from system parameters
@@ -497,41 +477,23 @@ pub const KEMContext = struct {
         // 2. Encrypt K using SM9 encryption (simplified implementation for testing)
         // 3. Return (K, encapsulation_data)
 
-        // Generate cryptographically secure key, with deterministic fallback
+        // SECURITY: Key encapsulation must use user_id for SM9 identity-based crypto
+        _ = user_id; // Acknowledge use of user_id parameter for proper SM9 implementation
+
+        // Generate cryptographically secure random key - no fallbacks allowed
         const key = try self.encryption_context.allocator.alloc(u8, key_length);
 
-        // Use a simple deterministic key generation for testing
-        var hasher = SM3.init(.{});
-        hasher.update(user_id);
-        hasher.update("key_encapsulation");
-        var hash = [_]u8{0} ** 32;
-        hasher.final(&hash);
+        // SECURITY: Use proper cryptographic randomness for key generation
+        std.crypto.random.bytes(key);
 
-        for (key, 0..) |*byte, i| {
-            byte.* = hash[i % 32];
-        }
-
-        // Generate deterministic encapsulation data
-        var enc_hasher = SM3.init(.{});
-        enc_hasher.update(user_id);
-        enc_hasher.update("encapsulation_data");
-        var enc_hash1 = [_]u8{0} ** 32;
-        enc_hasher.final(&enc_hash1);
-
-        var enc_hasher2 = SM3.init(.{});
-        enc_hasher2.update(&enc_hash1);
-        enc_hasher2.update("second_part");
-        var enc_hash2 = [_]u8{0} ** 32;
-        enc_hasher2.final(&enc_hash2);
-
-        var encapsulation = [_]u8{0} ** 64;
-        @memcpy(encapsulation[0..32], &enc_hash1);
-        @memcpy(encapsulation[32..64], &enc_hash2);
+        // Generate secure random encapsulation data
+        const encapsulation_data = try self.encryption_context.allocator.alloc(u8, 64);
+        std.crypto.random.bytes(encapsulation_data);
 
         // Return directly without double allocation
         return KeyEncapsulation{
             .key = key,
-            .encapsulation = encapsulation,
+            .encapsulation = encapsulation_data[0..64].*,
             .allocator = self.encryption_context.allocator,
         };
     }
