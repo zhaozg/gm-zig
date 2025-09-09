@@ -297,7 +297,7 @@ pub const EncryptionContext = struct {
 
         // Step 2: Generate cryptographically secure random r
         // CRITICAL: Must use secure randomness for CPA security compliance with GM/T 0044-2016
-        const r = random.secureRandomScalar(self.system_params) catch |err| {
+        const r = random.secureRandomScalar(self.system_params) catch {
             // SECURITY: No fallback to deterministic values - fail securely
             // Deterministic encryption violates CPA security requirements
             return EncryptionError.RandomGenerationFailed;
@@ -347,7 +347,7 @@ pub const EncryptionContext = struct {
 
         // Compute proper bilinear pairing: w = e(Qb, P2)
         // CRITICAL: Pairing computation is fundamental to SM9 security - no fallbacks allowed
-        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch |err| {
+        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch {
             // SECURITY: Pairing failure indicates mathematical error - fail securely
             // Simple hash fallbacks completely bypass SM9's identity-based cryptography
             return EncryptionError.PairingComputationFailed;
@@ -383,49 +383,7 @@ pub const EncryptionContext = struct {
                 c3,
                 options.format,
             );
-        };
-
-        // Extract bytes from Gt element for use in KDF
-        // Convert the 384-byte Gt element to 32-byte hash for KDF compatibility
-        const w_gt_bytes = w_gt_element.toBytes();
-        var w = [_]u8{0} ** 32;
-        var w_extract_hasher = SM3.init(.{});
-        w_extract_hasher.update(&w_gt_bytes);
-        w_extract_hasher.update("GT_ELEMENT_TO_KDF_BYTES");
-        w_extract_hasher.final(&w);
-
-        const w_bytes = &w;
-
-        // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
-        const kdf_len = options.kdf_len orelse message.len;
-        const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
-        defer self.allocator.free(K);
-
-        // Step 7: Compute C2 = M ⊕ K (XOR encryption)
-        const c2 = try self.allocator.alloc(u8, message.len);
-        // Note: c2 ownership will be transferred to Ciphertext
-
-        for (message, c2, 0..) |m_byte, *c_byte, i| {
-            c_byte.* = m_byte ^ K[i % K.len];
         }
-
-        // Step 8: Compute C3 = H2(C1 || M || ID_B)
-        var c3_hasher = SM3.init(.{});
-        c3_hasher.update(&c1);
-        c3_hasher.update(message);
-        c3_hasher.update(user_id);
-        var c3 = [_]u8{0} ** 32;
-        c3_hasher.final(&c3);
-
-        // Step 9: Return ciphertext C = (C1, C2, C3)
-        return Ciphertext.initTakeOwnership(
-            self.allocator,
-            c1,
-            c2,
-            c3,
-            options.format,
-        );
-    }
 
     /// Decrypt ciphertext with user private key
     pub fn decrypt(
@@ -524,7 +482,7 @@ pub const EncryptionContext = struct {
 
         // Compute proper bilinear pairing: w = e(Qb, P2) (same as encryption)
         // CRITICAL: Pairing computation is fundamental to SM9 decryption - no fallbacks allowed  
-        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch |err| {
+        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch {
             // SECURITY: Pairing failure in decryption indicates cryptographic error
             return EncryptionError.PairingComputationFailed;
         };

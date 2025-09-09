@@ -301,7 +301,7 @@ pub const SignatureContext = struct {
         // Create user private key as G1 point for proper elliptic curve operations
         const curve_module = @import("curve.zig");
         // CRITICAL: P1 parameter must be valid for SM9 security - no fallback allowed
-        const P1_point = curve_module.G1Point.fromCompressed(self.system_params.P1) catch |err| {
+        const P1_point = curve_module.G1Point.fromCompressed(self.system_params.P1) catch {
             // SECURITY: Invalid P1 parameter indicates system parameter corruption
             return SignatureError.InvalidPrivateKey;
         };
@@ -407,7 +407,7 @@ pub const SignatureContext = struct {
 
         // Get master public key for signatures
         // CRITICAL: Master public key must be valid for signature verification
-        const master_pub_point = curve_module.G2Point.fromUncompressed(self.sign_master_public.public_key) catch |err| {
+        const master_pub_point = curve_module.G2Point.fromUncompressed(self.sign_master_public.public_key) catch {
             // SECURITY: Invalid master public key indicates key corruption
             return false; // Signature verification fails with invalid master key
         };
@@ -440,12 +440,12 @@ pub const SignatureContext = struct {
 
         // Perform bilinear pairing verification: e(S, P2) = e(verification_point, user_pub_point)  
         // CRITICAL: Pairing verification is fundamental to SM9 digital signature security
-        const left_pairing = pairing_module.pairing(S_point, P2_point, self.system_params) catch |err| {
+        const left_pairing = pairing_module.pairing(S_point, P2_point, self.system_params) catch {
             // SECURITY: Pairing failure in signature verification indicates cryptographic error
             return SignatureError.PairingVerificationFailed;
         };
 
-        const right_pairing = pairing_module.pairing(verification_point, user_pub_point, self.system_params) catch |err| {
+        const right_pairing = pairing_module.pairing(verification_point, user_pub_point, self.system_params) catch {
             // SECURITY: Pairing failure in signature verification indicates cryptographic error  
             return SignatureError.PairingVerificationFailed;
         };
