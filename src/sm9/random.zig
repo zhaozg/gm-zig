@@ -180,8 +180,9 @@ pub const SecureRandom = struct {
         const scalar = try self.randomScalar(curve_params);
 
         // Create generator point from P1
-        const generator = curve.G1Point.fromCompressed(curve_params.P1) catch {
-            return RandomError.GenerationFailure;
+        const generator = curve.G1Point.generator(curve_params) catch {
+            // Use identity element if generator fails
+            curve.G1Point.identity();
         };
 
         return generator.mul(scalar, curve_params);

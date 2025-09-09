@@ -279,3 +279,8 @@ pub fn randomFieldElement(p: FieldElement, rng: std.Random) FieldError!FieldElem
     // This indicates either poor entropy source or invalid field parameter
     return FieldError.RandomGenerationFailed;
 }
+
+/// Check if a value is a valid field element (< field modulus)
+pub fn isValidFieldElement(value: [32]u8, modulus: [32]u8) bool {
+    return bigint.lessThan(value, modulus);
+}
