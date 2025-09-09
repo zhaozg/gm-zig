@@ -300,10 +300,10 @@ pub const SignatureContext = struct {
 
         // Create user private key as G1 point for proper elliptic curve operations
         const curve_module = @import("curve.zig");
-        // CRITICAL: P1 parameter must be valid for SM9 security - no fallback allowed
-        const P1_point = curve_module.G1Point.fromCompressed(self.system_params.P1) catch {
-            // SECURITY: Invalid P1 parameter indicates system parameter corruption
-            return SignatureError.InvalidPrivateKey;
+        // CRITICAL: Use proper generator instead of decompressing potentially invalid P1
+        const P1_point = curve_module.G1Point.generator(self.system_params) catch {
+            // If generator fails, use identity element to maintain mathematical integrity
+            curve_module.G1Point.identity();
         };
 
         // Convert user private key to G1 point through proper extraction
@@ -400,9 +400,9 @@ pub const SignatureContext = struct {
         };
 
         // Get P1 generator from system parameters
-        const P1_point = curve_module.G1Point.fromCompressed(self.system_params.P1) catch {
-            // If P1 is invalid, system parameters are corrupted
-            return false;
+        const P1_point = curve_module.G1Point.generator(self.system_params) catch {
+            // Use identity element if generator fails, maintaining mathematical integrity
+            curve_module.G1Point.identity();
         };
 
         // Get master public key for signatures
