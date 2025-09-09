@@ -37,6 +37,10 @@ pub const EncryptionError = error{
     InvalidUserPublicKey,
     // System parameter validation errors
     InvalidSystemParameters,
+    // Implementation completeness errors
+    NotImplemented,
+    // Point validation errors
+    InvalidPoint,
 };
 
 /// SM9 ciphertext format options
@@ -474,28 +478,11 @@ pub const KEMContext = struct {
     ) !KeyEncapsulation {
         // Implement SM9 key encapsulation
         // 1. Generate random symmetric key K
-        // 2. Encrypt K using SM9 encryption (simplified implementation for testing)
-        // 3. Return (K, encapsulation_data)
-
-        // SECURITY: Key encapsulation must use user_id for SM9 identity-based crypto
-        _ = user_id; // Acknowledge use of user_id parameter for proper SM9 implementation
-
-        // Generate cryptographically secure random key - no fallbacks allowed
-        const key = try self.encryption_context.allocator.alloc(u8, key_length);
-
-        // SECURITY: Use proper cryptographic randomness for key generation
-        std.crypto.random.bytes(key);
-
-        // Generate secure random encapsulation data
-        const encapsulation_data = try self.encryption_context.allocator.alloc(u8, 64);
-        std.crypto.random.bytes(encapsulation_data);
-
-        // Return directly without double allocation
-        return KeyEncapsulation{
-            .key = key,
-            .encapsulation = encapsulation_data[0..64].*,
-            .allocator = self.encryption_context.allocator,
-        };
+        _ = self; // Acknowledge self parameter for proper interface
+        // GM/T 0044-2016 compliance: Key encapsulation requires complete SM9 implementation
+        // Rather than use simplified testing implementations, return appropriate error
+        _ = user_id; _ = key_length; // Acknowledge parameters for proper GM/T 0044-2016 interface
+        return EncryptionError.NotImplemented;
     }
 
     /// Decapsulate key with user private key
@@ -505,24 +492,11 @@ pub const KEMContext = struct {
         user_private_key: key_extract.EncryptUserPrivateKey,
     ) ![]u8 {
         // Implement SM9 key decapsulation
-        // 1. Decrypt encapsulation data using SM9 decryption (simplified implementation for testing)
-        // 2. Return symmetric key K
-
-        // GM/T 0044-2016 compliant key decapsulation requires proper cryptographic operations
-        // rather than deterministic hash-based key generation. 
-        // For proper implementation, this would use pairing operations to recover the key
-        const key = try self.encryption_context.allocator.alloc(u8, 32);
-        
-        // SECURITY: Proper key decapsulation should verify encapsulation_data cryptographically
-        // and derive the key using bilinear pairing operations as per GM/T 0044-2016
-        // Current implementation returns zero key to indicate incomplete cryptographic operations
-        @memset(key, 0);
-        
-        // Proper validation would use pairing operations to verify encapsulation correctness
-        _ = encapsulation_data;
-        _ = user_private_key;
-
-        return key;
+        _ = self; // Acknowledge self parameter for proper interface  
+        // GM/T 0044-2016 compliance: Key decapsulation requires complete SM9 implementation  
+        // Rather than use simplified testing implementations, return appropriate error
+        _ = encapsulation_data; _ = user_private_key; // Acknowledge parameters for proper GM/T 0044-2016 interface
+        return EncryptionError.NotImplemented;
     }
 };
 
@@ -665,9 +639,9 @@ pub const EncryptionUtils = struct {
             return false;
         }
 
-        // Additional validation: point should be on the curve y² = x³ + b
-        // This is simplified validation; full implementation would compute y from x
-        return true;
+        // GM/T 0044-2016 compliance: Proper curve equation validation requires complete field operations
+        // Rather than use simplified approximations, return false to indicate validation failure
+        return false;
     }
 
     /// Validate point on G2 (enhanced with proper curve checks)
@@ -701,8 +675,8 @@ pub const EncryptionUtils = struct {
             return false;
         }
 
-        // Additional validation: point should be on the G2 curve
-        // This is simplified validation; full implementation would validate Fp2 curve equation
-        return true;
+        // GM/T 0044-2016 compliance: Proper Fp2 curve validation requires complete field operations
+        // Rather than use simplified approximations, return false to indicate validation failure
+        return false;
     }
 };

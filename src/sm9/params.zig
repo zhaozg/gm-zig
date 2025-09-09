@@ -187,34 +187,10 @@ pub const SignMasterKeyPair = struct {
             return false;
         }
 
-        // Basic validation for test compatibility
-        // In production environments with full curve operations, additional mathematical
-        // verification (public_key = private_key * P2) could be performed
-        // For now, we accept keys that pass basic format and range validation
-
-        // Verify public key coordinates are within field bounds when format allows parsing
-        if (self.public_key[0] == 0x04) {
-            // Uncompressed format: check x and y coordinates are < q
-            const x1_coord: [32]u8 = self.public_key[1..33].*;
-            const x2_coord: [32]u8 = self.public_key[33..65].*;
-
-            if (!isLessThan(x1_coord, params.q) or !isLessThan(x2_coord, params.q)) {
-                return false;
-            }
-        }
-
-        // Additional basic checks for key validity
-        // Ensure the public key is not all zeros (except format byte)
-        var all_zero = true;
-        for (self.public_key[1..]) |byte| {
-            if (byte != 0) {
-                all_zero = false;
-                break;
-            }
-        }
-        if (all_zero) return false;
-
-        return true;
+        // GM/T 0044-2016 compliance: Strict mathematical validation required
+        // Basic format validation is insufficient for cryptographic security
+        // Return false to indicate validation failure rather than use incomplete validation
+        return false;
     }
 };
 
@@ -281,31 +257,9 @@ pub const EncryptMasterKeyPair = struct {
             return false;
         }
 
-        // Basic validation for test compatibility
-        // In production environments with full curve operations, additional mathematical
-        // verification (public_key = private_key * P1) could be performed
-        // For now, we accept keys that pass basic format and range validation
-
-        // Verify public key coordinates are within field bounds when format allows parsing
-        if (self.public_key[0] == 0x02 or self.public_key[0] == 0x03) {
-            // Compressed format: check x coordinate is < q
-            const x_coord: [32]u8 = self.public_key[1..33].*;
-            if (!isLessThan(x_coord, params.q)) {
-                return false;
-            }
-        }
-
-        // Ensure the public key is not all zeros (except format byte)
-        var all_zero = true;
-        for (self.public_key[1..]) |byte| {
-            if (byte != 0) {
-                all_zero = false;
-                break;
-            }
-        }
-        if (all_zero) return false;
-
-        return true;
+        // GM/T 0044-2016 compliance: Strict mathematical validation required
+        // Basic format validation is insufficient for cryptographic security  
+        return false;
     }
 };
 
