@@ -11,6 +11,7 @@ pub const HashError = error{
     InvalidInput,
     InvalidLength,
     HashComputationFailed,
+    FieldElementGenerationFailed,
 };
 
 /// SM9 H1 hash function for key derivation
@@ -71,7 +72,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
         
         // GM/T 0044-2016 compliance: If max iterations exceeded, return error
         // No non-standard fallback mechanisms allowed
-        if (counter >= max_counter) {
+        if (attempts >= max_attempts) {
             return HashError.FieldElementGenerationFailed;
         }
     }
