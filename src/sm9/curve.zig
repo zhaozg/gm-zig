@@ -137,7 +137,7 @@ pub const G1Point = struct {
     }
 
     /// Create G1 point from compressed format with test mode option
-    pub fn fromCompressedWithMode(compressed: [33]u8, test_mode: bool) !G1Point {
+    pub fn fromCompressedWithMode(compressed: [33]u8, _: bool) !G1Point {
         // Always use proper mathematical implementation regardless of test mode
         // Algorithm correctness takes priority over test compatibility
         const system_params = params.SystemParams.init();
@@ -470,9 +470,11 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
 
     // Check if it's a quadratic residue
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const neg_one_mod_q = bigint.sub(modulus, one) catch {
+    const sub_result = bigint.sub(modulus, one);
+    if (sub_result.borrow) {
         return MathError.InvalidFieldOperation;
-    };
+    }
+    const neg_one_mod_q = sub_result.result;
     
     if (bigint.equal(legendre_result, one)) {
         // It's a quadratic residue (Legendre symbol = 1)
@@ -488,10 +490,11 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
     // Calculate exponent = (q + 1) / 4
     var exp = modulus;
     // Add 1 to modulus
-    const add_result = bigint.add(exp, one) catch {
+    const add_result = bigint.add(exp, one);
+    if (add_result.carry) {
         return MathError.InvalidFieldOperation;
-    };
-    exp = add_result;
+    }
+    exp = add_result.result;
 
     // Divide by 4 (shift right twice) to get (q+1)/4
     exp = bigint.shiftRight(bigint.shiftRight(exp));
@@ -517,9 +520,11 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
     const is_result_odd = (result[31] & 1) == 1;
     if (is_odd_y != is_result_odd) {
         // Negate result: result = q - result  
-        result = bigint.sub(modulus, result) catch {
+        const negate_result = bigint.sub(modulus, result);
+        if (negate_result.borrow) {
             return MathError.InvalidFieldOperation;
-        };
+        }
+        result = negate_result.result;
     }
 
     return result;
