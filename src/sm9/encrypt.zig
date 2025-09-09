@@ -508,32 +508,19 @@ pub const KEMContext = struct {
         // 1. Decrypt encapsulation data using SM9 decryption (simplified implementation for testing)
         // 2. Return symmetric key K
 
-        // For consistent testing, recreate the same key that was generated in encapsulate
+        // GM/T 0044-2016 compliant key decapsulation requires proper cryptographic operations
+        // rather than deterministic hash-based key generation. 
+        // For proper implementation, this would use pairing operations to recover the key
         const key = try self.encryption_context.allocator.alloc(u8, 32);
-
-        // Use the same deterministic key generation as encapsulate
-        var hasher = SM3.init(.{});
-        hasher.update(user_private_key.id);
-        hasher.update("key_encapsulation");
-        var hash = [_]u8{0} ** 32;
-        hasher.final(&hash);
-
-        for (key, 0..) |*byte, i| {
-            byte.* = hash[i % 32];
-        }
-
-        // Verify encapsulation data matches (simple validation)
-        var enc_hasher = SM3.init(.{});
-        enc_hasher.update(user_private_key.id);
-        enc_hasher.update("encapsulation_data");
-        var enc_hash1 = [_]u8{0} ** 32;
-        enc_hasher.final(&enc_hash1);
-
-        // Just check first 32 bytes for simple validation
-        if (!std.mem.eql(u8, encapsulation_data[0..32], &enc_hash1)) {
-            self.encryption_context.allocator.free(key);
-            return error.InvalidEncapsulation;
-        }
+        
+        // SECURITY: Proper key decapsulation should verify encapsulation_data cryptographically
+        // and derive the key using bilinear pairing operations as per GM/T 0044-2016
+        // Current implementation returns zero key to indicate incomplete cryptographic operations
+        @memset(key, 0);
+        
+        // Proper validation would use pairing operations to verify encapsulation correctness
+        _ = encapsulation_data;
+        _ = user_private_key;
 
         return key;
     }

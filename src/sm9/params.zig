@@ -315,6 +315,7 @@ pub const ParameterError = error{
     InvalidPrivateKey,
     InvalidPublicKey,
     ParameterGenerationFailed,
+    MasterKeyGenerationFailed,
     NotImplemented,
 };
 
@@ -362,13 +363,17 @@ pub const SM9System = struct {
         const encrypt_private_key = [32]u8{ 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40 };
 
         const sign_master = SignMasterKeyPair.fromPrivateKey(params, sign_private_key) catch {
-            // Fallback to generated keys if deterministic fails
-            return SM9System.init();
+            // SECURITY: Master key derivation failure indicates system configuration error
+            // GM/T 0044-2016 requires deterministic master key generation for interoperability
+            // Return error rather than using fallback to maintain cryptographic integrity
+            return ParameterError.MasterKeyGenerationFailed;
         };
 
         const encrypt_master = EncryptMasterKeyPair.fromPrivateKey(params, encrypt_private_key) catch {
-            // Fallback to generated keys if deterministic fails
-            return SM9System.init();
+            // SECURITY: Master key derivation failure indicates system configuration error  
+            // GM/T 0044-2016 requires deterministic master key generation for interoperability
+            // Return error rather than using fallback to maintain cryptographic integrity
+            return ParameterError.MasterKeyGenerationFailed;
         };
 
         return SM9System{
