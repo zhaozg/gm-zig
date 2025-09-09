@@ -26,6 +26,12 @@ pub const EncryptionError = error{
     HashComputationFailed,
     AuthenticationFailed,
     MemoryAllocationFailed,
+    // GM/T 0044-2016 KDF specific errors
+    InvalidKDFLength,
+    InvalidKDFInput,
+    KDFCounterOverflow,
+    KDFOutputAllZeros,
+    InvalidKDFOutput,
 };
 
 /// SM9 ciphertext format options
@@ -737,19 +743,20 @@ pub const KEMContext = struct {
 pub const EncryptionUtils = struct {
     /// Key derivation function for SM9 with enhanced security
     pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
-        // Enhanced KDF with input validation
+        // GM/T 0044-2016 compliant KDF with proper input validation
         if (input.len == 0) return error.KDFComputationFailed;
         if (output_len == 0) return error.KDFComputationFailed;
-        if (output_len > 0x10000) return error.KDFComputationFailed; // Reasonable limit
+        if (output_len > 0x100000) return error.KDFComputationFailed; // 1MB limit for security
 
-        // Use the proper KDF implementation from hash module
+        // First, try the hash module's KDF implementation
         const hash = @import("hash.zig");
-        const result = hash.kdf(input, output_len, allocator) catch {
-            // Fallback KDF using repeated hashing
-            return fallbackKdf(input, output_len, allocator);
+        const result = hash.kdf(input, output_len, allocator) catch |err| switch (err) {
+            // If hash module KDF fails, use our standard-compliant implementation
+            error.OutOfMemory => return err,
+            else => return standardCompliantKdf(input, output_len, allocator),
         };
 
-        // Validate KDF output is not all zeros (security requirement)
+        // Validate KDF output according to GM/T 0044-2016 requirements
         var all_zero = true;
         for (result) |byte| {
             if (byte != 0) {
@@ -759,38 +766,76 @@ pub const EncryptionUtils = struct {
         }
 
         if (all_zero) {
+            // Per GM/T 0044-2016, all-zero KDF output is a failure condition
+            // Do not attempt to "fix" it - this indicates a serious cryptographic error
             allocator.free(result);
-            // Generate non-zero fallback
-            return fallbackKdf(input, output_len, allocator);
+            return error.KDFOutputAllZeros;
         }
 
         return result;
     }
 
-    /// Fallback KDF implementation using repeated SM3 hashing
-    fn fallbackKdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
+    /// GM/T 0044-2016 compliant KDF implementation
+    /// Implements the Key Derivation Function according to GM/T 0044-2016 Section 5.4.3
+    fn standardCompliantKdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
+        if (output_len == 0) return error.InvalidKDFLength;
+        if (input.len == 0) return error.InvalidKDFInput;
+        
+        // Allocate output buffer
         var result = try allocator.alloc(u8, output_len);
-        var counter: u32 = 0;
+        errdefer allocator.free(result);
+
+        const hash_len = 32; // SM3 output length
         var offset: usize = 0;
+        var counter: u32 = 1; // GM/T 0044-2016 specifies counter starts from 1
 
         while (offset < output_len) {
             var hasher = SM3.init(.{});
+            
+            // Step 1: Hash the input material
             hasher.update(input);
-            hasher.update(&@as([4]u8, @bitCast(@byteSwap(counter)))); // Big-endian counter
+            
+            // Step 2: Add counter as 4-byte big-endian (GM/T 0044-2016 requirement)
+            const counter_bytes = [4]u8{
+                @as(u8, @intCast((counter >> 24) & 0xFF)),
+                @as(u8, @intCast((counter >> 16) & 0xFF)),
+                @as(u8, @intCast((counter >> 8) & 0xFF)),
+                @as(u8, @intCast(counter & 0xFF)),
+            };
+            hasher.update(&counter_bytes);
 
+            // Step 3: Compute hash
             var hash_output: [32]u8 = undefined;
             hasher.final(&hash_output);
 
-            const copy_len = @min(32, output_len - offset);
+            // Step 4: Copy appropriate amount to result
+            const copy_len = @min(hash_len, output_len - offset);
             @memcpy(result[offset .. offset + copy_len], hash_output[0..copy_len]);
 
             offset += copy_len;
             counter += 1;
+            
+            // Prevent infinite loop in case of implementation error
+            if (counter > 0x1000000) { // Reasonable upper limit
+                return error.KDFCounterOverflow;
+            }
         }
 
-        // Ensure result is not all zeros
-        if (std.mem.allEqual(u8, result, 0)) {
-            result[0] = 1; // Make it non-zero
+        // GM/T 0044-2016 security requirement: validate output
+        // If KDF produces all zeros, it indicates a serious error condition
+        // According to the standard, this should be treated as a failure
+        var all_zero = true;
+        for (result) |byte| {
+            if (byte != 0) {
+                all_zero = false;
+                break;
+            }
+        }
+        
+        if (all_zero) {
+            // This is a cryptographic failure condition per GM/T 0044-2016
+            // Do not modify the output - return error instead
+            return error.KDFOutputAllZeros;
         }
 
         return result;
