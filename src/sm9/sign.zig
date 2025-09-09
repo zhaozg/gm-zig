@@ -576,66 +576,24 @@ pub const SignatureError = error{
 
 /// Utility functions for SM9 signature
 pub const SignatureUtils = struct {
-    /// Compute SM9 hash function H1
+    /// Compute SM9 hash function H1 according to GM/T 0044-2016
+    /// Returns error if computation fails - no fallback mechanisms allowed
     /// Implementation following GM/T 0044-2016 standard
-    pub fn computeH1(id: []const u8, hid: u8, N: [32]u8) [32]u8 {
-        // Use the proper h1Hash from hash module
+    pub fn computeH1(id: []const u8, hid: u8, N: [32]u8) ![32]u8 {
+        // Use the proper h1Hash from hash module - strict error propagation
         const hash = @import("hash.zig");
         const allocator = std.heap.page_allocator;
-        const result = hash.h1Hash(id, hid, N, allocator) catch |err| switch (err) {
-            error.InvalidInput => {
-                // Fallback: create deterministic hash from ID and HID
-                var hasher = SM3.init(.{});
-                hasher.update(id);
-                hasher.update(&[1]u8{hid});
-                hasher.update("SM9_H1_FALLBACK");
-                var fallback_result: [32]u8 = undefined;
-                hasher.final(&fallback_result);
-                return fallback_result;
-            },
-            else => {
-                // General fallback for any other error
-                var hasher = SM3.init(.{});
-                hasher.update(id);
-                hasher.update(&[1]u8{hid});
-                hasher.update("SM9_H1_ERROR_FALLBACK");
-                var fallback_result: [32]u8 = undefined;
-                hasher.final(&fallback_result);
-                return fallback_result;
-            },
-        };
-        return result;
+        return hash.h1Hash(id, hid, N, allocator);
     }
 
-    /// Compute SM9 hash function H2
+    /// Compute SM9 hash function H2 according to GM/T 0044-2016
+    /// Returns error if computation fails - no fallback mechanisms allowed
     /// Implementation following GM/T 0044-2016 standard
-    pub fn computeH2(message: []const u8, w: []const u8, N: [32]u8) [32]u8 {
-        // Use the proper h2Hash from hash module
+    pub fn computeH2(message: []const u8, w: []const u8, N: [32]u8) ![32]u8 {
+        // Use the proper h2Hash from hash module - strict error propagation
         const hash = @import("hash.zig");
         const allocator = std.heap.page_allocator;
-        const result = hash.h2Hash(message, w, N, allocator) catch |err| switch (err) {
-            error.InvalidInput => {
-                // Fallback: create deterministic hash from message and w
-                var hasher = SM3.init(.{});
-                hasher.update(message);
-                hasher.update(w);
-                hasher.update("SM9_H2_FALLBACK");
-                var fallback_result: [32]u8 = undefined;
-                hasher.final(&fallback_result);
-                return fallback_result;
-            },
-            else => {
-                // General fallback for any other error
-                var hasher = SM3.init(.{});
-                hasher.update(message);
-                hasher.update(w);
-                hasher.update("SM9_H2_ERROR_FALLBACK");
-                var fallback_result: [32]u8 = undefined;
-                hasher.final(&fallback_result);
-                return fallback_result;
-            },
-        };
-        return result;
+        return hash.h2Hash(message, w, N, allocator);
     }
 
     /// Generate cryptographically secure random number

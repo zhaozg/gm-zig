@@ -167,14 +167,14 @@ test "SM9 signature utility functions" {
     const hid: u8 = 0x01;
     const N = std.mem.zeroes([32]u8);
 
-    // Test H1 computation
-    const h1 = sm9.sign.SignatureUtils.computeH1(id, hid, N);
+    // Test H1 computation - now returns error union
+    const h1 = try sm9.sign.SignatureUtils.computeH1(id, hid, N);
     try testing.expect(h1.len == 32);
 
     // Test H2 computation
     const message = "test message";
     const w = std.mem.zeroes([32]u8);
-    const h2 = sm9.sign.SignatureUtils.computeH2(message, &w, N);
+    const h2 = try sm9.sign.SignatureUtils.computeH2(message, &w, N);
     try testing.expect(h2.len == 32);
 
     // Test random generation
