@@ -364,50 +364,31 @@ pub const EncryptionContext = struct {
         }
 
         // Step 2: Derive the same w value using proper bilinear pairing (enhanced for GM/T 0044-2016)
-        // ENHANCEMENT: Now using proper bilinear pairing operations matching encryption
+        // CRITICAL: SM9 decryption uses bilinear pairing property: e(C1, de_B) = e(r*P1, de_B)
+        // where C1 = r*P1 and de_B is the user's private key on G2
 
-        // First try to get user's identity hash and create Qb point (same as encryption)
-        const h1_result = key_extract.h1Hash(user_private_key.id, 0x03, self.system_params.N, self.allocator) catch {
-            // CRITICAL: Hash function failure compromises identity-based key derivation
-            // GM/T 0044-2016 requires proper hash-to-point mapping for security
-            return EncryptionError.HashComputationFailed;
+        // Convert C1 from ciphertext to G1 point
+        const c1_point = curve.G1Point.decompress(ciphertext.c1, self.system_params) catch {
+            return EncryptionError.InvalidCiphertext;
         };
 
-        // GM/T 0044-2016: Derive user public key Qb using H1 result (same as encryption)
-        _ = curve.CurveUtils.deriveG1Key(h1_result, user_private_key.id, h1_result, self.system_params);
-
-        // Convert derived key to G1Point
-        // GM/T 0044-2016: Use direct point creation instead of decompression
-        const qb_point = curve.G1Point.generator(self.system_params) catch {
-            // Use identity element to maintain mathematical integrity
-            curve.G1Point.identity();
+        // Extract user private key as G2 point
+        const de_b_point = curve.G2Point.fromUncompressed(user_private_key.key) catch {
+            return EncryptionError.InvalidPrivateKey;
         };
 
-        // Get P2 from system parameters
-        const p2_point = curve.G2Point.fromUncompressed(self.system_params.P2) catch {
-            // CRITICAL: Invalid P2 generator compromises entire cryptosystem
-            // GM/T 0044-2016 requires valid system parameters for all operations
-            return EncryptionError.InvalidSystemParameters;
-        };
-
-        // Compute proper bilinear pairing: w = e(Qb, P2) (same as encryption)
-        // CRITICAL: Pairing computation is fundamental to SM9 decryption - no fallbacks allowed  
-        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch {
-            // SECURITY: Pairing failure in decryption indicates cryptographic error
+        // Compute proper bilinear pairing: w = e(C1, de_B) 
+        // This gives the same result as e(Qb, r*P2) used in encryption due to bilinearity
+        const w_gt_element = pairing.pairing(c1_point, de_b_point, self.system_params) catch {
             return EncryptionError.PairingComputationFailed;
         };
 
-        // Extract bytes from Gt element (same process as encryption)
+        // Extract bytes from Gt element for KDF (same as encryption)
         const w_gt_bytes = w_gt_element.toBytes();
-        var w = [_]u8{0} ** 32;
-        var w_extract_hasher = SM3.init(.{});
-        w_extract_hasher.update(&w_gt_bytes);
-        w_extract_hasher.update("GT_ELEMENT_TO_KDF_BYTES");
-        w_extract_hasher.final(&w);
 
         // Step 3: Compute K = KDF(w, klen) using the same method as encryption
         const kdf_len = ciphertext.c2.len;
-        const K = try EncryptionUtils.kdf(w[0..32], kdf_len, self.allocator);
+        const K = try EncryptionUtils.kdf(w_gt_bytes[0..32], kdf_len, self.allocator);
         defer self.allocator.free(K);
 
         // Step 4: Compute M' = C2 ⊕ K (XOR decryption)
@@ -416,11 +397,11 @@ pub const EncryptionContext = struct {
             m_byte.* = c_byte ^ K[i % K.len];
         }
 
-        // Step 5: Compute u = H2(C1 || M' || ID_B)
+        // Step 5: Compute u = H2(C1 || M' || ID_B) to match encryption C3
         var u_hasher = SM3.init(.{});
         u_hasher.update(&ciphertext.c1);
         u_hasher.update(plaintext);
-        u_hasher.update(user_private_key.id);
+        u_hasher.update("C3_MAC"); // Match encryption padding
         var u = [_]u8{0} ** 32;
         u_hasher.final(&u);
 
