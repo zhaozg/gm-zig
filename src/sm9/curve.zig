@@ -436,68 +436,25 @@ pub const G1Point = struct {
 /// Uses modular exponentiation approach for prime fields
 /// Returns error if input is not a quadratic residue (GM/T 0044-2016 compliance)
 fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u8 {
-    // First check if a is a quadratic residue using Legendre symbol: a^((q-1)/2) mod q
-    
     // Handle special case: if a is zero, return zero
     if (bigint.isZero(a)) {
         return [_]u8{0} ** 32;
     }
 
-    // Compute (q-1)/2 for Legendre symbol
-    var legendre_exp = modulus;
-    // Subtract 1
-    var borrow: u8 = 1;
-    var i: i32 = 31;
-    while (i >= 0) : (i -= 1) {
-        const diff = @as(i16, legendre_exp[@intCast(i)]) - @as(i16, borrow);
-        if (diff < 0) {
-            legendre_exp[@intCast(i)] = @intCast(diff + 256);
-            borrow = 1;
-        } else {
-            legendre_exp[@intCast(i)] = @intCast(diff);
-            borrow = 0;
-        }
-    }
-
-    // Divide by 2 (shift right) to get (q-1)/2
-    legendre_exp = bigint.shiftRight(legendre_exp);
-
-    // Compute Legendre symbol: a^((q-1)/2) mod q
-    const legendre_result = bigint.modPow(a, legendre_exp, modulus) catch {
-        // If modPow fails, this is a mathematical error - cannot proceed
+    // For BN256 curve (q ≡ 3 mod 4), we can directly use Tonelli-Shanks simplification
+    // Since q ≡ 3 mod 4, square root can be computed as: sqrt(a) = a^((q+1)/4) mod q
+    
+    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    
+    // Compute (q+1)/4 directly without checking Legendre symbol first
+    // Add 1 to modulus
+    const q_plus_1 = bigint.addMod(modulus, one, modulus) catch {
+        // If this fails, the modulus is invalid
         return MathError.InvalidFieldOperation;
     };
-
-    // Check if it's a quadratic residue
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const sub_result = bigint.sub(modulus, one);
-    if (sub_result.borrow) {
-        return MathError.InvalidFieldOperation;
-    }
-    const neg_one_mod_q = sub_result.result;
     
-    if (bigint.equal(legendre_result, one)) {
-        // It's a quadratic residue (Legendre symbol = 1)
-    } else if (bigint.equal(legendre_result, neg_one_mod_q)) {
-        // It's a quadratic non-residue (Legendre symbol = -1)
-        return MathError.NotQuadraticResidue;
-    } else {
-        // Unexpected Legendre symbol value - mathematical error
-        return MathError.InvalidFieldOperation;
-    }
-
-    // For BN256 curve (q ≡ 3 mod 4), we can use the simple formula: a^((q+1)/4)
-    // Calculate exponent = (q + 1) / 4
-    var exp = modulus;
-    // Add 1 to modulus
-    const add_result = bigint.add(exp, one);
-    if (add_result.carry) {
-        return MathError.InvalidFieldOperation;
-    }
-    exp = add_result.result;
-
-    // Divide by 4 (shift right twice) to get (q+1)/4
-    exp = bigint.shiftRight(bigint.shiftRight(exp));
+    // Divide by 4: shift right twice to get (q+1)/4
+    const exp = bigint.shiftRight(bigint.shiftRight(q_plus_1));
 
     // Compute square root: a^((q+1)/4) mod q
     var result = bigint.modPow(a, exp, modulus) catch {
@@ -512,19 +469,33 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
 
     if (!bigint.equal(result_squared, a)) {
         // SECURITY: If verification fails, this means our computation was incorrect
-        // We MUST return an error rather than proceed with invalid data
-        return MathError.NotQuadraticResidue;
+        // This could indicate either invalid input (not a quadratic residue) or computational error
+        // Check if it's a quadratic residue by computing Legendre symbol
+        const q_minus_1 = bigint.subMod(modulus, one, modulus) catch {
+            return MathError.InvalidFieldOperation;  
+        };
+        const legendre_exp = bigint.shiftRight(q_minus_1);
+        const legendre_result = bigint.modPow(a, legendre_exp, modulus) catch {
+            return MathError.InvalidFieldOperation;
+        };
+        
+        if (bigint.equal(legendre_result, one)) {
+            // It's a quadratic residue but our computation failed - this is an algorithm error
+            return MathError.InvalidFieldOperation;
+        } else {
+            // It's not a quadratic residue - invalid input data
+            return MathError.NotQuadraticResidue;
+        }
     }
 
     // Adjust for correct parity (odd/even) as specified
     const is_result_odd = (result[31] & 1) == 1;
     if (is_odd_y != is_result_odd) {
         // Negate result: result = q - result  
-        const negate_result = bigint.sub(modulus, result);
-        if (negate_result.borrow) {
+        const negate_result = bigint.subMod(modulus, result, modulus) catch {
             return MathError.InvalidFieldOperation;
-        }
-        result = negate_result.result;
+        };
+        result = negate_result;
     }
 
     return result;

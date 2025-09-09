@@ -32,6 +32,8 @@ pub const EncryptionError = error{
     KDFCounterOverflow,
     KDFOutputAllZeros,
     InvalidKDFOutput,
+    // System parameter validation errors
+    InvalidSystemParameters,
 };
 
 /// SM9 ciphertext format options
@@ -259,26 +261,10 @@ pub const EncryptionContext = struct {
 
         // Parse P1 (generator point) from system parameters
         const p1_point = curve_ops.G1Point.fromCompressed(self.system_params.P1) catch {
-            // Fallback: create deterministic point if parsing fails
-            var qb_bytes = [_]u8{0} ** 33;
-            qb_bytes[0] = 0x02; // Compressed point prefix
-
-            // Create deterministic point from h1_result and user_id
-            var point_hasher = SM3.init(.{});
-            point_hasher.update(&h1_result);
-            point_hasher.update(user_id);
-            point_hasher.update("FALLBACK_QB_POINT");
-            var point_hash = [_]u8{0} ** 32;
-            point_hasher.final(&point_hash);
-            @memcpy(qb_bytes[1..], &point_hash);
-
-            return Ciphertext.initTakeOwnership(
-                self.allocator,
-                qb_bytes, // Use fallback Qb as C1
-                try self.allocator.alloc(u8, 0), // Empty C2 for error case
-                [_]u8{0} ** 32, // Zero C3 for error case
-                options.format,
-            );
+            // CRITICAL: If system parameters are invalid, encryption cannot proceed safely
+            // Fallback mechanisms would compromise SM9's identity-based cryptography
+            // GM/T 0044-2016 requires valid system parameters for all operations
+            return EncryptionError.InvalidSystemParameters;
         };
 
         // For this implementation, create a deterministic Qb point based on h1_result
@@ -314,35 +300,18 @@ pub const EncryptionContext = struct {
         // ENHANCEMENT: Now using proper bilinear pairing operations instead of hash-based placeholder
 
         // Create user public key Qb from identity using proper G1 point creation
-        const qb_point = blk: {
-            // First try to create proper G1 point from computed qb_bytes
-            break :blk curve.G1Point.fromCompressed(qb_bytes) catch {
-                // If that fails, create a valid G1 point deterministically
-                // Use h1_result to create a proper point on the curve
-                var point_material = [_]u8{0} ** 32;
-                var point_hasher = SM3.init(.{});
-                point_hasher.update(&h1_result);
-                point_hasher.update(user_id);
-                point_hasher.update("GM_T_0044_2016_QB_POINT");
-                point_hasher.final(&point_material);
-
-                // Create affine point from material
-                var y_material = [_]u8{0} ** 32;
-                var y_hasher = SM3.init(.{});
-                y_hasher.update(&point_material);
-                y_hasher.update("QB_Y_COORDINATE");
-                y_hasher.final(&y_material);
-
-                break :blk curve.G1Point.affine(point_material, y_material);
-            };
+        const qb_point = curve.G1Point.fromCompressed(qb_bytes) catch {
+            // CRITICAL: If Qb point generation fails, encryption cannot proceed
+            // Fallback mechanisms would compromise identity-based cryptography security
+            // GM/T 0044-2016 requires mathematically valid elliptic curve points
+            return EncryptionError.InvalidSystemParameters;
         };
 
         // Get P2 from system parameters (G2 point)
-        const p2_point = curve.G2Point.fromUncompressed(self.system_params.P2) catch blk: {
-            // Fallback: create a deterministic G2 point for compatibility
-            const x_coord = [_]u8{0x55} ** 64;
-            const y_coord = [_]u8{0xAA} ** 64;
-            break :blk curve.G2Point.affine(x_coord, y_coord);
+        const p2_point = curve.G2Point.fromUncompressed(self.system_params.P2) catch {
+            // CRITICAL: Invalid P2 generator compromises entire cryptosystem
+            // GM/T 0044-2016 requires valid system parameters for all operations
+            return EncryptionError.InvalidSystemParameters;
         };
 
         // Compute proper bilinear pairing: w = e(Qb, P2)
@@ -362,10 +331,10 @@ pub const EncryptionContext = struct {
             const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
             defer self.allocator.free(K);
 
-            // Continue with rest of encryption...
-            var fallback_c2 = try self.allocator.alloc(u8, message.len);
+            // Step 7: Encrypt message: C2 = M ⊕ K (XOR encryption)
+            var c2 = try self.allocator.alloc(u8, message.len);
             for (message, K[0..message.len], 0..) |m, k, i| {
-                fallback_c2[i] = m ^ k;
+                c2[i] = m ^ k;
             }
 
             // Step 8: Compute C3 = MAC(C1 || M || padding)
@@ -379,7 +348,7 @@ pub const EncryptionContext = struct {
             return Ciphertext.initTakeOwnership(
                 self.allocator,
                 c1,
-                fallback_c2,
+                c2,
                 c3,
                 options.format,
             );
@@ -404,21 +373,10 @@ pub const EncryptionContext = struct {
 
         // First try to get user's identity hash and create Qb point (same as encryption)
         const h1_result = key_extract.h1Hash(user_private_key.id, 0x03, self.system_params.N, self.allocator) catch {
-            // Fallback to deterministic computation for test compatibility
-            var w_fallback = [_]u8{0} ** 32;
-            var w_hasher = SM3.init(.{});
-            w_hasher.update(user_private_key.id);
-            w_hasher.update(&ciphertext.c1);
-            w_hasher.update("SM9_PAIRING_FALLBACK_W");
-            w_hasher.final(&w_fallback);
-
-            // Continue with KDF using fallback w
-            const kdf_len = ciphertext.c2.len;
-            const K = try EncryptionUtils.kdf(w_fallback[0..32], kdf_len, self.allocator);
-            defer self.allocator.free(K);
-
-            // Continue with decryption...
-            const plaintext = try self.allocator.alloc(u8, ciphertext.c2.len);
+            // CRITICAL: Hash function failure compromises identity-based key derivation
+            // GM/T 0044-2016 requires proper hash-to-point mapping for security
+            return EncryptionError.HashComputationFailed;
+        };
             for (ciphertext.c2, plaintext, 0..) |c_byte, *m_byte, i| {
                 m_byte.* = c_byte ^ K[i % K.len];
             }
