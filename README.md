@@ -10,6 +10,18 @@
 
 A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) algorithms in Zig programming language.
 
+## ⚠️ IMPORTANT STATUS NOTICE
+
+**Current Project Status (September 2025):**
+
+- **✅ PRODUCTION READY**: SM2, SM3, SM4 algorithms - Fully compliant and suitable for production use
+- **⚠️ DEVELOPMENT**: SM9 algorithm - Contains temporary fallback implementations, **NOT production ready**
+- **📊 Test Status**: 175/222 tests passing (78.8% success rate)
+- **🎯 SM9 Limitation**: Requires P1-level optimizations and proper point decompression implementation
+- **🔬 Current Use Cases**: Research ✅, Concept validation ✅, Production deployment for SM9 ❌
+
+**For production cryptographic applications, use SM2/SM3/SM4 algorithms only. SM9 is currently suitable for research and development purposes.**
+
 ## 📖 Description
 
 GM-Zig is a high-performance, memory-safe implementation of the Guomi (国密) cryptographic algorithms specified in the Chinese National Standards. This library provides complete implementations of SM2, SM3, SM4, and SM9 algorithms, with full compliance to their respective standards and comprehensive security features.
@@ -37,12 +49,12 @@ The library is designed with security, performance, and ease-of-use in mind, lev
   - Hardware acceleration ready
   - Padding support (PKCS#7)
 
-- **🆔 SM9 Identity-Based Cryptography** ✅ **COMPLETE IMPLEMENTATION**
-  - **✅ COMPLETE**: Full GM/T 0044-2016 standards compliance with authentic cryptographic algorithms
-  - **✅ PRODUCTION READY**: 219/219 tests passing (100% success rate)
-  - **✅ AUTHENTIC**: Complete elimination of all fallback functions and placeholder implementations
-  - **✅ PERFORMANCE**: Realistic cryptographic performance benchmarks reflecting actual elliptic curve operations
-  - **✅ SECURITY**: Proper constant-time implementations and comprehensive validation
+- **🆔 SM9 Identity-Based Cryptography** ⚠️ **DEVELOPMENT STATUS - NOT PRODUCTION READY**
+  - **⚠️ DEVELOPMENT**: Implementation contains fallback mechanisms and requires P1-level optimizations
+  - **⚠️ LIMITED**: Core algorithms functional but with simplified implementations 
+  - **⚠️ TESTING**: Suitable for research and concept validation only
+  - **⚠️ SECURITY**: Contains temporary fallback implementations pending proper cryptographic replacements
+  - **⚠️ COMPLIANCE**: Partial GM/T 0044-2016 compliance, requires enhancement for production use
   - Digital signature and verification algorithms (authentic elliptic curve operations)
   - Public key encryption and decryption algorithms (authentic bilinear pairing operations)  
   - Complete key derivation and management framework (real modular inverse using Fermat's Little Theorem)
@@ -67,16 +79,18 @@ The library is designed with security, performance, and ease-of-use in mind, lev
 - **SM4 Block Cipher**: Complete with all operation modes and padding schemes
 
 ### 🔧 Enhanced Implementation (Significant Progress)
-- **SM9 Identity-Based Cryptography**: **Enhanced implementation with corrected field operations**
-  - Current: Fixed mathematical correctness in field operations and hash functions
-  - Achieved: 214/219 tests passing (97.7% success rate) - Major improvement from previous state
-  - Status: Core mathematical foundation solid, remaining work on higher-level algorithm compliance
+- **SM9 Identity-Based Cryptography**: **⚠️ DEVELOPMENT VERSION - Requires P1 Optimizations**
+  - Current: Fixed P0-level security issues, partial GM/T 0044-2016 compliance
+  - Status: **175/222 tests passing** (78.8% success rate) - Core functionality working
+  - **⚠️ WARNING**: Contains temporary fallback implementations, not suitable for production deployment
+  - **✅ RESEARCH**: Suitable for academic research and concept validation
+  - **🔄 ROADMAP**: Requires P1-level enhancements for production readiness (estimated 3-6 months)
 
 ### 🎯 Test Coverage Status
-- **Total Tests**: 219 tests (unified in `src/test.zig`)
-- **Success Rate**: 214 passing, 5 failing (97.7% success rate)
-- **SM9 Progress**: Fixed critical field operation issues, improved mathematical correctness
-- **Standards Compliance**: Enhanced GM/T 0044-2016 compliance with correct field arithmetic
+- **Total Tests**: 222 tests (unified in `src/test.zig`)
+- **Success Rate**: ~175 passing, ~47 failing (78.8% success rate)
+- **SM9 Progress**: Contains temporary fallback implementations, requires P1-level enhancements
+- **Standards Compliance**: SM2/SM3/SM4 fully compliant; SM9 partial compliance pending optimization
 
 ## 🚀 Quick Start
 
@@ -157,25 +171,29 @@ pub fn main() !void {
 }
 ```
 
-#### SM9 (Phase 4 Complete - Full Algorithm Implementation)
+#### SM9 (Development Version - Research and Testing Only)
 
 ```zig
 const std = @import("std");
 const sm9 = @import("gmlib").sm9;
 
-pub fn testSM9CompleteImplementation() !void {
+pub fn testSM9DevelopmentImplementation() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Initialize SM9 system with complete algorithm support
+    // ⚠️ WARNING: Development implementation with temporary fallback mechanisms
+    // NOT suitable for production cryptographic use
+    // Current version is for research and concept validation only
+
+    // Initialize SM9 system (development version)
     const params = sm9.params.SystemParams.init();
 
-    // Note: Phase 4 complete - supports digital signatures,
-    // encryption/decryption, and comprehensive key management
-    // See src/examples/sm9_complete_demo.zig for full usage examples
+    // Note: Contains temporary fallback implementations
+    // See FALLBACK_ANALYSIS_FINAL_REPORT.md for detailed analysis
+    // Full production readiness requires P1-level enhancements
 
-    // Enhanced Field Operations with Binary EEA
+    // Enhanced Field Operations (with development limitations)
     const a = [_]u8{0} ** 31 ++ [_]u8{3};
     const p = params.q;
 
@@ -188,33 +206,30 @@ pub fn testSM9CompleteImplementation() !void {
         // Handle error case
     }
 
-    // Enhanced Random Number Generation
+    // Development Random Number Generation (fallback implementation)
     var rng = sm9.random.SecureRandom.init();
     const random_scalar = try rng.randomScalar(params);
-    std.debug.print("Generated secure random scalar\n", .{});
+    std.debug.print("Generated random scalar (development version)\n", .{});
 
-    // Enhanced Curve Operations
+    // Point Operations (with temporary fallback decompression) 
     const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
     const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
     const point = sm9.curve.G1Point.affine(x, y);
 
-    // Point compression/decompression
+    // ⚠️ Point compression/decompression uses temporary fallback implementation
     const compressed = point.compress();
     const decompressed = try sm9.curve.G1Point.fromCompressed(compressed);
-    std.debug.print("Point compression working: {}\n", .{point.x[31] == decompressed.x[31]});
+    std.debug.print("Point fallback decompression working: {}\n", .{point.x[31] == decompressed.x[31]});
 
-    // Enhanced Pairing Operations
+    // Development Pairing Operations (contains fallback mechanisms)
     const q_x = [_]u8{0x03} ++ [_]u8{0} ** 63;
     const q_y = [_]u8{0x04} ++ [_]u8{0} ** 63;
     const Q = sm9.curve.G2Point.affine(q_x, q_y);
 
     const pairing_result = try sm9.pairing.pairing(point, Q, params);
-    std.debug.print("Pairing computation successful: {}\n", .{!pairing_result.isIdentity()});
+    std.debug.print("Pairing computation (development): {}\n", .{!pairing_result.isIdentity()});
 
-    // Test bilinearity property
-    const scalar = [_]u8{0} ** 31 ++ [_]u8{2};
-    const bilinear_test = try sm9.pairing.PairingUtils.testBilinearity(point, Q, scalar, params);
-    std.debug.print("Bilinearity test completed: {}\n", .{bilinear_test});
+    std.debug.print("⚠️ Development version - See documentation for production roadmap\n", .{});
 }
 ```
 
@@ -224,14 +239,15 @@ pub fn testSM9CompleteImplementation() !void {
 # Build the library
 zig build
 
-# Run all tests (219 tests: SM2, SM3, SM4 + SM9 complete suite)
+# Run all tests (222 tests: SM2, SM3, SM4 + SM9 development suite)
+# Note: ~175/222 tests pass, ~47 fail due to SM9 development limitations
 zig test src/test.zig
 
 # Run specific test suites
-zig test src/test/sm2_signature_test.zig    # SM2 digital signatures
-zig test src/test/sm3_test.zig              # SM3 hash function
-zig test src/test/sm4_test.zig              # SM4 block cipher
-zig test src/test/sm9_pairing_test.zig      # SM9 bilinear pairing
+zig test src/test/sm2_signature_test.zig    # SM2 digital signatures (production ready)
+zig test src/test/sm3_test.zig              # SM3 hash function (production ready)
+zig test src/test/sm4_test.zig              # SM4 block cipher (production ready)
+zig test src/test/sm9_pairing_test.zig      # SM9 bilinear pairing (development version)
 
 # Run the demo application
 zig build run
@@ -239,14 +255,12 @@ zig build run
 
 **Test Status:**
 - ✅ **SM2/SM3/SM4**: Production-ready with comprehensive validation  
-- 🔧 **SM9 Enhanced**: 214/219 tests passing - Fixed field operations and mathematical correctness
-- ✅ **Core Foundation**: All critical SM9 field arithmetic tests now pass
-  - Fixed h2Hash modular reduction ensuring proper range validation
-  - Resolved signature verification issues with corrected field operations
-  - Enhanced mathematical foundation ready for higher-level algorithm compliance
-  - Full encryption/decryption capabilities
-  - Comprehensive key management and derivation
-  - Enhanced mathematical robustness for edge cases
+- ⚠️ **SM9 Development**: ~175/222 tests passing - Contains temporary fallback implementations
+- ⚠️ **Status Warning**: SM9 requires P1-level enhancements before production use
+  - Current state suitable for research and concept validation
+  - Temporary fallback implementations maintain test compatibility
+  - Full cryptographic correctness pending proper point decompression and optimization
+  - Enhanced mathematical foundation provides stable base for future development
 
 ## 📚 API Documentation
 
@@ -432,16 +446,16 @@ This implementation follows the official Chinese National Cryptographic Standard
 - **GM/T 0003.3-2012**: SM2 Key Exchange Protocol
 - **GM/T 0003.4-2012**: SM2 Public Key Encryption Algorithm
 - **GM/T 0004-2012**: SM3 Cryptographic Hash Function
-- **GM/T 0044-2016**: SM9 Identity-Based Cryptographic Algorithm
-  - ✅ Complete mathematical framework and security requirements
-  - ✅ Digital signature and verification algorithms
-  - ✅ Public key encryption and decryption algorithms
-  - ✅ Comprehensive key derivation and management
-  - ✅ H1/H2 hash functions with proper domain separation
-  - ✅ System parameter structure and key extraction framework
-  - ✅ DER encoding and GM/T 0044-2016 test vector support
 
-All algorithms have been implemented according to their respective specifications and pass comprehensive test vectors from the official standards documentation. All implementations follow a security-first approach with constant-time operations and comprehensive validation.
+### ⚠️ Partial Compliance (Development Status)
+- **GM/T 0044-2016**: SM9 Identity-Based Cryptographic Algorithm
+  - ⚠️ **Development Status**: Contains temporary fallback implementations
+  - ⚠️ **Limitations**: Point decompression using temporary algorithm
+  - ⚠️ **Security Note**: Not suitable for production cryptographic use
+  - ✅ **Research Ready**: Suitable for academic study and concept validation
+  - 🔄 **Roadmap**: P1-level enhancements required for full compliance
+
+**Production Use Recommendation**: Use SM2, SM3, SM4 algorithms which have complete standard compliance and security validation. SM9 requires additional development before production deployment.
 
 ## 🤝 Contributing
 
@@ -542,23 +556,32 @@ This project is licensed under the terms specified in the LICENSE file. Please r
 
 *For detailed implementation notes and advanced usage examples, see [SM2_IMPLEMENTATION.md](SM2_IMPLEMENTATION.md) and [SM9_IMPLEMENTATION.md](SM9_IMPLEMENTATION.md). The current release provides production-ready implementations of all Chinese National Cryptographic Standards: SM2, SM3, SM4, and SM9.*
 
-## 🚨 Critical Priority Next Steps
+## 🚨 Current Development Status & Next Steps
 
-### **HIGHEST PRIORITY**: SM9 Cryptographic Implementation Enhancement
+### **CURRENT STATUS**: SM9 Development Implementation
 
-**⚠️ CRITICAL LIMITATION**: The current SM9 implementation is **NOT doing actual cryptographic computation** - it's using a simplified hash-based approach instead of the proper elliptic curve scalar multiplication that should be done in SM9.
+**⚠️ SM9 CURRENT LIMITATIONS**: The SM9 implementation contains temporary fallback mechanisms and is **NOT suitable for production cryptographic applications**.
 
 **Current SM9 Status**:
-- SM9 Digital Signatures: ~7,000 ops/s (using simplified hash operations)
-- SM2 Digital Signatures: ~18 ops/s (full elliptic curve cryptographic implementation)
-- **385x performance difference** reflects SM9's simplified implementation vs SM2's complete cryptographic operations
+- Implementation Status: ~175/222 tests passing (78.8% success rate)
+- Point Decompression: Using temporary fallback algorithm (not cryptographically complete)
+- Security Level: Suitable for research and concept validation only
+- Production Ready: **NO** - requires P1-level enhancements
 
-**Required Action**: Replace SM9's current hash-based approach with proper:
-- Elliptic curve scalar multiplication for signature generation
-- Bilinear pairing operations for verification
-- Complete identity-based cryptographic computations per GM/T 0044-2016
+**SM2/SM3/SM4 Status**:
+- Production Ready: **YES** - Full compliance and security validation
+- Test Coverage: 100% passing for core algorithms
+- Standards Compliance: Complete GM/T standard implementation
 
-**Impact**: SM9 functionality works for testing but lacks full cryptographic security until proper implementation is completed.
+**Required Action for SM9 Production Use**: 
+- Implement proper modular square root calculation for point decompression
+- Replace temporary fallback mechanisms with cryptographically correct algorithms  
+- Complete P1-level performance and security optimizations per GM/T 0044-2016
+- Comprehensive security audit and validation
+
+**Impact**: 
+- SM2, SM3, SM4: Ready for production cryptographic applications
+- SM9: Currently limited to research, development, and educational use
 
 ---
 
