@@ -296,23 +296,11 @@ pub const EncryptionContext = struct {
         @memcpy(qb_bytes[1..], &qb_hash);
 
         // Step 2: Generate cryptographically secure random r
-        // Use proper cryptographic random number generation in production
-        const r = blk: {
-            break :blk random.secureRandomScalar(self.system_params) catch {
-                // Fallback to deterministic generation if secure random fails
-                var r_fallback = [_]u8{0} ** 32;
-                var r_hasher = SM3.init(.{});
-                r_hasher.update(user_id);
-                r_hasher.update(message);
-                r_hasher.update("random_r");
-                r_hasher.final(&r_fallback);
-
-                // Ensure r is not zero (avoid degenerate case)
-                if (std.mem.allEqual(u8, &r_fallback, 0)) {
-                    r_fallback[31] = 1;
-                }
-                break :blk r_fallback;
-            };
+        // CRITICAL: Must use secure randomness for CPA security compliance with GM/T 0044-2016
+        const r = random.secureRandomScalar(self.system_params) catch |err| {
+            // SECURITY: No fallback to deterministic values - fail securely
+            // Deterministic encryption violates CPA security requirements
+            return EncryptionError.RandomGenerationFailed;
         };
 
         // Step 3: Compute C1 = r * P1 (elliptic curve scalar multiplication)
@@ -358,16 +346,15 @@ pub const EncryptionContext = struct {
         };
 
         // Compute proper bilinear pairing: w = e(Qb, P2)
-        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch {
-            // Fallback to deterministic computation for test compatibility
-            var w_fallback = [_]u8{0} ** 32;
-            var w_hasher = SM3.init(.{});
-            w_hasher.update(user_id);
-            w_hasher.update(&c1);
-            w_hasher.update("SM9_PAIRING_FALLBACK_W");
-            w_hasher.final(&w_fallback);
+        // CRITICAL: Pairing computation is fundamental to SM9 security - no fallbacks allowed
+        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch |err| {
+            // SECURITY: Pairing failure indicates mathematical error - fail securely
+            // Simple hash fallbacks completely bypass SM9's identity-based cryptography
+            return EncryptionError.PairingComputationFailed;
+        };
 
-            const w_bytes = &w_fallback;
+        // Convert GT element to bytes for KDF input (proper mathematical approach)
+        const w_bytes = w_gt_element.toBytes();
             // Continue with KDF computation...
 
             // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
@@ -536,40 +523,10 @@ pub const EncryptionContext = struct {
         };
 
         // Compute proper bilinear pairing: w = e(Qb, P2) (same as encryption)
-        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch {
-            // Fallback to deterministic computation for test compatibility
-            var w_fallback = [_]u8{0} ** 32;
-            var w_hasher = SM3.init(.{});
-            w_hasher.update(user_private_key.id);
-            w_hasher.update(&ciphertext.c1);
-            w_hasher.update("SM9_PAIRING_FALLBACK_W");
-            w_hasher.final(&w_fallback);
-
-            // Continue with KDF computation
-            const kdf_len = ciphertext.c2.len;
-            const K = try EncryptionUtils.kdf(w_fallback[0..32], kdf_len, self.allocator);
-            defer self.allocator.free(K);
-
-            // Continue with decryption...
-            const plaintext = try self.allocator.alloc(u8, ciphertext.c2.len);
-            for (ciphertext.c2, plaintext, 0..) |c_byte, *m_byte, i| {
-                m_byte.* = c_byte ^ K[i % K.len];
-            }
-
-            // Verification
-            var u_hasher = SM3.init(.{});
-            u_hasher.update(&ciphertext.c1);
-            u_hasher.update(plaintext);
-            u_hasher.update(user_private_key.id);
-            var u = [_]u8{0} ** 32;
-            u_hasher.final(&u);
-
-            if (!std.mem.eql(u8, &u, &ciphertext.c3)) {
-                self.allocator.free(plaintext);
-                return error.DecryptionFailed;
-            }
-
-            return plaintext;
+        // CRITICAL: Pairing computation is fundamental to SM9 decryption - no fallbacks allowed  
+        const w_gt_element = pairing.pairing(qb_point, p2_point, self.system_params) catch |err| {
+            // SECURITY: Pairing failure in decryption indicates cryptographic error
+            return EncryptionError.PairingComputationFailed;
         };
 
         // Extract bytes from Gt element (same process as encryption)

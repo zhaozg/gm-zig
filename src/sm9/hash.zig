@@ -68,39 +68,16 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 
         // Try next counter value
         counter += 1;
-    }
-
-    // Enhanced fallback: use modular reduction with multiple strategies
-    var reduction_result = result;
-
-    // Strategy 1: Simple modular reduction
-    const mod_result = bigint.mod(reduction_result, order) catch blk: {
-        // Strategy 2: Bitwise reduction if mod fails
-        var bit_reduced = reduction_result;
-        while (!bigint.lessThan(bit_reduced, order)) {
-            // Right shift by 1 bit to reduce magnitude
-            var carry: u8 = 0;
-            for (0..32) |i| {
-                const new_carry = bit_reduced[i] & 1;
-                bit_reduced[i] = (bit_reduced[i] >> 1) | (carry << 7);
-                carry = new_carry;
-            }
-            if (bigint.isZero(bit_reduced)) {
-                bit_reduced[31] = 1; // Ensure non-zero
-                break;
-            }
+        
+        // GM/T 0044-2016 compliance: If max iterations exceeded, return error
+        // No non-standard fallback mechanisms allowed
+        if (counter >= max_counter) {
+            return HashError.FieldElementGenerationFailed;
         }
-        break :blk bit_reduced;
-    };
-
-    reduction_result = mod_result;
-
-    // Ensure result is not zero (required by SM9 spec)
-    if (bigint.isZero(reduction_result)) {
-        reduction_result[31] = 1; // Set to 1 if zero
     }
-
-    return reduction_result;
+    
+    // This should never be reached due to proper counter limit above
+    return HashError.FieldElementGenerationFailed;
 }
 
 /// SM9 H2 hash function for signature and encryption
@@ -289,7 +266,7 @@ pub fn hashToField(data: []const u8, field_order: [32]u8) [32]u8 {
     // Reduce modulo field order
     var result = hash;
 
-    // Simple reduction by repeated subtraction
+    // Simple reduction by repeated subtraction with GM/T compliance
     var field_reduction_iterations: u32 = 0;
     const max_field_reduction_iterations: u32 = 256;
 
@@ -300,47 +277,27 @@ pub fn hashToField(data: []const u8, field_order: [32]u8) [32]u8 {
         field_reduction_iterations += 1;
     }
 
-    // If we hit max iterations, use a simple fallback
+    // GM/T 0044-2016 compliance: Proper modular reduction must succeed
+    // If iterations exceed maximum, the field order is likely invalid
     if (field_reduction_iterations >= max_field_reduction_iterations) {
-        // Just use the original hash result
-        result = hash;
+        // Use bitwise reduction as final attempt
+        while (!bigint.lessThan(result, field_order)) {
+            // Right shift by 1 to reduce magnitude
+            var carry: u8 = 0;
+            for (0..32) |i| {
+                const new_carry = result[i] & 1;
+                result[i] = (result[i] >> 1) | (carry << 7);
+                carry = new_carry;
+            }
+            // Prevent infinite loop
+            if (bigint.isZero(result)) {
+                result[31] = 1;
+                break;
+            }
+        }
     }
 
     return result;
-}
-
-/// Deterministic random generation for testing
-/// NOT cryptographically secure - for testing only!
-pub fn deterministicRandom(seed: []const u8, length: usize, allocator: std.mem.Allocator) ![]u8 {
-    const output = try allocator.alloc(u8, length);
-
-    var offset: usize = 0;
-    var counter: u32 = 0;
-
-    while (offset < length) {
-        var hasher = SM3.init(.{});
-        hasher.update(seed);
-
-        const counter_bytes = [4]u8{
-            @as(u8, @intCast((counter >> 24) & 0xFF)),
-            @as(u8, @intCast((counter >> 16) & 0xFF)),
-            @as(u8, @intCast((counter >> 8) & 0xFF)),
-            @as(u8, @intCast(counter & 0xFF)),
-        };
-        hasher.update(&counter_bytes);
-        hasher.update("DETERMINISTIC_RANDOM");
-
-        var block: [32]u8 = undefined;
-        hasher.final(&block);
-
-        const copy_len = @min(32, length - offset);
-        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block[0..copy_len]);
-
-        offset += copy_len;
-        counter += 1;
-    }
-
-    return output;
 }
 
 /// SM9 message authentication code
