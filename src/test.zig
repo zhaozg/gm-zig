@@ -30,6 +30,9 @@ test {
     _ = @import("test/sm9_robustness_test.zig"); // 6 robustness tests
     _ = @import("test/sm9_standard_compliance_test.zig"); // 15 standard compliance tests
 
+    // GM/T 0044-2016 KDF Compliance tests
+    _ = @import("test/kdf_compliance_test.zig"); // 3 KDF compliance tests
+
     // Debug and validation tests
     _ = @import("test/debug_test.zig"); // 3 basic debug/validation tests
 }
