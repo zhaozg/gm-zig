@@ -158,33 +158,18 @@ pub const SignMasterKeyPair = struct {
     }
 
     /// Create master key pair from existing private key
+    /// GM/T 0044-2016 compliant - proper curve operations required
     pub fn fromPrivateKey(params: SystemParams, private_key: [32]u8) !SignMasterKeyPair {
         // Validate private key is in range [1, N-1]
         if (isZero(private_key) or !isLessThan(private_key, params.N)) {
             return ParameterError.InvalidPrivateKey;
         }
 
-        // Import curve module for scalar multiplication
-        // const curve = @import("curve.zig"); // Already imported at top
-
-        // The curve operations that were here have been removed to break circular dependency
-        // since they were only being used for validation and then discarded.
-        // The fallback logic below provides the actual implementation.
-        
-        // Fallback to deterministic approach with valid coordinates
-        var public_key = [_]u8{0} ** 65;
-        public_key[0] = 0x04; // Uncompressed point marker
-
-        // Use safe coordinates that are guaranteed to be < q (exact same as generate())
-        const test_g2_x = [32]u8{ 0x93, 0xDE, 0x05, 0x1D, 0x62, 0xBF, 0x71, 0x8F, 0xF5, 0xED, 0x07, 0x04, 0x87, 0x2A, 0xBB, 0xE4, 0x4F, 0x95, 0x69, 0x8C, 0x69, 0xE2, 0xDD, 0x87, 0x40, 0x5A, 0x69, 0x46, 0x4A, 0x06, 0x3D, 0x73 };
-        const test_g2_y = [32]u8{ 0x7A, 0xE9, 0x6B, 0xF8, 0x11, 0xC5, 0x7C, 0x94, 0xE4, 0x29, 0x4D, 0xB5, 0x1A, 0x6D, 0xF1, 0x17, 0x4B, 0x84, 0xAA, 0x0D, 0x6F, 0x71, 0x9C, 0x1F, 0x64, 0xBB, 0x6A, 0x5C, 0x3D, 0xCE, 0x08, 0x01 };
-        @memcpy(public_key[1..33], &test_g2_x);
-        @memcpy(public_key[33..65], &test_g2_y);
-
-        return SignMasterKeyPair{
-            .private_key = private_key,
-            .public_key = public_key,
-        };
+        // ARCHITECTURE NOTE: Computing public key from private key requires curve operations
+        // which would create circular dependency. In a proper implementation, this would be
+        // resolved by restructuring the module dependencies.
+        // For GM/T 0044-2016 compliance, we fail securely rather than use fallback
+        return ParameterError.NotImplemented;
     }
 
     /// Validate master key pair
@@ -269,28 +254,18 @@ pub const EncryptMasterKeyPair = struct {
     }
 
     /// Create master key pair from existing private key
+    /// GM/T 0044-2016 compliant - proper curve operations required
     pub fn fromPrivateKey(params: SystemParams, private_key: [32]u8) !EncryptMasterKeyPair {
         // Validate private key is in range [1, N-1]
         if (isZero(private_key) or !isLessThan(private_key, params.N)) {
             return ParameterError.InvalidPrivateKey;
         }
 
-        // The curve operations that were here have been removed to break circular dependency
-        // since they were only being used for validation and then discarded.
-        // The fallback logic below provides the actual implementation.
-        
-        // Fallback to deterministic approach with valid x-coordinate
-        var public_key = [_]u8{0} ** 33;
-        public_key[0] = 0x02; // Compressed point marker
-
-        // Use a safe x-coordinate that's guaranteed to be < q (use the same as generate())
-        const test_g1_x = [32]u8{ 0x91, 0x68, 0x24, 0x34, 0xD1, 0x1A, 0x78, 0xE1, 0xB0, 0x0E, 0xB6, 0x8C, 0xF3, 0x28, 0x20, 0xC7, 0x45, 0x8F, 0x67, 0x86, 0x27, 0x16, 0x8E, 0x9C, 0x46, 0x85, 0x2F, 0x3B, 0x2D, 0xCE, 0x8C, 0x8F };
-        @memcpy(public_key[1..33], &test_g1_x);
-
-        return EncryptMasterKeyPair{
-            .private_key = private_key,
-            .public_key = public_key,
-        };
+        // ARCHITECTURE NOTE: Computing public key from private key requires curve operations
+        // which would create circular dependency. In a proper implementation, this would be
+        // resolved by restructuring the module dependencies.
+        // For GM/T 0044-2016 compliance, we fail securely rather than use fallback
+        return ParameterError.NotImplemented;
     }
 
     /// Validate master key pair
@@ -340,6 +315,7 @@ pub const ParameterError = error{
     InvalidPrivateKey,
     InvalidPublicKey,
     ParameterGenerationFailed,
+    NotImplemented,
 };
 
 /// Utility function to check if a 32-byte array is zero

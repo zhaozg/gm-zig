@@ -39,70 +39,50 @@ pub const EphemeralKeyPair = struct {
     public_key: [33]u8, // Compressed G1 point
 
     /// Initialize ephemeral key pair
+    /// GM/T 0044-2016 compliant - uses cryptographically secure random generation
     pub fn generate(user_id: []const u8, allocator: std.mem.Allocator) !EphemeralKeyPair {
+        _ = user_id; // Parameter kept for API compatibility but not used in current implementation
         _ = allocator; // Parameter kept for API compatibility but not used in current implementation
 
-        // Generate proper cryptographic ephemeral key with deterministic fallback for testing
+        // Generate proper cryptographic ephemeral key - GM/T 0044-2016 compliant
         var private_key = [_]u8{0} ** 32;
 
-        // First attempt: Use proper cryptographic random generation
+        // Use proper cryptographic random generation - no fallback mechanisms
         const random_module = @import("random.zig");
         const params_module = @import("params.zig");
-        private_key = random_module.secureRandomScalar(params_module.SM9System.init().params) catch blk: {
-            // Fallback: Enhanced deterministic for testing compatibility with additional entropy
-            var hasher = SM3.init(.{});
-            hasher.update(user_id);
-            hasher.update("SM9_EPHEMERAL_KEY_ENHANCED_DETERMINISTIC");
-
-            // Add deterministic counter-based entropy for testing
-            const counter: u64 = 0x123456789ABCDEF0; // Fixed for deterministic testing
-            hasher.update(&@as([8]u8, @bitCast(@byteSwap(counter))));
-
-            var key: [32]u8 = undefined;
-            hasher.final(&key);
-            break :blk key;
-        };
+        private_key = try random_module.secureRandomScalar(params_module.SM9System.init().params);
 
         // Ensure private key is not zero and is valid for curve operations
         if (std.mem.allEqual(u8, &private_key, 0)) {
-            private_key[31] = 1;
+            return KeyAgreementError.InvalidPrivateKey;
         }
 
         // Ensure the private key is within valid range (less than curve order)
         const bigint = @import("bigint.zig");
         const system = params.SM9System.init();
 
-        // If private key >= N, reduce it modulo N
+        // If private key >= N, this is an error in random generation
         if (!bigint.lessThan(private_key, system.params.N)) {
-            const reduced_key = bigint.subMod(private_key, system.params.N, system.params.N) catch private_key;
-            private_key = reduced_key;
+            return KeyAgreementError.InvalidPrivateKey;
         }
 
         // Compute public key: private_key * P1
-
         // Create base point from system parameters
-        const base_point = curve.CurveUtils.getG1Generator(system.params);
+        const base_point = try curve.CurveUtils.getG1Generator(system.params);
 
         // Perform scalar multiplication
         const public_point = base_point.mul(private_key, system.params);
 
-        // Compress the public key with validation fallback
-        var public_key = public_point.compress();
+        // Compress the public key - no fallback validation
+        const public_key = public_point.compress();
 
-        // Use known valid fallback key if the generated key has validation issues
-        const test_point = curve.G1Point.fromCompressed(public_key) catch blk: {
-            // Fallback to known valid coordinates
-            public_key[0] = 0x02; // Compressed format
-            const valid_x = [32]u8{ 0x91, 0x68, 0x24, 0x34, 0xD1, 0x1A, 0x78, 0xE1, 0xB0, 0x0E, 0xB6, 0x8C, 0xF3, 0x28, 0x20, 0xC7, 0x45, 0x8F, 0x67, 0x86, 0x27, 0x16, 0x8E, 0x9C, 0x46, 0x85, 0x2F, 0x3B, 0x2D, 0xCE, 0x8C, 0x8F };
-            @memcpy(public_key[1..33], &valid_x);
-            break :blk curve.G1Point.infinity();
+        // Validate the generated key pair - fail securely if invalid
+        const test_point = curve.G1Point.fromCompressed(public_key) catch {
+            return KeyAgreementError.InvalidPublicKey;
         };
 
-        // If validation fails, also use fallback
         if (!test_point.validate(system.params) and !test_point.isInfinity()) {
-            public_key[0] = 0x02; // Compressed format
-            const valid_x = [32]u8{ 0x91, 0x68, 0x24, 0x34, 0xD1, 0x1A, 0x78, 0xE1, 0xB0, 0x0E, 0xB6, 0x8C, 0xF3, 0x28, 0x20, 0xC7, 0x45, 0x8F, 0x67, 0x86, 0x27, 0x16, 0x8E, 0x9C, 0x46, 0x85, 0x2F, 0x3B, 0x2D, 0xCE, 0x8C, 0x8F };
-            @memcpy(public_key[1..33], &valid_x);
+            return KeyAgreementError.InvalidPublicKey;
         }
 
         return EphemeralKeyPair{

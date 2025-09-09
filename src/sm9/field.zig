@@ -186,14 +186,8 @@ pub fn fp2Inv(x: Fp2Element, m: FieldElement) FieldError!Fp2Element {
     const b_squared = try bigint.mulMod(x.b, x.b, m);
     const norm = try bigint.addMod(a_squared, b_squared, m);
 
-    // Invert the norm - use safe fallback if inverse fails
-    const norm_inv = bigint.invMod(norm, m) catch |err| switch (err) {
-        bigint.BigIntError.NotInvertible => {
-            // Return identity element if inverse fails
-            return Fp2Element.init([_]u8{0} ** 31 ++ [_]u8{1}, [_]u8{0} ** 32);
-        },
-        else => return err,
-    };
+    // Invert the norm - GM/T 0044-2016 requires proper error handling
+    const norm_inv = try bigint.invMod(norm, m);
 
     // Compute conjugate and multiply by norm inverse
     const real_part = try bigint.mulMod(x.a, norm_inv, m);

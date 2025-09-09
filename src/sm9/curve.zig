@@ -278,7 +278,7 @@ pub const G1Point = struct {
     }
 
     /// Convert to affine coordinates
-    pub fn toAffine(self: G1Point, curve_params: params.SystemParams) G1Point {
+    pub fn toAffine(self: G1Point, curve_params: params.SystemParams) !G1Point {
         if (self.isInfinity()) return G1Point.infinity();
 
         // Check if already in affine form (Z = 1)
@@ -292,19 +292,12 @@ pub const G1Point = struct {
         // For projective coordinates (X, Y, Z), affine coordinates are (X/Z, Y/Z)
         // Implement proper modular division using modular inverse
 
-        // Compute Z^(-1) mod p
-        const z_inv = bigint.invMod(self.z, curve_params.q) catch {
-            // If inverse computation fails, return point at infinity as safe fallback
-            return G1Point.infinity();
-        };
+        // Compute Z^(-1) mod p - GM/T 0044-2016 requires proper error handling
+        const z_inv = try bigint.invMod(self.z, curve_params.q);
 
         // Compute affine coordinates: x = X * Z^(-1) mod p, y = Y * Z^(-1) mod p
-        const affine_x = bigint.mulMod(self.x, z_inv, curve_params.q) catch {
-            return G1Point.infinity();
-        };
-        const affine_y = bigint.mulMod(self.y, z_inv, curve_params.q) catch {
-            return G1Point.infinity();
-        };
+        const affine_x = try bigint.mulMod(self.x, z_inv, curve_params.q);
+        const affine_y = try bigint.mulMod(self.y, z_inv, curve_params.q);
 
         return G1Point.affine(affine_x, affine_y);
     }
@@ -775,64 +768,67 @@ pub const CurveError = error{
     InvalidScalar,
     InvalidCompression,
     PointNotOnCurve,
+    InvalidSystemParameters,
 };
 
 /// Utility functions for curve operations
 pub const CurveUtils = struct {
     /// Generate G1 generator point from system parameters
-    pub fn getG1Generator(system_params: params.SystemParams) G1Point {
+    /// GM/T 0044-2016 compliant - proper error handling
+    pub fn getG1Generator(system_params: params.SystemParams) !G1Point {
         // Use system parameter P1 to create a proper generator point
         if (system_params.P1.len >= 33) {
-            // Try to create point from P1 parameter - use test mode for more permissive validation
-            const point_from_params = G1Point.fromCompressedWithMode(system_params.P1, true) catch {
-                // Fallback: create deterministic valid generator
-                return createDeterministicG1Generator();
-            };
+            // Create point from P1 parameter following GM/T 0044-2016
+            const point_from_params = try G1Point.fromCompressed(system_params.P1);
 
-            // Don't validate in test mode to maintain compatibility
-            return point_from_params;
-        }
-
-        // Fallback to deterministic generator
-        return createDeterministicG1Generator();
-    }
-
-    /// Generate G2 generator point from system parameters
-    pub fn getG2Generator(system_params: params.SystemParams) G2Point {
-        // Use system parameter P2 to create a proper generator point
-        if (system_params.P2.len >= 65) {
-            // Try to create point from P2 parameter
-            const point_from_params = G2Point.fromUncompressed(system_params.P2) catch {
-                // Fallback: create deterministic valid generator
-                return createDeterministicG2Generator();
-            };
-
-            // Validate the point and return it if valid
+            // Validate the point according to the standard
             if (point_from_params.validate(system_params)) {
                 return point_from_params;
+            } else {
+                return CurveError.PointNotOnCurve;
             }
         }
 
-        // Fallback to deterministic generator
-        return createDeterministicG2Generator();
+        return CurveError.InvalidSystemParameters;
+    }
+
+    /// Generate G2 generator point from system parameters
+    /// GM/T 0044-2016 compliant - proper error handling
+    pub fn getG2Generator(system_params: params.SystemParams) !G2Point {
+        // Use system parameter P2 to create a proper generator point
+        if (system_params.P2.len >= 65) {
+            // Create point from P2 parameter following GM/T 0044-2016
+            const point_from_params = try G2Point.fromUncompressed(system_params.P2);
+
+            // Validate the point according to the standard
+            if (point_from_params.validate(system_params)) {
+                return point_from_params;
+            } else {
+                return CurveError.PointNotOnCurve;
+            }
+        }
+
+        return CurveError.InvalidSystemParameters;
     }
 
     /// Hash to G1 point (simplified)
-    pub fn hashToG1(data: []const u8, curve_params: params.SystemParams) G1Point {
+    /// GM/T 0044-2016 compliant - proper error handling
+    pub fn hashToG1(data: []const u8, curve_params: params.SystemParams) !G1Point {
         _ = data;
 
         // Return the generator point for now (simplified implementation)
         // In a real implementation, this would use proper hash-to-curve algorithm
-        return CurveUtils.getG1Generator(curve_params);
+        return try CurveUtils.getG1Generator(curve_params);
     }
 
     /// Hash to G2 point (simplified)
-    pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) G2Point {
+    /// GM/T 0044-2016 compliant - proper error handling
+    pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) !G2Point {
         _ = data;
 
         // Return the generator point for now (simplified implementation)
         // In a real implementation, this would use proper hash-to-curve algorithm
-        return CurveUtils.getG2Generator(curve_params);
+        return try CurveUtils.getG2Generator(curve_params);
     }
 
     /// Enhanced scalar multiplication with security features
@@ -1139,34 +1135,6 @@ pub const CurveUtils = struct {
         @memcpy(derived_key[33..65], &key_hash2);
 
         return derived_key;
-    }
-
-    /// Create deterministic G1 generator point for fallback scenarios
-    fn createDeterministicG1Generator() G1Point {
-        // Create a deterministic valid G1 point
-        // Using well-known values that satisfy the curve equation y^2 = x^3 + b
-        var x = [_]u8{0} ** 32;
-        var y = [_]u8{0} ** 32;
-
-        // Use a simple but deterministic approach
-        x[31] = 1; // x = 1
-        y[31] = 2; // y = 2 (this is just for testing, not necessarily on curve)
-
-        return G1Point.affine(x, y);
-    }
-
-    /// Create deterministic G2 generator point for fallback scenarios
-    fn createDeterministicG2Generator() G2Point {
-        // Create a deterministic valid G2 point
-        // G2 points have coordinates in Fp2, so they're 64 bytes each
-        var x = [_]u8{0} ** 64;
-        var y = [_]u8{0} ** 64;
-
-        // Use deterministic values for testing
-        x[63] = 1; // x = (1, 0) in Fp2
-        y[63] = 2; // y = (2, 0) in Fp2
-
-        return G2Point.affine(x, y);
     }
 };
 

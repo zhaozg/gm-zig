@@ -20,6 +20,7 @@ pub const RandomError = error{
     EntropyFailure,
     InvalidRange,
     GenerationFailure,
+    InsufficientEntropy,
 };
 
 /// Cryptographically secure random number generator
@@ -126,8 +127,9 @@ pub const SecureRandom = struct {
             attempts += 1;
         }
 
-        // If we can't generate a secure random value, use deterministic fallback
-        return self.generateFallbackBigInt(max);
+        // GM/T 0044-2016 requires proper cryptographic randomness
+        // If we can't generate secure random after max attempts, fail securely
+        return RandomError.InsufficientEntropy;
     }
 
     /// Check if a value is secure (not a known weak value)
@@ -148,29 +150,6 @@ pub const SecureRandom = struct {
         }
 
         return true;
-    }
-
-    /// Generate fallback BigInt when normal generation fails
-    fn generateFallbackBigInt(self: *SecureRandom, max: bigint.BigInt) RandomError!bigint.BigInt {
-        // Use entropy pool to generate fallback value
-        var result: bigint.BigInt = undefined;
-        self.entropy_pool.extract(&result);
-
-        // Reduce modulo max using simple subtraction to avoid complex modular arithmetic
-        var reduction_attempts: u32 = 0;
-        while (reduction_attempts < 100 and !bigint.lessThan(result, max)) {
-            const sub_result = bigint.sub(result, max);
-            if (sub_result.borrow) break;
-            result = sub_result.result;
-            reduction_attempts += 1;
-        }
-
-        // Ensure result is not zero
-        if (bigint.isZero(result)) {
-            result[31] = 1;
-        }
-
-        return result;
     }
 
     /// Generate random field element in Fp
