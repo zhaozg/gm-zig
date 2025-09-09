@@ -13,6 +13,8 @@ pub const MathError = error{
     PointNotOnCurve,
     /// Invalid point coordinates
     InvalidCoordinates,
+    /// Point decompression not fully implemented (security measure)
+    PointDecompressionNotImplemented,
 };
 
 /// SM9 Elliptic Curve Operations
@@ -169,25 +171,10 @@ pub const G1Point = struct {
             return G1Point.affine(x, y);
         }
 
-        // For production use, we need the field parameters, but to avoid circular dependency,
-        // we'll use a conservative approach for point decompression in this case
-        // This is a safe fallback that creates valid points for testing
-
-        // Use simplified y-coordinate derivation to avoid circular dependency
-        // In a production system, this should use proper square root calculation
-        var y = x; // Start with x as base
-
-        // Apply compression bit to create different y values
-        if (compressed[0] == 0x03) {
-            // Flip some bits to create a different valid-looking y coordinate
-            y[0] = y[0] ^ 0x01;
-            y[31] = y[31] ^ 0x01;
-        } else {
-            // For 0x02, use x as-is but ensure it's different from 0x03 case
-            y[1] = y[1] ^ 0x01;
-        }
-
-        return G1Point.affine(x, y);
+        // GM/T 0044-2016 compliance: Proper point decompression required
+        // SECURITY: Cannot create fake points - must implement proper square root calculation
+        // For now, return error to prevent security issues from fake point generation
+        return error.PointDecompressionNotImplemented;
     }
 
     /// Check if point is at infinity

@@ -300,12 +300,10 @@ pub const SignatureContext = struct {
 
         // Create user private key as G1 point for proper elliptic curve operations
         const curve_module = @import("curve.zig");
-        const P1_point = curve_module.G1Point.fromCompressed(self.system_params.P1) catch blk: {
-            // If P1 is invalid, create fallback point
-            var fallback = curve_module.G1Point.infinity();
-            fallback.x = [_]u8{1} ** 32;
-            fallback.y = [_]u8{2} ** 32;
-            break :blk fallback;
+        // CRITICAL: P1 parameter must be valid for SM9 security - no fallback allowed
+        const P1_point = curve_module.G1Point.fromCompressed(self.system_params.P1) catch |err| {
+            // SECURITY: Invalid P1 parameter indicates system parameter corruption
+            return SignatureError.InvalidPrivateKey;
         };
 
         // Convert user private key to G1 point through proper extraction
@@ -408,9 +406,10 @@ pub const SignatureContext = struct {
         };
 
         // Get master public key for signatures
-        const master_pub_point = curve_module.G2Point.fromUncompressed(self.sign_master_public.public_key) catch blk: {
-            // If master public key is invalid, use P2 as fallback
-            break :blk P2_point;
+        // CRITICAL: Master public key must be valid for signature verification
+        const master_pub_point = curve_module.G2Point.fromUncompressed(self.sign_master_public.public_key) catch |err| {
+            // SECURITY: Invalid master public key indicates key corruption
+            return false; // Signature verification fails with invalid master key
         };
 
         // Compute h' * Ppub_s (scalar multiplication of master public key)
@@ -439,27 +438,27 @@ pub const SignatureContext = struct {
         // Compute user's public key point using h1 value
         const user_pub_point = curve_module.CurveUtils.scalarMultiplyG2(P2_point, h1_value, self.system_params);
 
-        // Perform bilinear pairing verification: e(S, P2) = e(verification_point, user_pub_point)
-        const left_pairing = pairing_module.pairing(S_point, P2_point, self.system_params) catch {
-            // If pairing computation fails, fallback to simple verification
-            return std.mem.eql(u8, &signature.h, &h_prime);
+        // Perform bilinear pairing verification: e(S, P2) = e(verification_point, user_pub_point)  
+        // CRITICAL: Pairing verification is fundamental to SM9 digital signature security
+        const left_pairing = pairing_module.pairing(S_point, P2_point, self.system_params) catch |err| {
+            // SECURITY: Pairing failure in signature verification indicates cryptographic error
+            return SignatureError.PairingVerificationFailed;
         };
 
-        const right_pairing = pairing_module.pairing(verification_point, user_pub_point, self.system_params) catch {
-            // If pairing computation fails, fallback to simple verification
-            return std.mem.eql(u8, &signature.h, &h_prime);
+        const right_pairing = pairing_module.pairing(verification_point, user_pub_point, self.system_params) catch |err| {
+            // SECURITY: Pairing failure in signature verification indicates cryptographic error  
+            return SignatureError.PairingVerificationFailed;
         };
 
-        // GM/T 0044-2016 verification: check if pairings are equal
+        // GM/T 0044-2016 verification: check if pairings are equal (mathematical correctness)
         const pairing_verification_result = left_pairing.equal(right_pairing);
 
-        // Enhanced verification: use pairing result as primary, hash verification as fallback
+        // Additional hash verification for robustness (but never as a fallback)
         const hash_verification_result = std.mem.eql(u8, &signature.h, &h_prime);
 
-        // For GM/T 0044-2016 compliance: prioritize pairing verification
-        // If pairing verification passes, signature is valid (proper cryptographic verification)
-        // If pairing verification fails but hash verification passes, fall back to legacy verification
-        return pairing_verification_result or hash_verification_result;
+        // GM/T 0044-2016 compliance: Both pairing and hash verification must pass
+        // This ensures both mathematical correctness and data integrity
+        return pairing_verification_result and hash_verification_result;
     }
 };
 
@@ -568,6 +567,7 @@ pub const SignatureError = error{
     InvalidUserId,
     RandomGenerationFailed,
     PairingComputationFailed,
+    PairingVerificationFailed,
     HashComputationFailed,
     InvalidSignatureFormat,
     NotImplemented,
