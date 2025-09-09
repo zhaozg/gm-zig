@@ -377,26 +377,6 @@ pub const EncryptionContext = struct {
             // GM/T 0044-2016 requires proper hash-to-point mapping for security
             return EncryptionError.HashComputationFailed;
         };
-            for (ciphertext.c2, plaintext, 0..) |c_byte, *m_byte, i| {
-                m_byte.* = c_byte ^ K[i % K.len];
-            }
-
-            // Compute verification hash
-            var u_hasher = SM3.init(.{});
-            u_hasher.update(&ciphertext.c1);
-            u_hasher.update(plaintext);
-            u_hasher.update(user_private_key.id);
-            var u = [_]u8{0} ** 32;
-            u_hasher.final(&u);
-
-            // Step 6: If u != C3, return error
-            if (!std.mem.eql(u8, &u, &ciphertext.c3)) {
-                self.allocator.free(plaintext);
-                return error.DecryptionFailed;
-            }
-
-            return plaintext;
-        };
 
         // Create user public key Qb (same as encryption)
         var qb_bytes = [_]u8{0} ** 33;
@@ -410,32 +390,17 @@ pub const EncryptionContext = struct {
         qb_hasher.final(&qb_hash);
         @memcpy(qb_bytes[1..], &qb_hash);
 
-        const qb_point = blk: {
-            break :blk curve.G1Point.fromCompressed(qb_bytes) catch {
-                // Create affine point from material
-                var point_material = [_]u8{0} ** 32;
-                var point_hasher = SM3.init(.{});
-                point_hasher.update(&h1_result);
-                point_hasher.update(user_private_key.id);
-                point_hasher.update("GM_T_0044_2016_QB_POINT");
-                point_hasher.final(&point_material);
-
-                var y_material = [_]u8{0} ** 32;
-                var y_hasher = SM3.init(.{});
-                y_hasher.update(&point_material);
-                y_hasher.update("QB_Y_COORDINATE");
-                y_hasher.final(&y_material);
-
-                break :blk curve.G1Point.affine(point_material, y_material);
-            };
+        const qb_point = curve.G1Point.fromCompressed(qb_bytes) catch {
+            // CRITICAL: If Qb point derivation fails, decryption cannot proceed
+            // GM/T 0044-2016 requires valid elliptic curve points for identity-based operations
+            return EncryptionError.InvalidSystemParameters;
         };
 
         // Get P2 from system parameters
-        const p2_point = curve.G2Point.fromUncompressed(self.system_params.P2) catch blk: {
-            // Fallback: create a deterministic G2 point for compatibility
-            const x_coord = [_]u8{0x55} ** 64;
-            const y_coord = [_]u8{0xAA} ** 64;
-            break :blk curve.G2Point.affine(x_coord, y_coord);
+        const p2_point = curve.G2Point.fromUncompressed(self.system_params.P2) catch {
+            // CRITICAL: Invalid P2 generator compromises entire cryptosystem
+            // GM/T 0044-2016 requires valid system parameters for all operations
+            return EncryptionError.InvalidSystemParameters;
         };
 
         // Compute proper bilinear pairing: w = e(Qb, P2) (same as encryption)
