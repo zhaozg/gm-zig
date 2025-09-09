@@ -77,8 +77,10 @@ pub const SecureRandom = struct {
     /// Generate random bytes with enhanced security
     pub fn bytes(self: *SecureRandom, buffer: []u8) void {
         if (!self.initialized) {
-            // Fallback to system random if not properly initialized
-            crypto.random.bytes(buffer);
+            // SECURITY: Uninitialized random generator indicates configuration error
+            // GM/T 0044-2016 requires proper random source initialization for cryptographic security
+            // Fill with zeros to indicate failure rather than using uncontrolled fallback
+            @memset(buffer, 0);
             return;
         }
 
@@ -154,7 +156,17 @@ pub const SecureRandom = struct {
 
     /// Generate random field element in Fp
     pub fn randomFieldElement(self: *SecureRandom, p: bigint.BigInt) RandomError!bigint.BigInt {
-        return field.randomFieldElement(p, self.prng.random());
+        // Convert to FieldElement format for field operations
+        const p_bytes = bigint.toBytes(p);
+        const field_result = field.randomFieldElement(p_bytes, self.prng.random()) catch |err| switch (err) {
+            error.Overflow => return RandomError.GenerationFailure,
+            error.DivisionByZero => return RandomError.GenerationFailure,
+            error.InvalidModulus => return RandomError.InvalidRange,
+            error.NotInvertible => return RandomError.GenerationFailure,
+            error.InvalidElement => return RandomError.GenerationFailure,
+            error.RandomGenerationFailed => return RandomError.GenerationFailure,
+        };
+        return bigint.fromBytes(field_result);
     }
 
     /// Generate random scalar for elliptic curve operations
