@@ -30,11 +30,11 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     try helpers.Validation.validateUserId(data);
     try helpers.Validation.validateHashIdentifier(hid);
 
-    // Use working order with fallback for test environments
-    const working_order = if (bigint.isZero(order))
-        constants.TestConstants.TEST_FALLBACK_ORDER
-    else
-        order;
+    // GM/T 0044-2016 compliance: Reject zero order - no fallback mechanisms allowed
+    if (bigint.isZero(order)) {
+        return HashError.InvalidInput;
+    }
+    const working_order = order;
 
     // Phase 1: Standard iterative hashing (GM/T 0044-2016 compliant)
     if (try standardHashIteration(data, hid, working_order)) |result| {
@@ -111,13 +111,13 @@ fn finalCompliantFallback(data: []const u8, hid: u8, order: [32]u8) ![32]u8 {
 
     // Apply proper modular reduction
     const reduced = helpers.ModularReduction.reduce(result, order) catch {
-        // Ultimate fallback: return minimum valid field element
-        return constants.TestConstants.MIN_FIELD_ELEMENT;
+        // GM/T 0044-2016 compliance: Fail securely instead of using fallback
+        return HashError.ModularReductionFailed;
     };
 
-    // Ensure result is non-zero
+    // GM/T 0044-2016 compliance: Zero result indicates computation failure
     if (bigint.isZero(reduced)) {
-        return constants.TestConstants.MIN_FIELD_ELEMENT;
+        return HashError.FieldElementGenerationFailed;
     }
 
     return reduced;
@@ -133,11 +133,11 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
     // Input validation
     try helpers.Validation.validateMessage(message);
 
-    // Use working order with fallback for test environments
-    const working_order = if (bigint.isZero(order))
-        constants.TestConstants.TEST_FALLBACK_ORDER
-    else
-        order;
+    // GM/T 0044-2016 compliance: Reject zero order - no fallback mechanisms allowed
+    if (bigint.isZero(order)) {
+        return HashError.InvalidInput;
+    }
+    const working_order = order;
 
     // Build hash with proper domain separation
     var builder = helpers.SM3Builder.init();

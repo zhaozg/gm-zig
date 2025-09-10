@@ -43,7 +43,7 @@ pub const FieldSize = struct {
 pub const Limits = struct {
     /// Maximum counter value for hash iteration (GM/T 0044-2016 compliance)
     pub const MAX_HASH_COUNTER: u32 = 256;
-    /// Extended counter range for fallback scenarios
+    /// Extended counter range for complex hash computations
     pub const EXTENDED_HASH_COUNTER: u32 = 256;
     /// Maximum modular reduction iterations
     pub const MAX_MODULAR_REDUCTION_ITERATIONS: u32 = 300;
@@ -113,9 +113,7 @@ pub const TestConstants = struct {
     pub const TEST_USER_ID: []const u8 = "alice@example.com";
     /// Test message for validation
     pub const TEST_MESSAGE: []const u8 = "SM9 test message for cryptographic validation";
-    /// Fallback order for test environments (small positive value)
-    pub const TEST_FALLBACK_ORDER: [32]u8 = [_]u8{0x24} ++ [_]u8{0} ** 30 ++ [_]u8{1};
-    /// Minimum valid field element (1)
+    /// Minimum valid field element (1) - GM/T 0044-2016 compliant
     pub const MIN_FIELD_ELEMENT: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{1};
 };
 
