@@ -191,7 +191,7 @@ pub fn shiftLeft(a: BigInt) BigInt {
 }
 
 /// Right shift by one bit
-pub fn shiftRight(a: BigInt) BigInt {
+pub fn shiftRightOne(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
 
@@ -1260,4 +1260,41 @@ fn montgomeryMulModSM9(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const result64 = fromMontgomerySM9(result_mont);
 
     return fromU64Array(result64);
+}
+
+/// Shift bigint right by n bits (in-place)
+pub fn shiftRight(a: *BigInt, n: u8) void {
+    if (n == 0) return;
+    
+    if (n >= 256) {
+        @memset(a, 0);
+        return;
+    }
+    
+    const byte_shift = n / 8;
+    const bit_shift = n % 8;
+    
+    // Handle byte shifts
+    if (byte_shift > 0) {
+        var i: usize = 31;
+        while (i >= byte_shift) : (i -= 1) {
+            a[i] = a[i - byte_shift];
+            if (i == 0) break;
+        }
+        // Clear the most significant bytes
+        for (0..byte_shift) |j| {
+            a[j] = 0;
+        }
+    }
+    
+    // Handle bit shifts
+    if (bit_shift > 0) {
+        var carry: u8 = 0;
+        for (0..32) |i| {
+            const shift_mask: u8 = (@as(u8, 1) << @as(u3, @intCast(bit_shift))) - 1;
+            const new_carry = a[i] & shift_mask;
+            a[i] = (a[i] >> @as(u3, @intCast(bit_shift))) | (carry << @as(u3, @intCast(8 - bit_shift)));
+            carry = new_carry;
+        }
+    }
 }

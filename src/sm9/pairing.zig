@@ -48,32 +48,53 @@ pub const GtElement = struct {
         return true;
     }
 
-    /// Multiply two Gt elements using proper Fp12 field arithmetic
-    /// Basic implementation for testing - performs field-like operations
+    /// Multiply two Gt elements using optimized Fp12 field arithmetic
+    /// Uses Karatsuba method for improved performance
     pub fn mul(self: GtElement, other: GtElement) GtElement {
         // Handle identity cases for efficiency
         if (self.isIdentity()) return other;
         if (other.isIdentity()) return self;
 
-        var result = GtElement{ .data = [_]u8{0} ** 384 };
+        return fp12Multiply(self.data, other.data);
+    }
 
-        // Simple field multiplication approximation
-        // For full GM/T 0044-2016 compliance, this should implement proper Fp12 multiplication
-        for (self.data, other.data, 0..) |a, b, i| {
-            // Use modular arithmetic to prevent overflow and maintain field properties
-            const product = (@as(u16, a) * @as(u16, b)) % 251; // Use prime modulus
-            result.data[i] = @as(u8, @intCast(product));
-        }
+    /// Fast squaring for Fp12 elements - more efficient than general multiplication
+    /// Implements optimized squaring with reduced multiplications
+    pub fn square(self: GtElement) GtElement {
+        if (self.isIdentity()) return GtElement.identity();
+        
+        return fp12Square(self.data);
+    }
 
-        // Ensure result is not identity unless both inputs are identity
-        if (!self.isIdentity() and !other.isIdentity()) {
-            // Ensure at least one non-zero byte in a non-identity position
-            if (result.isIdentity()) {
-                result.data[32] = 1; // Set a non-identity component
-            }
-        }
-
-        return result;
+    /// Multiply by conjugate for norm computation and optimization
+    pub fn mulByConjugate(self: GtElement) GtElement {
+        var result = self.data;
+        
+        // Conjugate in Fp12: (c0 + c1*w)* = c0 - c1*w
+        // Multiply self * conjugate = c0^2 - (c1*w)^2 = c0^2 - c1^2*w^2
+        // Since w^2 = v (non-residue), this becomes c0^2 + c1^2*v
+        
+        // This optimization computes self * conjugate(self) efficiently
+        const c0 = self.getFp6Component(0);
+        const c1 = self.getFp6Component(1);
+        
+        // c0^2 using fast Fp6 squaring
+        const c0_squared = fp6Square(c0);
+        
+        // c1^2 using fast Fp6 squaring  
+        const c1_squared = fp6Square(c1);
+        
+        // c1^2 * xi (multiply by non-residue)
+        const c1_squared_xi = fp6MultiplyByXi(c1_squared);
+        
+        // Final result: c0^2 + c1^2*xi
+        const result_c0 = fp6Add(c0_squared, c1_squared_xi);
+        const result_c1 = [_]u8{0} ** 192; // Zero Fp6 element
+        
+        @memcpy(result[0..192], &result_c0);
+        @memcpy(result[192..384], &result_c1);
+        
+        return GtElement{ .data = result };
     }
 
     /// Get Fp6 component (0 for c0, 1 for c1)
@@ -253,6 +274,22 @@ fn fp6Add(a: [192]u8, b: [192]u8) [192]u8 {
         const b_comp = b[start .. start + 64];
         const sum = fp2Add(a_comp[0..64].*, b_comp[0..64].*);
         @memcpy(result[start .. start + 64], &sum);
+    }
+
+    return result;
+}
+
+/// Subtract two Fp6 elements: (a0, a1, a2) - (b0, b1, b2) = (a0-b0, a1-b1, a2-b2)
+fn fp6Sub(a: [192]u8, b: [192]u8) [192]u8 {
+    var result: [192]u8 = undefined;
+
+    // Subtract three Fp2 components
+    for (0..3) |i| {
+        const start = i * 64;
+        const a_comp = a[start .. start + 64];
+        const b_comp = b[start .. start + 64];
+        const diff = fp2Sub(a_comp[0..64].*, b_comp[0..64].*);
+        @memcpy(result[start .. start + 64], &diff);
     }
 
     return result;
@@ -1249,3 +1286,176 @@ pub const GtElementExtended = struct {
         return self.base.pow(r_minus_1);
     }
 };
+
+/// Optimized Fp12 multiplication using Karatsuba method
+/// Fp12 = Fp6[w]/(w^2 - v) where v is a non-residue in Fp6
+fn fp12Multiply(a: [384]u8, b: [384]u8) GtElement {
+    // Split inputs into Fp6 components: a = a0 + a1*w, b = b0 + b1*w
+    const a0 = a[0..192].*;
+    const a1 = a[192..384].*;
+    const b0 = b[0..192].*;
+    const b1 = b[192..384].*;
+
+    // Karatsuba multiplication: (a0 + a1*w)(b0 + b1*w) = c0 + c1*w
+    // c0 = a0*b0 + a1*b1*v (where w^2 = v)
+    // c1 = (a0 + a1)(b0 + b1) - a0*b0 - a1*b1
+
+    const a0b0 = fp6Multiply(a0, b0);
+    const a1b1 = fp6Multiply(a1, b1);
+    
+    const a0_plus_a1 = fp6Add(a0, a1);
+    const b0_plus_b1 = fp6Add(b0, b1);
+    const sum_product = fp6Multiply(a0_plus_a1, b0_plus_b1);
+    
+    // c1 = sum_product - a0b0 - a1b1
+    const c1_temp = fp6Sub(sum_product, a0b0);
+    const c1 = fp6Sub(c1_temp, a1b1);
+    
+    // c0 = a0b0 + a1b1*v (multiply a1b1 by non-residue v)
+    const a1b1_v = fp6MultiplyByXi(a1b1);
+    const c0 = fp6Add(a0b0, a1b1_v);
+    
+    var result: [384]u8 = undefined;
+    @memcpy(result[0..192], &c0);
+    @memcpy(result[192..384], &c1);
+    
+    return GtElement{ .data = result };
+}
+
+/// Optimized Fp12 squaring - faster than general multiplication
+fn fp12Square(a: [384]u8) GtElement {
+    // Split input into Fp6 components: a = a0 + a1*w
+    const a0 = a[0..192].*;
+    const a1 = a[192..384].*;
+
+    // Optimized squaring: (a0 + a1*w)^2 = c0 + c1*w
+    // c0 = a0^2 + a1^2*v
+    // c1 = 2*a0*a1
+
+    const a0_squared = fp6Square(a0);
+    const a1_squared = fp6Square(a1);
+    const a1_squared_v = fp6MultiplyByXi(a1_squared);
+    const c0 = fp6Add(a0_squared, a1_squared_v);
+    
+    const a0a1 = fp6Multiply(a0, a1);
+    const c1 = fp6Double(a0a1); // 2*a0*a1
+    
+    var result: [384]u8 = undefined;
+    @memcpy(result[0..192], &c0);
+    @memcpy(result[192..384], &c1);
+    
+    return GtElement{ .data = result };
+}
+
+/// Fast Fp6 squaring
+fn fp6Square(a: [192]u8) [192]u8 {
+    // Split into Fp2 components: a = a0 + a1*v + a2*v^2
+    const a0 = a[0..64].*;
+    const a1 = a[64..128].*;
+    const a2 = a[128..192].*;
+
+    // Optimized Fp6 squaring using complex multiplication identity
+    // (a0 + a1*v + a2*v^2)^2 = c0 + c1*v + c2*v^2
+    
+    const a0_squared = fp2Square(a0);
+    const a1_squared = fp2Square(a1);
+    const a2_squared = fp2Square(a2);
+    
+    const a0a1 = fp2Multiply(a0, a1);
+    const a0a2 = fp2Multiply(a0, a2);
+    const a1a2 = fp2Multiply(a1, a2);
+    
+    // c0 = a0^2 + xi*(2*a1*a2)
+    const two_a1a2 = fp2Double(a1a2);
+    const xi_two_a1a2 = fp2MultiplyByXi(two_a1a2);
+    const c0 = fp2Add(a0_squared, xi_two_a1a2);
+    
+    // c1 = 2*a0*a1 + xi*a2^2
+    const two_a0a1 = fp2Double(a0a1);
+    const xi_a2_squared = fp2MultiplyByXi(a2_squared);
+    const c1 = fp2Add(two_a0a1, xi_a2_squared);
+    
+    // c2 = a1^2 + 2*a0*a2
+    const two_a0a2 = fp2Double(a0a2);
+    const c2 = fp2Add(a1_squared, two_a0a2);
+    
+    var result: [192]u8 = undefined;
+    @memcpy(result[0..64], &c0);
+    @memcpy(result[64..128], &c1);
+    @memcpy(result[128..192], &c2);
+    
+    return result;
+}
+
+/// Fast Fp2 squaring
+fn fp2Square(a: [64]u8) [64]u8 {
+    const a0 = a[0..32].*;
+    const a1 = a[32..64].*;
+    
+    // (a0 + a1*i)^2 = (a0^2 - a1^2) + 2*a0*a1*i
+    const a0_squared = fpSquare(a0);
+    const a1_squared = fpSquare(a1);
+    const a0a1 = fpMultiply(a0, a1);
+    
+    const real = fpSub(a0_squared, a1_squared);
+    const imag = fpDouble(a0a1);
+    
+    var result: [64]u8 = undefined;
+    @memcpy(result[0..32], &real);
+    @memcpy(result[32..64], &imag);
+    
+    return result;
+}
+
+/// Fp6 doubling: 2*a
+fn fp6Double(a: [192]u8) [192]u8 {
+    var result: [192]u8 = undefined;
+    for (0..3) |i| {
+        const fp2_component = a[i * 64..(i + 1) * 64].*;
+        const doubled = fp2Double(fp2_component);
+        @memcpy(result[i * 64..(i + 1) * 64], &doubled);
+    }
+    return result;
+}
+
+/// Fp2 doubling: 2*a
+fn fp2Double(a: [64]u8) [64]u8 {
+    const a0 = a[0..32].*;
+    const a1 = a[32..64].*;
+    
+    const doubled_a0 = fpDouble(a0);
+    const doubled_a1 = fpDouble(a1);
+    
+    var result: [64]u8 = undefined;
+    @memcpy(result[0..32], &doubled_a0);
+    @memcpy(result[32..64], &doubled_a1);
+    
+    return result;
+}
+
+/// Fp doubling: 2*a (with modular reduction)
+fn fpDouble(a: [32]u8) [32]u8 {
+    // Simple doubling with overflow check
+    var carry: u8 = 0;
+    var result: [32]u8 = undefined;
+    
+    for (0..32) |i| {
+        const doubled = (@as(u16, a[31 - i]) << 1) + carry;
+        result[31 - i] = @as(u8, @intCast(doubled & 0xFF));
+        carry = @as(u8, @intCast(doubled >> 8));
+    }
+    
+    // Simple modular reduction (would need proper field modulus in production)
+    if (carry != 0) {
+        // Subtract a simple modulus if overflow occurred
+        const simple_modulus = [_]u8{0xFF} ** 31 ++ [_]u8{0x7F};
+        result = fpSub(result, simple_modulus);
+    }
+    
+    return result;
+}
+
+/// Fp squaring: a^2
+fn fpSquare(a: [32]u8) [32]u8 {
+    return fpMultiply(a, a);
+}

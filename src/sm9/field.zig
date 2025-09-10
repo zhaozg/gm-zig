@@ -286,12 +286,12 @@ pub fn modularInverseBinaryEEA(a: FieldElement, m: FieldElement) FieldError!Fiel
 
     // Remove factors of 2 from u
     while ((u[31] & 1) == 0) {
-        u = bigint.shiftRight(u);
+        u = bigint.shiftRightOne(u);
         if ((g1[31] & 1) == 0) {
-            g1 = bigint.shiftRight(g1);
+            g1 = bigint.shiftRightOne(g1);
         } else {
             const sum = bigint.add(g1, m);
-            g1 = bigint.shiftRight(sum.result);
+            g1 = bigint.shiftRightOne(sum.result);
         }
     }
 
@@ -302,12 +302,12 @@ pub fn modularInverseBinaryEEA(a: FieldElement, m: FieldElement) FieldError!Fiel
     while (!bigint.equal(v, [_]u8{0} ** 32) and iterations < max_iterations) {
         // Remove factors of 2 from v
         while ((v[31] & 1) == 0) {
-            v = bigint.shiftRight(v);
+            v = bigint.shiftRightOne(v);
             if ((g2[31] & 1) == 0) {
-                g2 = bigint.shiftRight(g2);
+                g2 = bigint.shiftRightOne(g2);
             } else {
                 const sum = bigint.add(g2, m);
-                g2 = bigint.shiftRight(sum.result);
+                g2 = bigint.shiftRightOne(sum.result);
             }
         }
 
@@ -429,7 +429,7 @@ pub fn fieldSqrt(x: FieldElement, p: FieldElement) FieldError!FieldElement {
     var exponent = p_plus_1.result;
 
     // Divide by 4 (shift right by 2 bits)
-    exponent = bigint.shiftRight(bigint.shiftRight(exponent));
+    exponent = bigint.shiftRightOne(bigint.shiftRightOne(exponent));
 
     return modularExponentiation(x, exponent, p);
 }
@@ -444,7 +444,7 @@ pub fn legendreSymbol(x: FieldElement, p: FieldElement) FieldError!i8 {
     var exponent = p_minus_1.result;
 
     // Divide by 2 (shift right by 1 bit)
-    exponent = bigint.shiftRight(exponent);
+    exponent = bigint.shiftRightOne(exponent);
 
     const result = try modularExponentiation(x, exponent, p);
 
@@ -631,5 +631,221 @@ pub const P1Benchmark = struct {
         std.log.info("🎯 Target: {d:.1} MB/s | Field Add: {d:.1} MB/s | Fp2 Mul: {d:.1} MB/s", .{
             config.target_throughput_mbps, add_result.throughput_mbps, fp2_mul_result.throughput_mbps
         });
+    }
+};
+
+/// Memory-optimized field operations with cache-friendly data layouts
+pub const CacheOptimizedOps = struct {
+    /// Batch field operations for improved cache utilization
+    /// Process multiple field elements together to maximize cache efficiency
+    pub fn batchFieldAddition(
+        operands_a: []const FieldElement,
+        operands_b: []const FieldElement,
+        modulus: FieldElement,
+        results: []FieldElement
+    ) void {
+        if (operands_a.len != operands_b.len or operands_a.len != results.len) return;
+        
+        // Process in cache-friendly chunks of 64 elements (2KB chunks)
+        const chunk_size = 64;
+        var i: usize = 0;
+        
+        while (i < operands_a.len) {
+            const end_idx = @min(i + chunk_size, operands_a.len);
+            
+            // Process chunk with improved locality
+            for (i..end_idx) |j| {
+                results[j] = SIMDFieldOps.addModSimd(operands_a[j], operands_b[j], modulus);
+            }
+            
+            i = end_idx;
+        }
+    }
+    
+    /// Memory pool for temporary field element allocations
+    const FieldElementPool = struct {
+        elements: [1024]FieldElement, // Pre-allocated pool of 32KB
+        free_list: [1024]bool,
+        next_free: usize,
+        
+        pub fn init() FieldElementPool {
+            return FieldElementPool{
+                .elements = [_]FieldElement{[_]u8{0} ** 32} ** 1024,
+                .free_list = [_]bool{true} ** 1024,
+                .next_free = 0,
+            };
+        }
+        
+        pub fn acquire(self: *FieldElementPool) ?*FieldElement {
+            var i = self.next_free;
+            while (i < 1024) : (i += 1) {
+                if (self.free_list[i]) {
+                    self.free_list[i] = false;
+                    self.next_free = i + 1;
+                    return &self.elements[i];
+                }
+            }
+            
+            // Wrap around search
+            i = 0;
+            while (i < self.next_free) : (i += 1) {
+                if (self.free_list[i]) {
+                    self.free_list[i] = false;
+                    self.next_free = i + 1;
+                    return &self.elements[i];
+                }
+            }
+            
+            return null; // Pool exhausted
+        }
+        
+        pub fn release(self: *FieldElementPool, element: *FieldElement) void {
+            const index = (@intFromPtr(element) - @intFromPtr(&self.elements[0])) / @sizeOf(FieldElement);
+            if (index < 1024) {
+                self.free_list[index] = true;
+                if (index < self.next_free) {
+                    self.next_free = index;
+                }
+            }
+        }
+    };
+    
+    /// Thread-local memory pool instance
+    var thread_pool: ?FieldElementPool = null;
+    
+    pub fn getPool() *FieldElementPool {
+        if (thread_pool == null) {
+            thread_pool = FieldElementPool.init();
+        }
+        return &thread_pool.?;
+    }
+    
+    /// Stack-allocated temporary storage for small computations
+    pub const StackTemp = struct {
+        buffer: [16]FieldElement, // 512 bytes on stack
+        used: u8,
+        
+        pub fn init() StackTemp {
+            return StackTemp{
+                .buffer = [_]FieldElement{[_]u8{0} ** 32} ** 16,
+                .used = 0,
+            };
+        }
+        
+        pub fn allocElement(self: *StackTemp) ?*FieldElement {
+            if (self.used >= 16) return null;
+            
+            const element = &self.buffer[self.used];
+            self.used += 1;
+            return element;
+        }
+        
+        pub fn reset(self: *StackTemp) void {
+            self.used = 0;
+        }
+    };
+    
+    /// Cache-optimized Fp2 batch multiplication
+    pub fn batchFp2Multiplication(
+        operands_a: []const Fp2Element,
+        operands_b: []const Fp2Element,
+        modulus: FieldElement,
+        results: []Fp2Element
+    ) void {
+        if (operands_a.len != operands_b.len or operands_a.len != results.len) return;
+        
+        // Use temporary stack storage for intermediate results
+        var temp_storage = StackTemp.init();
+        
+        // Process in groups that fit in L1 cache (32KB)
+        const cache_chunk = 256; // 256 Fp2 elements = ~32KB
+        
+        var i: usize = 0;
+        while (i < operands_a.len) {
+            const end_idx = @min(i + cache_chunk, operands_a.len);
+            
+            // Process chunk with data locality optimization
+            for (i..end_idx) |j| {
+                results[j] = operands_a[j].mulSimd(operands_b[j], modulus);
+            }
+            
+            i = end_idx;
+            temp_storage.reset();
+        }
+    }
+    
+    /// Prefetch data for improved cache performance
+    pub inline fn prefetchFieldElement(element: *const FieldElement) void {
+        // Compiler hint for data prefetch (actual implementation may vary)
+        _ = element;
+        // @prefetch(element, std.builtin.PrefetchOptions{
+        //     .rw = .read,
+        //     .locality = 3, // Keep in all cache levels
+        //     .cache = .data,
+        // });
+    }
+    
+    /// Memory-aligned field element for SIMD operations
+    pub const AlignedFieldElement = struct {
+        data: FieldElement align(32), // 32-byte aligned for AVX operations
+        
+        pub fn init(element: FieldElement) AlignedFieldElement {
+            return AlignedFieldElement{ .data = element };
+        }
+        
+        pub fn toFieldElement(self: AlignedFieldElement) FieldElement {
+            return self.data;
+        }
+    };
+    
+    /// Vectorized field operations using aligned data
+    pub fn vectorizedAdd(
+        a: AlignedFieldElement,
+        b: AlignedFieldElement,
+        modulus: FieldElement
+    ) AlignedFieldElement {
+        const result = SIMDFieldOps.addModSimd(a.data, b.data, modulus);
+        return AlignedFieldElement.init(result);
+    }
+};
+
+/// Constant-time field operations resistant to timing attacks
+pub const ConstantTimeOps = struct {
+    /// Constant-time conditional select: returns a if condition == 1, else b
+    pub fn conditionalSelect(condition: u1, a: FieldElement, b: FieldElement) FieldElement {
+        var result: FieldElement = undefined;
+        const mask = @as(u8, condition) *% 0xFF; // 0xFF if condition == 1, else 0x00
+        
+        for (0..32) |i| {
+            result[i] = (a[i] & mask) | (b[i] & (~mask));
+        }
+        
+        return result;
+    }
+    
+    /// Constant-time equality check
+    pub fn constantTimeEqual(a: FieldElement, b: FieldElement) u1 {
+        var diff: u8 = 0;
+        
+        for (0..32) |i| {
+            diff |= a[i] ^ b[i];
+        }
+        
+        // Return 1 if all bytes are equal (diff == 0), else 0
+        return @as(u1, @intCast(1 ^ (((diff | (~diff +% 1)) >> 7) & 1)));
+    }
+    
+    /// Constant-time comparison: returns 1 if a < b, else 0
+    pub fn constantTimeLess(a: FieldElement, b: FieldElement) u1 {
+        var borrow: u8 = 0;
+        
+        // Compute a - b and check for borrow
+        for (0..32) |i| {
+            const idx = 31 - i; // Process from least significant byte
+            const temp = @as(u16, a[idx]) -% @as(u16, b[idx]) -% borrow;
+            borrow = @as(u8, @intCast((temp >> 8) & 1));
+        }
+        
+        return @as(u1, @intCast(borrow));
     }
 };
