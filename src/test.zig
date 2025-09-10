@@ -34,6 +34,9 @@ test {
     // GM/T 0044-2016 KDF Compliance tests
     _ = @import("test/kdf_compliance_test.zig"); // 3 KDF compliance tests
 
+    // GM/T 0044-2016 Strict Compliance tests
+    _ = @import("test/gmt_0044_2016_compliance_test.zig"); // 5 strict compliance tests
+
     // Debug and validation tests
     _ = @import("test/debug_test.zig"); // 3 basic debug/validation tests
 }

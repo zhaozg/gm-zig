@@ -191,7 +191,7 @@ pub fn shiftLeft(a: BigInt) BigInt {
 }
 
 /// Right shift by one bit
-pub fn shiftRight(a: BigInt) BigInt {
+pub fn shiftRightOne(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
 
@@ -220,14 +220,8 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
         return fastMulModSmall(a, b, m);
     }
 
-    // TEMPORARY: Disable Montgomery multiplication to isolate issue
-    // Check for SM9 prime modulus and use Montgomery multiplication
-    // if (equal(m, sm9_q)) {
-    //     return montgomeryMulModSM9(a, b, m);
-    // }
-
-    // TEMPORARY: Use simplest possible implementation to fix correctness issues
-    // For other moduli, use the basic multiplication algorithm
+    // Use basic multiplication algorithm for all moduli
+    // Montgomery multiplication disabled to ensure correctness
     return mulModBasic(a, b, m);
 }
 
@@ -419,9 +413,16 @@ pub fn mod(a: BigInt, m: BigInt) BigIntError!BigInt {
 
     // For SM9 prime modulus, use optimized reduction
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+    // SM9 group order N
+    const sm9_n = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
 
     if (equal(m, sm9_q)) {
         return modOptimized(a, m);
+    }
+
+    // Use simple reduction for SM9 group order (workaround for optimized functions bug)
+    if (equal(m, sm9_n)) {
+        return modSimple(a, m);
     }
 
     // For small moduli like those used in tests, use efficient u64 arithmetic
@@ -478,6 +479,32 @@ fn modOptimized(a: BigInt, m: BigInt) BigIntError!BigInt {
     }
 
     return fromU64Array(result64);
+}
+
+/// Simple modular reduction using basic subtraction (for debugging)
+fn modSimple(a: BigInt, m: BigInt) BigIntError!BigInt {
+    if (isZero(m)) return BigIntError.InvalidModulus;
+
+    var result = a;
+    var iterations: u32 = 0;
+    const max_iterations: u32 = 1000; // More iterations for safety
+
+    // Keep subtracting m from result until result < m
+    while (!lessThan(result, m) and iterations < max_iterations) {
+        const sub_result = sub(result, m);
+        if (sub_result.borrow) {
+            // This shouldn't happen if result >= m
+            break;
+        }
+        result = sub_result.result;
+        iterations += 1;
+    }
+
+    if (iterations >= max_iterations) {
+        return BigIntError.InvalidModulus;
+    }
+
+    return result;
 }
 
 /// General modular reduction using optimized u64 arithmetic
@@ -1260,4 +1287,41 @@ fn montgomeryMulModSM9(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const result64 = fromMontgomerySM9(result_mont);
 
     return fromU64Array(result64);
+}
+
+/// Shift bigint right by n bits (in-place)
+pub fn shiftRight(a: *BigInt, n: u8) void {
+    if (n == 0) return;
+
+    if (n >= 256) {
+        @memset(a, 0);
+        return;
+    }
+
+    const byte_shift = n / 8;
+    const bit_shift = n % 8;
+
+    // Handle byte shifts
+    if (byte_shift > 0) {
+        var i: usize = 31;
+        while (i >= byte_shift) : (i -= 1) {
+            a[i] = a[i - byte_shift];
+            if (i == 0) break;
+        }
+        // Clear the most significant bytes
+        for (0..byte_shift) |j| {
+            a[j] = 0;
+        }
+    }
+
+    // Handle bit shifts
+    if (bit_shift > 0) {
+        var carry: u8 = 0;
+        for (0..32) |i| {
+            const shift_mask: u8 = (@as(u8, 1) << @as(u3, @intCast(bit_shift))) - 1;
+            const new_carry = a[i] & shift_mask;
+            a[i] = (a[i] >> @as(u3, @intCast(bit_shift))) | (carry << @as(u3, @intCast(8 - bit_shift)));
+            carry = new_carry;
+        }
+    }
 }

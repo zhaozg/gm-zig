@@ -346,6 +346,81 @@ pub const G1Point = struct {
         return result;
     }
 
+    /// Negate a point: -P = (x, -y)
+    pub fn negate(self: G1Point) G1Point {
+        if (self.isInfinity()) {
+            return G1Point.infinity();
+        }
+
+        // For elliptic curves, -P = (x, -y mod p)
+        // In SM9, the field modulus is stored in the curve parameters
+        const field_p = params.SystemParams.init().q;
+        const neg_y = bigint.subMod(field_p, self.y, field_p) catch return self;
+
+        return G1Point{
+            .x = self.x,
+            .y = neg_y,
+            .z = self.z,
+            .is_infinity = false,
+        };
+    }
+
+    /// Batch scalar multiplication for multiple points and scalars
+    /// Optimized for computing k1*P1 + k2*P2 + ... + kn*Pn efficiently
+    pub fn batchScalarMul(points: []const G1Point, scalars: []const [32]u8, curve_params: params.SystemParams) G1Point {
+        if (points.len != scalars.len or points.len == 0) {
+            return G1Point.infinity();
+        }
+
+        if (points.len == 1) {
+            return points[0].scalarMul(scalars[0], curve_params);
+        }
+
+        // Use Shamir's trick for dual scalar multiplication
+        if (points.len == 2) {
+            return shamirDualScalarMul(points[0], scalars[0], points[1], scalars[1], curve_params);
+        }
+
+        // For multiple points, use simple accumulation (can be optimized further)
+        var result = G1Point.infinity();
+        for (points, scalars) |point, scalar| {
+            const term = point.scalarMul(scalar, curve_params);
+            result = result.add(term, curve_params);
+        }
+
+        return result;
+    }
+
+    /// Shamir's trick for computing k1*P1 + k2*P2 efficiently
+    fn shamirDualScalarMul(p1: G1Point, k1: [32]u8, p2: G1Point, k2: [32]u8, curve_params: params.SystemParams) G1Point {
+        // Precompute [P1, P2, P1+P2]
+        const p1_plus_p2 = p1.add(p2, curve_params);
+
+        var result = G1Point.infinity();
+
+        // Process both scalars bit by bit from MSB to LSB
+        var i: i32 = 255;
+        while (i >= 0) : (i -= 1) {
+            result = result.double(curve_params);
+
+            const byte_idx = @as(usize, @intCast(i / 8));
+            const bit_idx = @as(u3, @intCast(i % 8));
+
+            const bit1 = (k1[31 - byte_idx] >> bit_idx) & 1;
+            const bit2 = (k2[31 - byte_idx] >> bit_idx) & 1;
+
+            if (bit1 == 1 and bit2 == 1) {
+                result = result.add(p1_plus_p2, curve_params);
+            } else if (bit1 == 1) {
+                result = result.add(p1, curve_params);
+            } else if (bit2 == 1) {
+                result = result.add(p2, curve_params);
+            }
+        }
+
+        return result;
+    }
+
     /// Convert point to compressed format (33 bytes)
     pub fn toCompressed(self: G1Point) [33]u8 {
         if (self.isInfinity()) {
@@ -539,7 +614,7 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
     };
 
     // Divide by 4: shift right twice to get (q+1)/4
-    const exp = bigint.shiftRight(bigint.shiftRight(q_plus_1));
+    const exp = bigint.shiftRightOne(bigint.shiftRightOne(q_plus_1));
 
     // Compute square root: a^((q+1)/4) mod q
     var result = bigint.modPow(a, exp, modulus) catch {
@@ -559,7 +634,7 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
         const q_minus_1 = bigint.subMod(modulus, one, modulus) catch {
             return MathError.InvalidFieldOperation;
         };
-        const legendre_exp = bigint.shiftRight(q_minus_1);
+        const legendre_exp = bigint.shiftRightOne(q_minus_1);
         const legendre_result = bigint.modPow(a, legendre_exp, modulus) catch {
             return MathError.InvalidFieldOperation;
         };
@@ -601,7 +676,7 @@ fn computeAlternativeSquareRoot(a: [32]u8, modulus: [32]u8) MathError![32]u8 {
 
     var exponent = p_plus_1;
     // Divide by 4 (shift right 2 bits)
-    exponent = bigint.shiftRight(bigint.shiftRight(exponent));
+    exponent = bigint.shiftRightOne(bigint.shiftRightOne(exponent));
 
     // Compute a^((p+1)/4) mod p
     const result = bigint.modPow(a, exponent, modulus) catch {
@@ -1363,57 +1438,116 @@ fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u
 // Windowed scalar multiplication for optimized performance
 // ============================================================================
 
-/// Windowed scalar multiplication using precomputed points
-/// Window size of 4 provides good balance between memory and performance
+/// Enhanced windowed scalar multiplication with sliding window NAF optimization
+/// Window size of 6 provides better performance with acceptable memory usage
 fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.SystemParams) G1Point {
-    const window_size = 4; // 4-bit window gives 16 precomputed points
-    const table_size = 1 << window_size; // 2^4 = 16
+    const window_size = 6; // 6-bit window gives better performance
+    const table_size = 1 << (window_size - 1); // 2^5 = 32 (only odd multiples)
 
-    // Precompute table: [P, 2P, 3P, ..., 15P]
+    // Precompute table for odd multiples: [P, 3P, 5P, ..., 31P]
     var table: [table_size]G1Point = undefined;
-    table[0] = G1Point.infinity(); // 0P = infinity
-    table[1] = point; // 1P = P
 
-    // Compute odd multiples: 3P, 5P, 7P, ..., 15P
-    for (1..(table_size / 2)) |i| {
-        table[2 * i + 1] = table[2 * i - 1].add(table[2], curve_params);
+    // Efficient precomputation using Montgomery ladder
+    table[0] = point; // 1P = P
+    if (table_size > 1) {
+        const double_p = point.double(curve_params); // 2P
+
+        // Compute odd multiples efficiently: 3P, 5P, 7P, ..., 31P
+        var i: usize = 1;
+        while (i < table_size) : (i += 1) {
+            table[i] = table[i - 1].add(double_p, curve_params); // (2i-1)P + 2P = (2i+1)P
+        }
     }
 
-    // Compute even multiples: 2P, 4P, 6P, ..., 14P
-    table[2] = point.double(curve_params); // 2P
-    for (2..(table_size / 2)) |i| {
-        table[2 * i] = table[i].double(curve_params);
-    }
+    // Convert scalar to NAF (Non-Adjacent Form) for reduced operations
+    const naf_scalar = computeNAF(scalar, window_size);
 
-    // Find the most significant non-zero window
+    // Process NAF form for optimized scalar multiplication
     var result = G1Point.infinity();
-    var found_first = false;
 
-    // Process scalar in 4-bit windows from most significant to least significant
-    var window_idx: i32 = 62; // 256 bits / 4 = 64 windows, indexed 0-63
-    while (window_idx >= 0) : (window_idx -= 1) {
-        const bit_offset = @as(u8, @intCast(window_idx * 4));
-        const window_value = extractWindow(scalar, bit_offset, window_size);
+    // Find first non-zero coefficient
+    var i: i32 = 255;
+    while (i >= 0 and naf_scalar[@as(usize, @intCast(i))] == 0) : (i -= 1) {}
 
-        if (!found_first) {
-            if (window_value != 0) {
-                result = table[window_value];
-                found_first = true;
-            }
+    if (i >= 0) {
+        const first_coeff = naf_scalar[@as(usize, @intCast(i))];
+        if (first_coeff > 0) {
+            result = table[@as(usize, @intCast(@divTrunc(first_coeff - 1, 2)))];
         } else {
-            // Double result 4 times (shift left by window_size bits)
-            for (0..window_size) |_| {
-                result = result.double(curve_params);
-            }
+            result = table[@as(usize, @intCast(@divTrunc(-first_coeff - 1, 2)))].negate();
+        }
 
-            // Add the windowed value
-            if (window_value != 0) {
-                result = result.add(table[window_value], curve_params);
+        i -= 1;
+        while (i >= 0) : (i -= 1) {
+            result = result.double(curve_params);
+
+            const coeff = naf_scalar[@as(usize, @intCast(i))];
+            if (coeff > 0) {
+                result = result.add(table[@as(usize, @intCast(@divTrunc(coeff - 1, 2)))], curve_params);
+            } else if (coeff < 0) {
+                result = result.add(table[@as(usize, @intCast(@divTrunc(-coeff - 1, 2)))].negate(), curve_params);
             }
         }
     }
 
     return result;
+}
+
+/// Compute Non-Adjacent Form (NAF) representation of scalar for optimized multiplication
+/// NAF reduces the average Hamming weight by ~1/3, reducing point additions
+fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
+    var naf: [256]i8 = [_]i8{0} ** 256;
+    var scalar_copy: [32]u8 = scalar;
+
+    const window_mask = (@as(u32, 1) << @intCast(window_size)) - 1;
+
+    var i: usize = 0;
+    while (i < 256 and !bigint.isZero(scalar_copy)) : (i += 1) {
+        if (scalar_copy[31] & 1 == 1) {
+            // Extract window
+            var window_val: u32 = 0;
+            var bit_idx: u8 = 0;
+            while (bit_idx < window_size and i + bit_idx < 256) : (bit_idx += 1) {
+                const byte_idx = (i + bit_idx) / 8;
+                const bit_pos = (i + bit_idx) % 8;
+                if (scalar_copy[31 - byte_idx] & (@as(u8, 1) << @intCast(bit_pos)) != 0) {
+                    window_val |= @as(u32, 1) << @intCast(bit_idx);
+                }
+            }
+
+            window_val &= window_mask;
+
+            if (window_val >= (@as(u32, 1) << @intCast(window_size - 1))) {
+                // Use negative coefficient to reduce weight
+                naf[i] = @as(i8, @intCast(@as(i32, @intCast(window_val)) - @as(i32, @intCast(@as(u32, 1) << @intCast(window_size)))));
+
+                // Add 1 to scalar_copy to handle the negative coefficient
+                var carry: u8 = 1;
+                for (0..32) |j| {
+                    const sum = @as(u16, scalar_copy[31 - j]) + carry;
+                    scalar_copy[31 - j] = @as(u8, @intCast(sum & 0xFF));
+                    carry = @as(u8, @intCast(sum >> 8));
+                    if (carry == 0) break;
+                }
+            } else {
+                naf[i] = @as(i8, @intCast(window_val));
+            }
+
+            // Subtract the window value from scalar_copy
+            var window_bytes: [32]u8 = [_]u8{0} ** 32;
+            var window_temp = @as(u32, @intCast(@abs(naf[i])));
+            for (0..4) |j| {
+                window_bytes[31 - j] = @as(u8, @intCast(window_temp & 0xFF));
+                window_temp >>= 8;
+            }
+            scalar_copy = bigint.sub(scalar_copy, window_bytes).result;
+        }
+
+        // Shift scalar right by 1 bit
+        bigint.shiftRight(&scalar_copy, 1);
+    }
+
+    return naf;
 }
 
 /// Extract a window of bits from scalar starting at bit_offset

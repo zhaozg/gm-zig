@@ -22,7 +22,7 @@ pub const HashError = error{
 /// SM9 H1 hash function for key derivation
 /// H1: {0,1}* × {0,1}* × Z+ → Z*_N
 /// Used to hash identity and additional data to an integer mod N
-/// Refactored for better maintainability and clarity
+/// GM/T 0044-2016 compliant implementation with proper modular reduction
 pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
@@ -30,158 +30,85 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     try helpers.Validation.validateUserId(data);
     try helpers.Validation.validateHashIdentifier(hid);
 
-    // GM/T 0044-2016 compliance: Reject zero order - no fallback mechanisms allowed
+    // GM/T 0044-2016 compliance: Reject zero order
     if (bigint.isZero(order)) {
         return HashError.InvalidInput;
     }
-    const working_order = order;
 
-    // Phase 1: Standard iterative hashing (GM/T 0044-2016 compliant)
-    if (try standardHashIteration(data, hid, working_order)) |result| {
-        return result;
-    }
+    // GM/T 0044-2016 standard approach: Hash with counter and reduce modulo N
+    var counter: u32 = 1;
 
-    // Phase 2: Extended iteration range for edge cases
-    if (try extendedHashIteration(data, hid, working_order)) |result| {
-        return result;
-    }
-
-    // Phase 3: Final standard-compliant fallback
-    return finalCompliantFallback(data, hid, working_order);
-}
-
-/// Standard hash iteration following GM/T 0044-2016
-fn standardHashIteration(data: []const u8, hid: u8, order: [32]u8) !?[32]u8 {
-    var counter_mgr = helpers.CounterManager.init();
-    var result: [32]u8 = undefined;
-
-    while (!counter_mgr.isAtMax()) {
-        // Build hash using fluent interface
+    while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
+        // Build hash using standard GM/T 0044-2016 approach
         var builder = helpers.SM3Builder.init();
         _ = builder.update(data)
             .updateHashId(hid)
-            .updateCounter(counter_mgr.current());
-        builder.finalize(&result);
+            .updateCounter(counter);
 
-        // Check if result is in valid range [1, N-1]
-        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
-            return result;
+        var hash_result: [32]u8 = undefined;
+        builder.finalize(&hash_result);
+
+        // Apply modular reduction as specified in GM/T 0044-2016
+        const reduced = bigint.mod(hash_result, order) catch {
+            continue; // Try next counter value if modular reduction fails
+        };
+
+        // Ensure result is in range [1, N-1] as required by GM/T 0044-2016
+        // Z*_N means non-zero elements modulo N
+        if (!bigint.isZero(reduced)) {
+            return reduced;
         }
-
-        counter_mgr.increment() catch break;
+        // If result is zero, continue to next counter value
     }
 
-    return null; // No result found in standard range
-}
-
-/// Extended hash iteration for edge cases
-fn extendedHashIteration(data: []const u8, hid: u8, order: [32]u8) !?[32]u8 {
-    var counter_mgr = helpers.CounterManager.initWithLimit(constants.Limits.EXTENDED_HASH_COUNTER);
-    counter_mgr.current_value = constants.Limits.MAX_HASH_COUNTER; // Start where standard iteration ended
-
-    var result: [32]u8 = undefined;
-
-    while (!counter_mgr.isAtMax()) {
-        var builder = helpers.SM3Builder.init();
-        _ = builder.update(data)
-            .updateHashId(hid)
-            .updateCounter(counter_mgr.current());
-        builder.finalize(&result);
-
-        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
-            return result;
-        }
-
-        counter_mgr.increment() catch break;
-    }
-
-    return null; // No result found in extended range
-}
-
-/// Final GM/T 0044-2016 compliant fallback using modular reduction
-fn finalCompliantFallback(data: []const u8, hid: u8, order: [32]u8) ![32]u8 {
-    // Generate final hash
-    var builder = helpers.SM3Builder.init();
-    _ = builder.update(data)
-        .updateHashId(hid)
-        .updateDomainSeparator(constants.Strings.H2_DOMAIN_SEPARATOR);
-
-    var result: [32]u8 = undefined;
-    builder.finalize(&result);
-
-    // Apply proper modular reduction
-    const reduced = helpers.ModularReduction.reduce(result, order) catch {
-        // GM/T 0044-2016 compliance: Fail securely instead of using fallback
-        return HashError.ModularReductionFailed;
-    };
-
-    // GM/T 0044-2016 compliance: Zero result indicates computation failure
-    if (bigint.isZero(reduced)) {
-        return HashError.FieldElementGenerationFailed;
-    }
-
-    return reduced;
+    // GM/T 0044-2016 compliance: If no valid result found after standard iterations, fail
+    return HashError.FieldElementGenerationFailed;
 }
 
 /// SM9 H2 hash function for signature and encryption
 /// H2: {0,1}* × {0,1}* → Z*_N
 /// Used to hash message and additional data for signature/encryption
-/// Refactored for better maintainability following GM/T 0044-2016
+/// GM/T 0044-2016 compliant implementation with proper modular reduction
 pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
     // Input validation
     try helpers.Validation.validateMessage(message);
 
-    // GM/T 0044-2016 compliance: Reject zero order - no fallback mechanisms allowed
+    // GM/T 0044-2016 compliance: Reject zero order
     if (bigint.isZero(order)) {
         return HashError.InvalidInput;
     }
-    const working_order = order;
 
-    // Build hash with proper domain separation
-    var builder = helpers.SM3Builder.init();
-    _ = builder.update(message)
-        .update(additional_data)
-        .updateDomainSeparator(constants.Strings.H2_DOMAIN_SEPARATOR);
+    // GM/T 0044-2016 standard approach: Hash with counter and reduce modulo N
+    var counter: u32 = 1;
 
-    var result: [32]u8 = undefined;
-    builder.finalize(&result);
+    while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
+        // Build hash with counter following GM/T 0044-2016 specification
+        var builder = helpers.SM3Builder.init();
+        _ = builder.update(message)
+            .update(additional_data)
+            .updateDomainSeparator(constants.Strings.H2_DOMAIN_SEPARATOR)
+            .updateCounter(counter);
 
-    // Apply modular reduction to ensure result is in range [1, N-1]
-    const reduced = helpers.ModularReduction.reduce(result, working_order) catch |err| switch (err) {
-        error.InvalidInput => return HashError.InvalidInput,
-        error.ModularReductionFailed => return applyAlternativeReduction(result, working_order),
-        else => return HashError.ModularReductionFailed,
-    };
+        var hash_result: [32]u8 = undefined;
+        builder.finalize(&hash_result);
 
-    // Ensure result is non-zero
-    if (bigint.isZero(reduced)) {
-        return constants.TestConstants.MIN_FIELD_ELEMENT;
-    }
+        // Apply modular reduction as specified in GM/T 0044-2016
+        const reduced = bigint.mod(hash_result, order) catch {
+            continue; // Try next counter value if modular reduction fails
+        };
 
-    return reduced;
-}
-
-/// Alternative reduction method for edge cases in H2
-fn applyAlternativeReduction(value: [32]u8, order: [32]u8) [32]u8 {
-    var result = value;
-
-    // Apply byte-wise modular reduction according to working order
-    // This ensures we stay within mathematical bounds
-    var i: usize = 0;
-    while (i < constants.FieldSize.FIELD_ELEMENT_BYTES) : (i += 1) {
-        if (order[i] > 0) {
-            result[i] = result[i] % order[i];
+        // Ensure result is in range [1, N-1] as required by GM/T 0044-2016
+        // Z*_N means non-zero elements modulo N
+        if (!bigint.isZero(reduced)) {
+            return reduced;
         }
+        // If result is zero, continue to next counter value
     }
 
-    // Ensure result is non-zero and less than order
-    if (bigint.isZero(result)) {
-        return constants.TestConstants.MIN_FIELD_ELEMENT;
-    }
-
-    return result;
+    // GM/T 0044-2016 compliance: If no valid result found after standard iterations, fail
+    return HashError.FieldElementGenerationFailed;
 }
 
 /// SM9 Key Derivation Function (KDF)
