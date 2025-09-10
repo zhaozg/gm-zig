@@ -201,12 +201,14 @@ pub const EncryptUserPrivateKey = struct {
 
         const g2_point = g2_base.mul(t2_inv, system_params);
 
-        // Temporary workaround: If scalar multiplication produces infinity, use base point
-        // This maintains functional key format while we fix the core G2 arithmetic
-        const final_g2_point = if (g2_point.isInfinity()) g2_base else g2_point;
+        // GM/T 0044-2016 compliance: If scalar multiplication produces infinity, this indicates
+        // an invalid key computation according to the standard - fail securely
+        if (g2_point.isInfinity()) {
+            return KeyExtractionError.KeyGenerationFailed;
+        }
 
         // Step 6: Convert G2 point to uncompressed format (65 bytes)
-        const uncompressed_key = final_g2_point.compress(); // Note: G2.compress() returns uncompressed format
+        const uncompressed_key = g2_point.compress(); // Note: G2.compress() returns uncompressed format
 
         return EncryptUserPrivateKey{
             .id = user_id,
