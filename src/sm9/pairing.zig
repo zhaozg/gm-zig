@@ -1281,23 +1281,23 @@ fn fp12Multiply(a: [384]u8, b: [384]u8) GtElement {
 
     const a0b0 = fp6Multiply(a0, b0);
     const a1b1 = fp6Multiply(a1, b1);
-    
+
     const a0_plus_a1 = fp6Add(a0, a1);
     const b0_plus_b1 = fp6Add(b0, b1);
     const sum_product = fp6Multiply(a0_plus_a1, b0_plus_b1);
-    
+
     // c1 = sum_product - a0b0 - a1b1
     const c1_temp = fp6Sub(sum_product, a0b0);
     const c1 = fp6Sub(c1_temp, a1b1);
-    
+
     // c0 = a0b0 + a1b1*v (multiply a1b1 by non-residue v)
     const a1b1_v = fp6MultiplyByXi(a1b1);
     const c0 = fp6Add(a0b0, a1b1_v);
-    
+
     var result: [384]u8 = undefined;
     @memcpy(result[0..192], &c0);
     @memcpy(result[192..384], &c1);
-    
+
     return GtElement{ .data = result };
 }
 
@@ -1315,14 +1315,14 @@ fn fp12Square(a: [384]u8) GtElement {
     const a1_squared = fp6Square(a1);
     const a1_squared_v = fp6MultiplyByXi(a1_squared);
     const c0 = fp6Add(a0_squared, a1_squared_v);
-    
+
     const a0a1 = fp6Multiply(a0, a1);
     const c1 = fp6Double(a0a1); // 2*a0*a1
-    
+
     var result: [384]u8 = undefined;
     @memcpy(result[0..192], &c0);
     @memcpy(result[192..384], &c1);
-    
+
     return GtElement{ .data = result };
 }
 
@@ -1335,34 +1335,34 @@ fn fp6Square(a: [192]u8) [192]u8 {
 
     // Optimized Fp6 squaring using complex multiplication identity
     // (a0 + a1*v + a2*v^2)^2 = c0 + c1*v + c2*v^2
-    
+
     const a0_squared = fp2Square(a0);
     const a1_squared = fp2Square(a1);
     const a2_squared = fp2Square(a2);
-    
+
     const a0a1 = fp2Multiply(a0, a1);
     const a0a2 = fp2Multiply(a0, a2);
     const a1a2 = fp2Multiply(a1, a2);
-    
+
     // c0 = a0^2 + xi*(2*a1*a2)
     const two_a1a2 = fp2Double(a1a2);
     const xi_two_a1a2 = fp2MultiplyByXi(two_a1a2);
     const c0 = fp2Add(a0_squared, xi_two_a1a2);
-    
+
     // c1 = 2*a0*a1 + xi*a2^2
     const two_a0a1 = fp2Double(a0a1);
     const xi_a2_squared = fp2MultiplyByXi(a2_squared);
     const c1 = fp2Add(two_a0a1, xi_a2_squared);
-    
+
     // c2 = a1^2 + 2*a0*a2
     const two_a0a2 = fp2Double(a0a2);
     const c2 = fp2Add(a1_squared, two_a0a2);
-    
+
     var result: [192]u8 = undefined;
     @memcpy(result[0..64], &c0);
     @memcpy(result[64..128], &c1);
     @memcpy(result[128..192], &c2);
-    
+
     return result;
 }
 
@@ -1370,19 +1370,19 @@ fn fp6Square(a: [192]u8) [192]u8 {
 fn fp2Square(a: [64]u8) [64]u8 {
     const a0 = a[0..32].*;
     const a1 = a[32..64].*;
-    
+
     // (a0 + a1*i)^2 = (a0^2 - a1^2) + 2*a0*a1*i
     const a0_squared = fpSquare(a0);
     const a1_squared = fpSquare(a1);
     const a0a1 = fpMultiply(a0, a1);
-    
+
     const real = fpSub(a0_squared, a1_squared);
     const imag = fpDouble(a0a1);
-    
+
     var result: [64]u8 = undefined;
     @memcpy(result[0..32], &real);
     @memcpy(result[32..64], &imag);
-    
+
     return result;
 }
 
@@ -1390,9 +1390,9 @@ fn fp2Square(a: [64]u8) [64]u8 {
 fn fp6Double(a: [192]u8) [192]u8 {
     var result: [192]u8 = undefined;
     for (0..3) |i| {
-        const fp2_component = a[i * 64..(i + 1) * 64].*;
+        const fp2_component = a[i * 64 .. (i + 1) * 64].*;
         const doubled = fp2Double(fp2_component);
-        @memcpy(result[i * 64..(i + 1) * 64], &doubled);
+        @memcpy(result[i * 64 .. (i + 1) * 64], &doubled);
     }
     return result;
 }
@@ -1401,14 +1401,14 @@ fn fp6Double(a: [192]u8) [192]u8 {
 fn fp2Double(a: [64]u8) [64]u8 {
     const a0 = a[0..32].*;
     const a1 = a[32..64].*;
-    
+
     const doubled_a0 = fpDouble(a0);
     const doubled_a1 = fpDouble(a1);
-    
+
     var result: [64]u8 = undefined;
     @memcpy(result[0..32], &doubled_a0);
     @memcpy(result[32..64], &doubled_a1);
-    
+
     return result;
 }
 
@@ -1417,20 +1417,20 @@ fn fpDouble(a: [32]u8) [32]u8 {
     // Simple doubling with overflow check
     var carry: u8 = 0;
     var result: [32]u8 = undefined;
-    
+
     for (0..32) |i| {
         const doubled = (@as(u16, a[31 - i]) << 1) + carry;
         result[31 - i] = @as(u8, @intCast(doubled & 0xFF));
         carry = @as(u8, @intCast(doubled >> 8));
     }
-    
+
     // Simple modular reduction (would need proper field modulus in production)
     if (carry != 0) {
         // Subtract a simple modulus if overflow occurred
         const simple_modulus = [_]u8{0xFF} ** 31 ++ [_]u8{0x7F};
         result = fpSub(result, simple_modulus);
     }
-    
+
     return result;
 }
 

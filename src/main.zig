@@ -460,10 +460,10 @@ fn demonstrateSM9(allocator: std.mem.Allocator) !void {
 /// Shows the performance improvements from SIMD-accelerated field operations
 fn demonstrateP1Performance(allocator: std.mem.Allocator) !void {
     print("🚀 Initializing SM9 P1.1 Field Operations Performance Tests...\n", .{});
-    
+
     // Run the P1 performance suite
     try sm9.field.P1Benchmark.runP1PerformanceSuite(allocator);
-    
+
     print("📊 P1.1 Performance Summary:\n", .{});
     print("   🎯 Target Performance: 300+ MB/s field operations\n", .{});
     print("   ⚡ SIMD Optimizations: ENABLED\n", .{});

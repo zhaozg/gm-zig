@@ -356,7 +356,7 @@ pub const G1Point = struct {
         // In SM9, the field modulus is stored in the curve parameters
         const field_p = params.SystemParams.init().q;
         const neg_y = bigint.subMod(field_p, self.y, field_p) catch return self;
-        
+
         return G1Point{
             .x = self.x,
             .y = neg_y,
@@ -367,11 +367,7 @@ pub const G1Point = struct {
 
     /// Batch scalar multiplication for multiple points and scalars
     /// Optimized for computing k1*P1 + k2*P2 + ... + kn*Pn efficiently
-    pub fn batchScalarMul(
-        points: []const G1Point, 
-        scalars: []const [32]u8, 
-        curve_params: params.SystemParams
-    ) G1Point {
+    pub fn batchScalarMul(points: []const G1Point, scalars: []const [32]u8, curve_params: params.SystemParams) G1Point {
         if (points.len != scalars.len or points.len == 0) {
             return G1Point.infinity();
         }
@@ -391,34 +387,28 @@ pub const G1Point = struct {
             const term = point.scalarMul(scalar, curve_params);
             result = result.add(term, curve_params);
         }
-        
+
         return result;
     }
 
     /// Shamir's trick for computing k1*P1 + k2*P2 efficiently
-    fn shamirDualScalarMul(
-        p1: G1Point, 
-        k1: [32]u8, 
-        p2: G1Point, 
-        k2: [32]u8, 
-        curve_params: params.SystemParams
-    ) G1Point {
+    fn shamirDualScalarMul(p1: G1Point, k1: [32]u8, p2: G1Point, k2: [32]u8, curve_params: params.SystemParams) G1Point {
         // Precompute [P1, P2, P1+P2]
         const p1_plus_p2 = p1.add(p2, curve_params);
-        
+
         var result = G1Point.infinity();
-        
+
         // Process both scalars bit by bit from MSB to LSB
         var i: i32 = 255;
         while (i >= 0) : (i -= 1) {
             result = result.double(curve_params);
-            
+
             const byte_idx = @as(usize, @intCast(i / 8));
             const bit_idx = @as(u3, @intCast(i % 8));
-            
+
             const bit1 = (k1[31 - byte_idx] >> bit_idx) & 1;
             const bit2 = (k2[31 - byte_idx] >> bit_idx) & 1;
-            
+
             if (bit1 == 1 and bit2 == 1) {
                 result = result.add(p1_plus_p2, curve_params);
             } else if (bit1 == 1) {
@@ -427,7 +417,7 @@ pub const G1Point = struct {
                 result = result.add(p2, curve_params);
             }
         }
-        
+
         return result;
     }
 
@@ -1456,12 +1446,12 @@ fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.S
 
     // Precompute table for odd multiples: [P, 3P, 5P, ..., 31P]
     var table: [table_size]G1Point = undefined;
-    
+
     // Efficient precomputation using Montgomery ladder
     table[0] = point; // 1P = P
     if (table_size > 1) {
         const double_p = point.double(curve_params); // 2P
-        
+
         // Compute odd multiples efficiently: 3P, 5P, 7P, ..., 31P
         var i: usize = 1;
         while (i < table_size) : (i += 1) {
@@ -1471,14 +1461,14 @@ fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.S
 
     // Convert scalar to NAF (Non-Adjacent Form) for reduced operations
     const naf_scalar = computeNAF(scalar, window_size);
-    
+
     // Process NAF form for optimized scalar multiplication
     var result = G1Point.infinity();
-    
+
     // Find first non-zero coefficient
     var i: i32 = 255;
     while (i >= 0 and naf_scalar[@as(usize, @intCast(i))] == 0) : (i -= 1) {}
-    
+
     if (i >= 0) {
         const first_coeff = naf_scalar[@as(usize, @intCast(i))];
         if (first_coeff > 0) {
@@ -1486,11 +1476,11 @@ fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.S
         } else {
             result = table[@as(usize, @intCast(@divTrunc(-first_coeff - 1, 2)))].negate();
         }
-        
+
         i -= 1;
         while (i >= 0) : (i -= 1) {
             result = result.double(curve_params);
-            
+
             const coeff = naf_scalar[@as(usize, @intCast(i))];
             if (coeff > 0) {
                 result = result.add(table[@as(usize, @intCast(@divTrunc(coeff - 1, 2)))], curve_params);
@@ -1508,9 +1498,9 @@ fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.S
 fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
     var naf: [256]i8 = [_]i8{0} ** 256;
     var scalar_copy: [32]u8 = scalar;
-    
+
     const window_mask = (@as(u32, 1) << @intCast(window_size)) - 1;
-    
+
     var i: usize = 0;
     while (i < 256 and !bigint.isZero(scalar_copy)) : (i += 1) {
         if (scalar_copy[31] & 1 == 1) {
@@ -1524,13 +1514,13 @@ fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
                     window_val |= @as(u32, 1) << @intCast(bit_idx);
                 }
             }
-            
+
             window_val &= window_mask;
-            
+
             if (window_val >= (@as(u32, 1) << @intCast(window_size - 1))) {
                 // Use negative coefficient to reduce weight
                 naf[i] = @as(i8, @intCast(@as(i32, @intCast(window_val)) - @as(i32, @intCast(@as(u32, 1) << @intCast(window_size)))));
-                
+
                 // Add 1 to scalar_copy to handle the negative coefficient
                 var carry: u8 = 1;
                 for (0..32) |j| {
@@ -1542,7 +1532,7 @@ fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
             } else {
                 naf[i] = @as(i8, @intCast(window_val));
             }
-            
+
             // Subtract the window value from scalar_copy
             var window_bytes: [32]u8 = [_]u8{0} ** 32;
             var window_temp = @as(u32, @intCast(@abs(naf[i])));
@@ -1552,11 +1542,11 @@ fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
             }
             scalar_copy = bigint.sub(scalar_copy, window_bytes).result;
         }
-        
+
         // Shift scalar right by 1 bit
         bigint.shiftRight(&scalar_copy, 1);
     }
-    
+
     return naf;
 }
 

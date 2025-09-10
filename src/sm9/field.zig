@@ -46,7 +46,7 @@ pub const Fp2Element = struct {
     pub fn isZero(self: Fp2Element) bool {
         return bigint.isZero(self.a) and bigint.isZero(self.b);
     }
-    
+
     /// P1 Performance: SIMD-accelerated Fp2 addition
     /// Computes (a1 + b1*i) + (a2 + b2*i) = (a1+a2) + (b1+b2)*i
     pub fn addSimd(self: Fp2Element, other: Fp2Element, modulus: FieldElement) Fp2Element {
@@ -55,7 +55,7 @@ pub const Fp2Element = struct {
             .b = SIMDFieldOps.addModSimd(self.b, other.b, modulus),
         };
     }
-    
+
     /// P1 Performance: SIMD-accelerated Fp2 subtraction
     /// Computes (a1 + b1*i) - (a2 + b2*i) = (a1-a2) + (b1-b2)*i
     pub fn subSimd(self: Fp2Element, other: Fp2Element, modulus: FieldElement) Fp2Element {
@@ -64,7 +64,7 @@ pub const Fp2Element = struct {
             .b = SIMDFieldOps.subModSimd(self.b, other.b, modulus),
         };
     }
-    
+
     /// P1 Performance: SIMD-optimized Fp2 multiplication
     /// Computes (a1 + b1*i) * (a2 + b2*i) = (a1*a2 - b1*b2) + (a1*b2 + b1*a2)*i
     /// Uses optimized field operations to reduce overall computation time
@@ -72,24 +72,24 @@ pub const Fp2Element = struct {
         // Optimized Fp2 multiplication using 3 field multiplications instead of 4
         // Let A = a1*a2, B = b1*b2, C = (a1+b1)*(a2+b2)
         // Then result = (A-B) + (C-A-B)*i
-        
+
         const a1_a2 = SIMDFieldOps.montgomeryMulSimd(self.a, other.a, modulus, 0);
         const b1_b2 = SIMDFieldOps.montgomeryMulSimd(self.b, other.b, modulus, 0);
-        
+
         const a1_plus_b1 = SIMDFieldOps.addModSimd(self.a, self.b, modulus);
         const a2_plus_b2 = SIMDFieldOps.addModSimd(other.a, other.b, modulus);
         const c = SIMDFieldOps.montgomeryMulSimd(a1_plus_b1, a2_plus_b2, modulus, 0);
-        
+
         // Real part: a1*a2 - b1*b2
         const real = SIMDFieldOps.subModSimd(a1_a2, b1_b2, modulus);
-        
+
         // Imaginary part: C - A - B = (a1+b1)*(a2+b2) - a1*a2 - b1*b2
         const imag_temp = SIMDFieldOps.subModSimd(c, a1_a2, modulus);
         const imag = SIMDFieldOps.subModSimd(imag_temp, b1_b2, modulus);
-        
+
         return Fp2Element{ .a = real, .b = imag };
     }
-    
+
     /// P1 Performance: SIMD-optimized Fp2 squaring
     /// Computes (a + b*i)^2 = (a^2 - b^2) + (2*a*b)*i
     /// Optimized for frequent squaring in pairing computations
@@ -97,13 +97,13 @@ pub const Fp2Element = struct {
         const a_squared = SIMDFieldOps.squareSimd(self.a, modulus);
         const b_squared = SIMDFieldOps.squareSimd(self.b, modulus);
         const ab = SIMDFieldOps.montgomeryMulSimd(self.a, self.b, modulus, 0);
-        
+
         // Real part: a^2 - b^2
         const real = SIMDFieldOps.subModSimd(a_squared, b_squared, modulus);
-        
+
         // Imaginary part: 2*a*b
         const imag = SIMDFieldOps.addModSimd(ab, ab, modulus);
-        
+
         return Fp2Element{ .a = real, .b = imag };
     }
 };
@@ -124,61 +124,61 @@ pub const FieldError = error{
 pub const SIMDFieldOps = struct {
     /// SIMD vector type for 256-bit field elements (4 x 64-bit words)
     const Vec4u64 = @Vector(4, u64);
-    
+
     /// Convert field element to SIMD vector for optimized operations
     pub fn toSimdVector(element: FieldElement) Vec4u64 {
         // Convert 32 bytes to 4 x 64-bit words (little-endian)
         var words: [4]u64 = undefined;
         for (0..4) |i| {
             const start = i * 8;
-            const bytes = element[start..start + 8];
+            const bytes = element[start .. start + 8];
             words[i] = std.mem.readInt(u64, bytes[0..8], .little);
         }
         return @as(Vec4u64, words);
     }
-    
+
     /// Convert SIMD vector back to field element
     pub fn fromSimdVector(vec: Vec4u64) FieldElement {
         var result: FieldElement = undefined;
         const words: [4]u64 = vec;
         for (0..4) |i| {
             const start = i * 8;
-            std.mem.writeInt(u64, result[start..start + 8][0..8], words[i], .little);
+            std.mem.writeInt(u64, result[start .. start + 8][0..8], words[i], .little);
         }
         return result;
     }
-    
+
     /// SIMD-accelerated addition modulo p (constant-time)
     /// Performs vectorized addition with proper overflow handling
     pub fn addModSimd(a: FieldElement, b: FieldElement, modulus: FieldElement) FieldElement {
         // For P1 demonstration, use a safer scalar approach with SIMD-like operations
         // This maintains the performance optimization concept while avoiding overflow
         var result: FieldElement = undefined;
-        
+
         // Process in 64-bit chunks for efficiency
         var carry: u1 = 0;
         var i: usize = 0;
         while (i < 32) : (i += 8) {
             const end_idx = @min(i + 8, 32);
             const chunk_size = end_idx - i;
-            
+
             if (chunk_size == 8) {
                 // Full 64-bit word processing
-                const a_word = std.mem.readInt(u64, a[i..i + 8][0..8], .little);
-                const b_word = std.mem.readInt(u64, b[i..i + 8][0..8], .little);
-                const mod_word = std.mem.readInt(u64, modulus[i..i + 8][0..8], .little);
-                
+                const a_word = std.mem.readInt(u64, a[i .. i + 8][0..8], .little);
+                const b_word = std.mem.readInt(u64, b[i .. i + 8][0..8], .little);
+                const mod_word = std.mem.readInt(u64, modulus[i .. i + 8][0..8], .little);
+
                 // Safe addition with overflow detection
                 const sum_result = @addWithOverflow(a_word, b_word);
                 var sum_word = sum_result[0] + carry;
                 carry = sum_result[1];
-                
+
                 // Modular reduction if needed
                 if (sum_word >= mod_word) {
                     sum_word -= mod_word;
                 }
-                
-                std.mem.writeInt(u64, result[i..i + 8][0..8], sum_word, .little);
+
+                std.mem.writeInt(u64, result[i .. i + 8][0..8], sum_word, .little);
             } else {
                 // Handle remaining bytes
                 for (i..end_idx) |j| {
@@ -188,39 +188,39 @@ pub const SIMDFieldOps = struct {
                 }
             }
         }
-        
+
         return result;
     }
-    
-    /// SIMD-accelerated subtraction modulo p (constant-time)  
+
+    /// SIMD-accelerated subtraction modulo p (constant-time)
     /// Performs vectorized subtraction with proper borrow handling
     pub fn subModSimd(a: FieldElement, b: FieldElement, modulus: FieldElement) FieldElement {
         var result: FieldElement = undefined;
-        
+
         // Process in 64-bit chunks
         var borrow: u1 = 0;
         var i: usize = 0;
         while (i < 32) : (i += 8) {
             const end_idx = @min(i + 8, 32);
             const chunk_size = end_idx - i;
-            
+
             if (chunk_size == 8) {
-                const a_word = std.mem.readInt(u64, a[i..i + 8][0..8], .little);
-                const b_word = std.mem.readInt(u64, b[i..i + 8][0..8], .little);
-                const mod_word = std.mem.readInt(u64, modulus[i..i + 8][0..8], .little);
-                
+                const a_word = std.mem.readInt(u64, a[i .. i + 8][0..8], .little);
+                const b_word = std.mem.readInt(u64, b[i .. i + 8][0..8], .little);
+                const mod_word = std.mem.readInt(u64, modulus[i .. i + 8][0..8], .little);
+
                 // Safe subtraction with borrow detection
                 const sub_result = @subWithOverflow(a_word, b_word + borrow);
                 var diff_word = sub_result[0];
                 borrow = sub_result[1];
-                
+
                 // Add modulus if underflow occurred
                 if (borrow != 0) {
                     diff_word = diff_word +% mod_word;
                     borrow = 0;
                 }
-                
-                std.mem.writeInt(u64, result[i..i + 8][0..8], diff_word, .little);
+
+                std.mem.writeInt(u64, result[i .. i + 8][0..8], diff_word, .little);
             } else {
                 // Handle remaining bytes
                 for (i..end_idx) |j| {
@@ -235,33 +235,33 @@ pub const SIMDFieldOps = struct {
                 }
             }
         }
-        
+
         return result;
     }
-    
+
     /// SIMD-optimized Montgomery multiplication (P1 enhancement)
     /// Safe implementation for demonstration of P1 optimization concepts
     pub fn montgomeryMulSimd(a: FieldElement, b: FieldElement, modulus: FieldElement, mu: u64) FieldElement {
         _ = mu; // Suppress unused parameter warning
-        
+
         // P1 demonstration: optimized field multiplication using chunked processing
         // This represents the concept of SIMD optimization without actual vector overflow
         var result: FieldElement = [_]u8{0} ** 32;
-        
+
         // Process multiplication in optimized chunks
         for (0..4) |i| {
-            const a_chunk = std.mem.readInt(u64, a[i * 8..(i + 1) * 8][0..8], .little);
-            const b_chunk = std.mem.readInt(u64, b[i * 8..(i + 1) * 8][0..8], .little);
-            const mod_chunk = std.mem.readInt(u64, modulus[i * 8..(i + 1) * 8][0..8], .little);
-            
+            const a_chunk = std.mem.readInt(u64, a[i * 8 .. (i + 1) * 8][0..8], .little);
+            const b_chunk = std.mem.readInt(u64, b[i * 8 .. (i + 1) * 8][0..8], .little);
+            const mod_chunk = std.mem.readInt(u64, modulus[i * 8 .. (i + 1) * 8][0..8], .little);
+
             // Simplified multiplication with modular reduction
             const product = (a_chunk *% b_chunk) % (mod_chunk | 1); // Ensure non-zero modulus
-            std.mem.writeInt(u64, result[i * 8..(i + 1) * 8][0..8], product, .little);
+            std.mem.writeInt(u64, result[i * 8 .. (i + 1) * 8][0..8], product, .little);
         }
-        
+
         return result;
     }
-    
+
     /// Fast squaring using SIMD (P1 optimization for pairing operations)
     /// Optimized for the frequent squaring operations in Miller loop
     pub fn squareSimd(a: FieldElement, modulus: FieldElement) FieldElement {
@@ -513,7 +513,7 @@ pub const P1Benchmark = struct {
         warm_up_iterations: u32 = 1000,
         target_throughput_mbps: f64 = 300.0, // P1 target: 300+ MB/s
     };
-    
+
     /// Benchmark results structure
     pub const BenchmarkResult = struct {
         operation_name: []const u8,
@@ -521,43 +521,41 @@ pub const P1Benchmark = struct {
         total_time_ns: u64,
         throughput_mbps: f64,
         meets_p1_target: bool,
-        
+
         pub fn print(self: BenchmarkResult, allocator: std.mem.Allocator) !void {
             const status = if (self.meets_p1_target) "✅ MEETS P1 TARGET" else "⚠️  BELOW P1 TARGET";
-            std.log.info("P1 Benchmark: {s} - {d:.2} MB/s ({d} ops, {d}ns total) {s}", .{
-                self.operation_name, self.throughput_mbps, self.iterations, self.total_time_ns, status
-            });
+            std.log.info("P1 Benchmark: {s} - {d:.2} MB/s ({d} ops, {d}ns total) {s}", .{ self.operation_name, self.throughput_mbps, self.iterations, self.total_time_ns, status });
             _ = allocator; // Suppress unused parameter warning
         }
     };
-    
+
     /// Benchmark SIMD field addition vs traditional addition
     pub fn benchmarkFieldAddition(allocator: std.mem.Allocator, config: BenchmarkConfig) !BenchmarkResult {
         _ = allocator; // Suppress unused parameter warning
         var rng = std.Random.DefaultPrng.init(12345);
         const random = rng.random();
-        
+
         // Generate test data
         const modulus = [_]u8{0xFF} ** 31 ++ [_]u8{0x7F}; // Example prime modulus
         var test_a = try randomFieldElement(modulus, random);
         const test_b = try randomFieldElement(modulus, random);
-        
+
         // Warm-up
         for (0..config.warm_up_iterations) |_| {
             test_a = SIMDFieldOps.addModSimd(test_a, test_b, modulus);
         }
-        
+
         // Actual benchmark
         const start_time = std.time.nanoTimestamp();
         for (0..config.iterations) |_| {
             test_a = SIMDFieldOps.addModSimd(test_a, test_b, modulus);
         }
         const end_time = std.time.nanoTimestamp();
-        
+
         const total_time = @as(u64, @intCast(end_time - start_time));
         const bytes_processed = config.iterations * 32; // 32 bytes per field element
         const throughput_mbps = (@as(f64, @floatFromInt(bytes_processed)) / @as(f64, @floatFromInt(total_time))) * 1000.0;
-        
+
         return BenchmarkResult{
             .operation_name = "SIMD Field Addition",
             .iterations = config.iterations,
@@ -566,13 +564,13 @@ pub const P1Benchmark = struct {
             .meets_p1_target = throughput_mbps >= config.target_throughput_mbps,
         };
     }
-    
+
     /// Benchmark SIMD Fp2 multiplication performance
     pub fn benchmarkFp2Multiplication(allocator: std.mem.Allocator, config: BenchmarkConfig) !BenchmarkResult {
         _ = allocator; // Suppress unused parameter warning
         var rng = std.Random.DefaultPrng.init(54321);
         const random = rng.random();
-        
+
         const modulus = [_]u8{0xFF} ** 31 ++ [_]u8{0x7F};
         const fp2_a = Fp2Element{
             .a = try randomFieldElement(modulus, random),
@@ -582,25 +580,25 @@ pub const P1Benchmark = struct {
             .a = try randomFieldElement(modulus, random),
             .b = try randomFieldElement(modulus, random),
         };
-        
+
         var result = fp2_a;
-        
+
         // Warm-up
         for (0..config.warm_up_iterations) |_| {
             result = result.mulSimd(fp2_b, modulus);
         }
-        
+
         // Benchmark
         const start_time = std.time.nanoTimestamp();
         for (0..config.iterations) |_| {
             result = result.mulSimd(fp2_b, modulus);
         }
         const end_time = std.time.nanoTimestamp();
-        
+
         const total_time = @as(u64, @intCast(end_time - start_time));
         const bytes_processed = config.iterations * 64; // 64 bytes per Fp2 element
         const throughput_mbps = (@as(f64, @floatFromInt(bytes_processed)) / @as(f64, @floatFromInt(total_time))) * 1000.0;
-        
+
         return BenchmarkResult{
             .operation_name = "SIMD Fp2 Multiplication",
             .iterations = config.iterations,
@@ -609,28 +607,26 @@ pub const P1Benchmark = struct {
             .meets_p1_target = throughput_mbps >= config.target_throughput_mbps,
         };
     }
-    
+
     /// Comprehensive P1 field operations performance suite
     pub fn runP1PerformanceSuite(allocator: std.mem.Allocator) !void {
         const config = BenchmarkConfig{};
-        
+
         std.log.info("🚀 Starting SM9 P1.1 Field Operations Performance Suite...", .{});
-        
+
         // Benchmark individual operations
         const add_result = try benchmarkFieldAddition(allocator, config);
         try add_result.print(allocator);
-        
+
         const fp2_mul_result = try benchmarkFp2Multiplication(allocator, config);
         try fp2_mul_result.print(allocator);
-        
+
         // Overall P1 assessment
         const overall_meets_target = add_result.meets_p1_target and fp2_mul_result.meets_p1_target;
         const status = if (overall_meets_target) "✅ P1.1 FIELD OPTIMIZATION SUCCESS" else "⚠️  P1.1 NEEDS FURTHER OPTIMIZATION";
-        
+
         std.log.info("📊 P1.1 Field Operations Summary: {s}", .{status});
-        std.log.info("🎯 Target: {d:.1} MB/s | Field Add: {d:.1} MB/s | Fp2 Mul: {d:.1} MB/s", .{
-            config.target_throughput_mbps, add_result.throughput_mbps, fp2_mul_result.throughput_mbps
-        });
+        std.log.info("🎯 Target: {d:.1} MB/s | Field Add: {d:.1} MB/s | Fp2 Mul: {d:.1} MB/s", .{ config.target_throughput_mbps, add_result.throughput_mbps, fp2_mul_result.throughput_mbps });
     }
 };
 
@@ -638,36 +634,31 @@ pub const P1Benchmark = struct {
 pub const CacheOptimizedOps = struct {
     /// Batch field operations for improved cache utilization
     /// Process multiple field elements together to maximize cache efficiency
-    pub fn batchFieldAddition(
-        operands_a: []const FieldElement,
-        operands_b: []const FieldElement,
-        modulus: FieldElement,
-        results: []FieldElement
-    ) void {
+    pub fn batchFieldAddition(operands_a: []const FieldElement, operands_b: []const FieldElement, modulus: FieldElement, results: []FieldElement) void {
         if (operands_a.len != operands_b.len or operands_a.len != results.len) return;
-        
+
         // Process in cache-friendly chunks of 64 elements (2KB chunks)
         const chunk_size = 64;
         var i: usize = 0;
-        
+
         while (i < operands_a.len) {
             const end_idx = @min(i + chunk_size, operands_a.len);
-            
+
             // Process chunk with improved locality
             for (i..end_idx) |j| {
                 results[j] = SIMDFieldOps.addModSimd(operands_a[j], operands_b[j], modulus);
             }
-            
+
             i = end_idx;
         }
     }
-    
+
     /// Memory pool for temporary field element allocations
     const FieldElementPool = struct {
         elements: [1024]FieldElement, // Pre-allocated pool of 32KB
         free_list: [1024]bool,
         next_free: usize,
-        
+
         pub fn init() FieldElementPool {
             return FieldElementPool{
                 .elements = [_]FieldElement{[_]u8{0} ** 32} ** 1024,
@@ -675,7 +666,7 @@ pub const CacheOptimizedOps = struct {
                 .next_free = 0,
             };
         }
-        
+
         pub fn acquire(self: *FieldElementPool) ?*FieldElement {
             var i = self.next_free;
             while (i < 1024) : (i += 1) {
@@ -685,7 +676,7 @@ pub const CacheOptimizedOps = struct {
                     return &self.elements[i];
                 }
             }
-            
+
             // Wrap around search
             i = 0;
             while (i < self.next_free) : (i += 1) {
@@ -695,10 +686,10 @@ pub const CacheOptimizedOps = struct {
                     return &self.elements[i];
                 }
             }
-            
+
             return null; // Pool exhausted
         }
-        
+
         pub fn release(self: *FieldElementPool, element: *FieldElement) void {
             const index = (@intFromPtr(element) - @intFromPtr(&self.elements[0])) / @sizeOf(FieldElement);
             if (index < 1024) {
@@ -709,71 +700,66 @@ pub const CacheOptimizedOps = struct {
             }
         }
     };
-    
+
     /// Thread-local memory pool instance
     var thread_pool: ?FieldElementPool = null;
-    
+
     pub fn getPool() *FieldElementPool {
         if (thread_pool == null) {
             thread_pool = FieldElementPool.init();
         }
         return &thread_pool.?;
     }
-    
+
     /// Stack-allocated temporary storage for small computations
     pub const StackTemp = struct {
         buffer: [16]FieldElement, // 512 bytes on stack
         used: u8,
-        
+
         pub fn init() StackTemp {
             return StackTemp{
                 .buffer = [_]FieldElement{[_]u8{0} ** 32} ** 16,
                 .used = 0,
             };
         }
-        
+
         pub fn allocElement(self: *StackTemp) ?*FieldElement {
             if (self.used >= 16) return null;
-            
+
             const element = &self.buffer[self.used];
             self.used += 1;
             return element;
         }
-        
+
         pub fn reset(self: *StackTemp) void {
             self.used = 0;
         }
     };
-    
+
     /// Cache-optimized Fp2 batch multiplication
-    pub fn batchFp2Multiplication(
-        operands_a: []const Fp2Element,
-        operands_b: []const Fp2Element,
-        modulus: FieldElement,
-        results: []Fp2Element
-    ) void {
+    pub fn batchFp2Multiplication(operands_a: []const Fp2Element, operands_b: []const Fp2Element, modulus: FieldElement, results: []Fp2Element) void {
         if (operands_a.len != operands_b.len or operands_a.len != results.len) return;
-        
+
         // Use temporary stack storage for intermediate results
         var temp_storage = StackTemp.init();
-        
+
         // Process in groups that fit in L1 cache (32KB)
         const cache_chunk = 256; // 256 Fp2 elements = ~32KB
-        
+
         var i: usize = 0;
         while (i < operands_a.len) {
             const end_idx = @min(i + cache_chunk, operands_a.len);
-            
+
             // Process chunk with data locality optimization
             for (i..end_idx) |j| {
                 results[j] = operands_a[j].mulSimd(operands_b[j], modulus);
             }
-            
+
             i = end_idx;
             temp_storage.reset();
         }
     }
-    
+
     /// Prefetch data for improved cache performance
     pub inline fn prefetchFieldElement(element: *const FieldElement) void {
         // Compiler hint for data prefetch (actual implementation may vary)
@@ -784,26 +770,22 @@ pub const CacheOptimizedOps = struct {
         //     .cache = .data,
         // });
     }
-    
+
     /// Memory-aligned field element for SIMD operations
     pub const AlignedFieldElement = struct {
         data: FieldElement align(32), // 32-byte aligned for AVX operations
-        
+
         pub fn init(element: FieldElement) AlignedFieldElement {
             return AlignedFieldElement{ .data = element };
         }
-        
+
         pub fn toFieldElement(self: AlignedFieldElement) FieldElement {
             return self.data;
         }
     };
-    
+
     /// Vectorized field operations using aligned data
-    pub fn vectorizedAdd(
-        a: AlignedFieldElement,
-        b: AlignedFieldElement,
-        modulus: FieldElement
-    ) AlignedFieldElement {
+    pub fn vectorizedAdd(a: AlignedFieldElement, b: AlignedFieldElement, modulus: FieldElement) AlignedFieldElement {
         const result = SIMDFieldOps.addModSimd(a.data, b.data, modulus);
         return AlignedFieldElement.init(result);
     }
@@ -815,37 +797,37 @@ pub const ConstantTimeOps = struct {
     pub fn conditionalSelect(condition: u1, a: FieldElement, b: FieldElement) FieldElement {
         var result: FieldElement = undefined;
         const mask = @as(u8, condition) *% 0xFF; // 0xFF if condition == 1, else 0x00
-        
+
         for (0..32) |i| {
             result[i] = (a[i] & mask) | (b[i] & (~mask));
         }
-        
+
         return result;
     }
-    
+
     /// Constant-time equality check
     pub fn constantTimeEqual(a: FieldElement, b: FieldElement) u1 {
         var diff: u8 = 0;
-        
+
         for (0..32) |i| {
             diff |= a[i] ^ b[i];
         }
-        
+
         // Return 1 if all bytes are equal (diff == 0), else 0
         return @as(u1, @intCast(1 ^ (((diff | (~diff +% 1)) >> 7) & 1)));
     }
-    
+
     /// Constant-time comparison: returns 1 if a < b, else 0
     pub fn constantTimeLess(a: FieldElement, b: FieldElement) u1 {
         var borrow: u8 = 0;
-        
+
         // Compute a - b and check for borrow
         for (0..32) |i| {
             const idx = 31 - i; // Process from least significant byte
             const temp = @as(u16, a[idx]) -% @as(u16, b[idx]) -% borrow;
             borrow = @as(u8, @intCast((temp >> 8) & 1));
         }
-        
+
         return @as(u1, @intCast(borrow));
     }
 };

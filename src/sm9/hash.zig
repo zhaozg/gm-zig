@@ -37,22 +37,22 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 
     // GM/T 0044-2016 standard approach: Hash with counter and reduce modulo N
     var counter: u32 = 1;
-    
+
     while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
         // Build hash using standard GM/T 0044-2016 approach
         var builder = helpers.SM3Builder.init();
         _ = builder.update(data)
             .updateHashId(hid)
             .updateCounter(counter);
-        
+
         var hash_result: [32]u8 = undefined;
         builder.finalize(&hash_result);
-        
+
         // Apply modular reduction as specified in GM/T 0044-2016
         const reduced = bigint.mod(hash_result, order) catch {
             continue; // Try next counter value if modular reduction fails
         };
-        
+
         // Ensure result is in range [1, N-1] as required by GM/T 0044-2016
         // Z*_N means non-zero elements modulo N
         if (!bigint.isZero(reduced)) {
@@ -64,9 +64,6 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     // GM/T 0044-2016 compliance: If no valid result found after standard iterations, fail
     return HashError.FieldElementGenerationFailed;
 }
-
-
-
 
 /// SM9 H2 hash function for signature and encryption
 /// H2: {0,1}* × {0,1}* → Z*_N
@@ -113,7 +110,6 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
     // GM/T 0044-2016 compliance: If no valid result found after standard iterations, fail
     return HashError.FieldElementGenerationFailed;
 }
-
 
 /// SM9 Key Derivation Function (KDF)
 /// KDF: {0,1}* × Z+ → {0,1}*
