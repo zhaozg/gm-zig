@@ -22,7 +22,7 @@ pub const HashError = error{
 /// SM9 H1 hash function for key derivation
 /// H1: {0,1}* × {0,1}* × Z+ → Z*_N
 /// Used to hash identity and additional data to an integer mod N
-/// Refactored for better maintainability and clarity
+/// GM/T 0044-2016 compliant implementation with proper modular reduction
 pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
@@ -30,80 +30,48 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     try helpers.Validation.validateUserId(data);
     try helpers.Validation.validateHashIdentifier(hid);
 
-    // GM/T 0044-2016 compliance: Reject zero order - no fallback mechanisms allowed
+    // GM/T 0044-2016 compliance: Reject zero order
     if (bigint.isZero(order)) {
         return HashError.InvalidInput;
     }
-    const working_order = order;
 
-    // Phase 1: Standard iterative hashing (GM/T 0044-2016 compliant)
-    if (try standardHashIteration(data, hid, working_order)) |result| {
-        return result;
+    // GM/T 0044-2016 standard approach: Hash with counter and reduce modulo N
+    var counter: u32 = 1;
+    
+    while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
+        // Build hash using standard GM/T 0044-2016 approach
+        var builder = helpers.SM3Builder.init();
+        _ = builder.update(data)
+            .updateHashId(hid)
+            .updateCounter(counter);
+        
+        var hash_result: [32]u8 = undefined;
+        builder.finalize(&hash_result);
+        
+        // Apply modular reduction as specified in GM/T 0044-2016
+        const reduced = bigint.mod(hash_result, order) catch {
+            continue; // Try next counter value if modular reduction fails
+        };
+        
+        // Ensure result is in range [1, N-1] as required by GM/T 0044-2016
+        // Z*_N means non-zero elements modulo N
+        if (!bigint.isZero(reduced)) {
+            return reduced;
+        }
+        // If result is zero, continue to next counter value
     }
 
-    // Phase 2: Extended iteration range for edge cases
-    if (try extendedHashIteration(data, hid, working_order)) |result| {
-        return result;
-    }
-
-    // GM/T 0044-2016 compliance: If no valid result found after all iterations, fail
+    // GM/T 0044-2016 compliance: If no valid result found after standard iterations, fail
     return HashError.FieldElementGenerationFailed;
 }
 
-/// Standard hash iteration following GM/T 0044-2016
-fn standardHashIteration(data: []const u8, hid: u8, order: [32]u8) !?[32]u8 {
-    var counter_mgr = helpers.CounterManager.init();
-    var result: [32]u8 = undefined;
-
-    while (!counter_mgr.isAtMax()) {
-        // Build hash using fluent interface
-        var builder = helpers.SM3Builder.init();
-        _ = builder.update(data)
-            .updateHashId(hid)
-            .updateCounter(counter_mgr.current());
-        builder.finalize(&result);
-
-        // Check if result is in valid range [1, N-1]
-        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
-            return result;
-        }
-
-        counter_mgr.increment() catch break;
-    }
-
-    return null; // No result found in standard range
-}
-
-/// Extended hash iteration for edge cases
-fn extendedHashIteration(data: []const u8, hid: u8, order: [32]u8) !?[32]u8 {
-    var counter_mgr = helpers.CounterManager.initWithLimit(constants.Limits.EXTENDED_HASH_COUNTER);
-    counter_mgr.current_value = constants.Limits.MAX_HASH_COUNTER; // Start where standard iteration ended
-
-    var result: [32]u8 = undefined;
-
-    while (!counter_mgr.isAtMax()) {
-        var builder = helpers.SM3Builder.init();
-        _ = builder.update(data)
-            .updateHashId(hid)
-            .updateCounter(counter_mgr.current());
-        builder.finalize(&result);
-
-        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
-            return result;
-        }
-
-        counter_mgr.increment() catch break;
-    }
-
-    return null; // No result found in extended range
-}
 
 
 
 /// SM9 H2 hash function for signature and encryption
 /// H2: {0,1}* × {0,1}* → Z*_N
 /// Used to hash message and additional data for signature/encryption
-/// GM/T 0044-2016 strict compliance - no fallback mechanisms
+/// GM/T 0044-2016 compliant implementation with proper modular reduction
 pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
@@ -115,9 +83,8 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
         return HashError.InvalidInput;
     }
 
-    // GM/T 0044-2016 standard iterative hash approach similar to H1
+    // GM/T 0044-2016 standard approach: Hash with counter and reduce modulo N
     var counter: u32 = 1;
-    var result: [32]u8 = undefined;
 
     while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
         // Build hash with counter following GM/T 0044-2016 specification
@@ -127,12 +94,20 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
             .updateDomainSeparator(constants.Strings.H2_DOMAIN_SEPARATOR)
             .updateCounter(counter);
 
-        builder.finalize(&result);
+        var hash_result: [32]u8 = undefined;
+        builder.finalize(&hash_result);
 
-        // Check if result is in valid range [1, N-1] as per GM/T 0044-2016
-        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
-            return result;
+        // Apply modular reduction as specified in GM/T 0044-2016
+        const reduced = bigint.mod(hash_result, order) catch {
+            continue; // Try next counter value if modular reduction fails
+        };
+
+        // Ensure result is in range [1, N-1] as required by GM/T 0044-2016
+        // Z*_N means non-zero elements modulo N
+        if (!bigint.isZero(reduced)) {
+            return reduced;
         }
+        // If result is zero, continue to next counter value
     }
 
     // GM/T 0044-2016 compliance: If no valid result found after standard iterations, fail
