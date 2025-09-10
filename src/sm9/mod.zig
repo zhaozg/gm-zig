@@ -22,6 +22,8 @@ pub const pairing = @import("pairing.zig");
 // Phase 3: Enhanced core operations
 pub const field = @import("field.zig");
 pub const random = @import("random.zig");
+pub const constants = @import("constants.zig");
+pub const helpers = @import("helpers.zig");
 
 // Re-export commonly used types for convenience
 pub const SystemParams = params.SystemParams;

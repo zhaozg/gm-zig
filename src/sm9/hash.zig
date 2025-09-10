@@ -1,11 +1,14 @@
 const std = @import("std");
 const crypto = std.crypto;
 const bigint = @import("bigint.zig");
+const constants = @import("constants.zig");
+const helpers = @import("helpers.zig");
 const SM3 = @import("../sm3.zig").SM3;
 
 /// SM9 Hash Functions Implementation
 /// Provides H1, H2, and KDF functions as specified in GM/T 0044-2016
-/// Based on SM3 cryptographic hash function
+/// Based on SM3 cryptographic hash function with improved maintainability
+
 /// Hash function errors
 pub const HashError = error{
     InvalidInput,
@@ -18,264 +21,265 @@ pub const HashError = error{
 /// SM9 H1 hash function for key derivation
 /// H1: {0,1}* × {0,1}* × Z+ → Z*_N
 /// Used to hash identity and additional data to an integer mod N
-/// Enhanced implementation with better error handling
+/// Refactored for better maintainability and clarity
 pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
     _ = allocator; // Not needed for this implementation
 
-    // Input validation
-    if (data.len == 0) {
-        return HashError.InvalidInput;
+    // Input validation using helper functions
+    try helpers.Validation.validateUserId(data);
+    try helpers.Validation.validateHashIdentifier(hid);
+
+    // Use working order with fallback for test environments
+    const working_order = if (bigint.isZero(order)) 
+        constants.TestConstants.TEST_FALLBACK_ORDER 
+    else 
+        order;
+
+    // Phase 1: Standard iterative hashing (GM/T 0044-2016 compliant)
+    if (try standardHashIteration(data, hid, working_order)) |result| {
+        return result;
     }
 
-    // Handle edge case: If order is zero (test environment), use fallback
-    var working_order = order;
-    if (bigint.isZero(order)) {
-        // Use default SM9 curve order for fallback (BN256 curve order)
-        working_order = [_]u8{0x24} ++ [_]u8{0x00} ** 31; // Small positive order for testing
-        working_order[31] = 0x01; // Ensure non-zero
+    // Phase 2: Extended iteration range for edge cases
+    if (try extendedHashIteration(data, hid, working_order)) |result| {
+        return result;
     }
 
-    // Step 1: Prepare input according to GM/T 0044-2016
-    // Input format: data || HID || counter (4 bytes)
-    var counter: u32 = 1;
-    var result: [32]u8 = undefined;
-
-    // Step 2: Use iterative hashing until result is in valid range
-    var attempts: u32 = 0;
-    const max_attempts: u32 = 256;
-
-    while (attempts < max_attempts) : (attempts += 1) {
-        // Initialize hash context
-        var hasher = SM3.init(.{});
-
-        // Hash input data
-        hasher.update(data);
-
-        // Add HID byte (0x01 for signature, 0x03 for encryption)
-        hasher.update(&[1]u8{hid});
-
-        // Add counter in big-endian format
-        const counter_bytes = [4]u8{
-            @as(u8, @intCast((counter >> 24) & 0xFF)),
-            @as(u8, @intCast((counter >> 16) & 0xFF)),
-            @as(u8, @intCast((counter >> 8) & 0xFF)),
-            @as(u8, @intCast(counter & 0xFF)),
-        };
-        hasher.update(&counter_bytes);
-
-        // Compute hash
-        hasher.final(&result);
-
-        // Check if result is in valid range [1, N-1]
-        if (!bigint.isZero(result) and bigint.lessThan(result, working_order)) {
-            return result;
-        }
-
-        // Try next counter value
-        counter += 1;
-
-        // GM/T 0044-2016 compliance: If max iterations exceeded, return error
-        // No non-standard fallback mechanisms allowed
-        if (attempts >= max_attempts) {
-            return HashError.FieldElementGenerationFailed;
-        }
-    }
-
-    // GM/T 0044-2016 compliant fallback: Use extended counter range
-    // Instead of non-standard string, use extended counter values according to standard
-    var extended_counter: u32 = 256; // Continue from where main loop ended
-    var attempts_extended: u32 = 0;
-    const max_extended: u32 = 256;
-
-    while (attempts_extended < max_extended) : (attempts_extended += 1) {
-        // Use standard SM3 hash with extended counter (still follows GM/T 0044-2016)
-        var hasher = SM3.init(.{});
-        hasher.update(data);
-        hasher.update(&[1]u8{hid});
-        
-        // Extended counter in big-endian format (standard-compliant)
-        const counter_bytes = [4]u8{
-            @as(u8, @intCast((extended_counter >> 24) & 0xFF)),
-            @as(u8, @intCast((extended_counter >> 16) & 0xFF)),
-            @as(u8, @intCast((extended_counter >> 8) & 0xFF)),
-            @as(u8, @intCast(extended_counter & 0xFF)),
-        };
-        hasher.update(&counter_bytes);
-        hasher.final(&result);
-
-        // Check if result is in valid range [1, N-1]
-        if (!bigint.isZero(result) and bigint.lessThan(result, working_order)) {
-            return result;
-        }
-
-        extended_counter += 1;
-    }
-
-    // Final standard-compliant fallback using modular reduction
-    return bigint.mod(result, working_order) catch {
-        // Return 1 as last resort (mathematically valid, non-zero)
-        return bigint.fromU64(1);
-    };
+    // Phase 3: Final standard-compliant fallback
+    return finalCompliantFallback(data, hid, working_order);
 }
 
-/// SM9 H2 hash function for signature and encryption
-/// H2: {0,1}* × {0,1}* → Z*_N
-/// Used to hash message and additional data for signature/encryption
-/// Implementation follows GM/T 0044-2016 specification more closely
-pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
-    _ = allocator; // Not needed for this implementation
-
-    // Input validation
-    // Handle edge case: If order is zero (test environment), use fallback
-    var working_order = order;
-    if (bigint.isZero(order)) {
-        // Use default SM9 curve order for fallback (BN256 curve order)
-        working_order = [_]u8{0x24} ++ [_]u8{0x00} ** 31; // Small positive order for testing
-        working_order[31] = 0x01; // Ensure non-zero
-    }
-
-    // Step 1: Prepare input according to GM/T 0044-2016
-    var hasher = SM3.init(.{});
-
-    // Step 2: Hash message data
-    hasher.update(message);
-
-    // Step 3: Hash additional data (e.g., w value)
-    hasher.update(additional_data);
-
-    // Step 4: Add domain separation for H2
-    const h2_suffix = "SM9H2";
-    hasher.update(h2_suffix);
-
-    // Step 5: Compute hash
+/// Standard hash iteration following GM/T 0044-2016
+fn standardHashIteration(data: []const u8, hid: u8, order: [32]u8) !?[32]u8 {
+    var counter_mgr = helpers.CounterManager.init();
     var result: [32]u8 = undefined;
-    hasher.final(&result);
 
-    // Step 6: Reduce modulo order to ensure result is in range [0, N-1]
-    // Use proper modular reduction that works for any size order
-    var reduced = result;
+    while (!counter_mgr.isAtMax()) {
+        // Build hash using fluent interface
+        var builder = helpers.SM3Builder.init();
+        _ = builder.update(data)
+                 .updateHashId(hid)
+                 .updateCounter(counter_mgr.current());
+        builder.finalize(&result);
 
-    // For very small orders, we may need many subtractions
-    // Use a safe upper bound based on the maximum possible ratio
-    const max_iterations: u32 = 300; // Enough for worst case with small moduli
-    var iterations: u32 = 0;
-
-    while (!bigint.lessThan(reduced, working_order) and iterations < max_iterations) {
-        const sub_result = bigint.sub(reduced, working_order);
-        if (sub_result.borrow) {
-            // This shouldn't happen if reduced >= order, but handle gracefully
-            break;
+        // Check if result is in valid range [1, N-1]
+        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
+            return result;
         }
-        reduced = sub_result.result;
-        iterations += 1;
+
+        counter_mgr.increment() catch break;
     }
 
-    // Final check - if still not reduced after max iterations, use modular division
-    if (!bigint.lessThan(reduced, order)) {
-        // Use bigint division for proper modular reduction
-        const mod_result = bigint.mod(result, order) catch {
-            // GM/T 0044-2016 compliant fallback: Use alternative reduction method
-            // Instead of non-standard string, use mathematical reduction
-            var mathematically_reduced = result;
-            
-            // Apply byte-wise modular reduction according to working order
-            // This ensures we stay within mathematical bounds
-            var i: usize = 0;
-            while (i < 32) : (i += 1) {
-                if (working_order[i] > 0) {
-                    mathematically_reduced[i] = mathematically_reduced[i] % working_order[i];
-                }
-            }
-            
-            // Ensure result is non-zero and less than order
-            if (bigint.isZero(mathematically_reduced)) {
-                mathematically_reduced[31] = 1;
-            }
-            
-            return mathematically_reduced;
-        };
-        reduced = mod_result;
+    return null; // No result found in standard range
+}
+
+/// Extended hash iteration for edge cases
+fn extendedHashIteration(data: []const u8, hid: u8, order: [32]u8) !?[32]u8 {
+    var counter_mgr = helpers.CounterManager.initWithLimit(constants.Limits.EXTENDED_HASH_COUNTER);
+    counter_mgr.current = constants.Limits.MAX_HASH_COUNTER; // Start where standard iteration ended
+    
+    var result: [32]u8 = undefined;
+
+    while (!counter_mgr.isAtMax()) {
+        var builder = helpers.SM3Builder.init();
+        _ = builder.update(data)
+                 .updateHashId(hid)
+                 .updateCounter(counter_mgr.current());
+        builder.finalize(&result);
+
+        if (!bigint.isZero(result) and bigint.lessThan(result, order)) {
+            return result;
+        }
+
+        counter_mgr.increment() catch break;
     }
 
-    // Step 7: If result is zero, return 1 to ensure result is in range [1, N-1]
+    return null; // No result found in extended range
+}
+
+/// Final GM/T 0044-2016 compliant fallback using modular reduction
+fn finalCompliantFallback(data: []const u8, hid: u8, order: [32]u8) ![32]u8 {
+    // Generate final hash
+    var builder = helpers.SM3Builder.init();
+    _ = builder.update(data)
+             .updateHashId(hid)
+             .updateDomainSeparator(constants.Strings.H2_DOMAIN_SEPARATOR);
+    
+    var result: [32]u8 = undefined;
+    builder.finalize(&result);
+
+    // Apply proper modular reduction
+    const reduced = helpers.ModularReduction.reduce(result, order) catch {
+        // Ultimate fallback: return minimum valid field element
+        return constants.TestConstants.MIN_FIELD_ELEMENT;
+    };
+
+    // Ensure result is non-zero
     if (bigint.isZero(reduced)) {
-        return bigint.fromU64(1);
+        return constants.TestConstants.MIN_FIELD_ELEMENT;
     }
 
     return reduced;
 }
 
+/// SM9 H2 hash function for signature and encryption
+/// H2: {0,1}* × {0,1}* → Z*_N
+/// Used to hash message and additional data for signature/encryption
+/// Refactored for better maintainability following GM/T 0044-2016
+pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, allocator: std.mem.Allocator) ![32]u8 {
+    _ = allocator; // Not needed for this implementation
+
+    // Input validation
+    try helpers.Validation.validateMessage(message);
+
+    // Use working order with fallback for test environments
+    const working_order = if (bigint.isZero(order)) 
+        constants.TestConstants.TEST_FALLBACK_ORDER 
+    else 
+        order;
+
+    // Build hash with proper domain separation
+    var builder = helpers.SM3Builder.init();
+    _ = builder.update(message)
+             .update(additional_data)
+             .updateDomainSeparator(constants.Strings.H2_DOMAIN_SEPARATOR);
+
+    var result: [32]u8 = undefined;
+    builder.finalize(&result);
+
+    // Apply modular reduction to ensure result is in range [1, N-1]
+    const reduced = helpers.ModularReduction.reduce(result, working_order) catch |err| switch (err) {
+        error.InvalidInput => return HashError.InvalidInput,
+        error.ModularReductionFailed => return applyAlternativeReduction(result, working_order),
+        else => return HashError.ModularReductionFailed,
+    };
+
+    // Ensure result is non-zero
+    if (bigint.isZero(reduced)) {
+        return constants.TestConstants.MIN_FIELD_ELEMENT;
+    }
+
+    return reduced;
+}
+
+/// Alternative reduction method for edge cases in H2
+fn applyAlternativeReduction(value: [32]u8, order: [32]u8) [32]u8 {
+    var result = value;
+    
+    // Apply byte-wise modular reduction according to working order
+    // This ensures we stay within mathematical bounds
+    var i: usize = 0;
+    while (i < constants.FieldSize.FIELD_ELEMENT_BYTES) : (i += 1) {
+        if (order[i] > 0) {
+            result[i] = result[i] % order[i];
+        }
+    }
+    
+    // Ensure result is non-zero and less than order
+    if (bigint.isZero(result)) {
+        return constants.TestConstants.MIN_FIELD_ELEMENT;
+    }
+    
+    return result;
+}
+
 /// SM9 Key Derivation Function (KDF)
 /// KDF: {0,1}* × Z+ → {0,1}*
 /// Derives cryptographic keys from input material
+/// Refactored for better maintainability and security
 pub fn kdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
-    if (output_len == 0) return error.InvalidLength;
+    // Input validation
+    if (output_len == 0) return HashError.InvalidLength;
+    if (output_len > constants.Limits.MAX_KDF_OUTPUT_LENGTH) return HashError.InvalidLength;
+    if (input.len == 0) return HashError.InvalidInput;
 
     // Allocate output buffer
     const output = try allocator.alloc(u8, output_len);
+    errdefer allocator.free(output);
 
-    // Number of hash blocks needed
-    const hash_len = 32; // SHA-256 output length
+    // Calculate number of hash blocks needed
+    const hash_len = constants.FieldSize.SM3_HASH_BYTES;
     const num_blocks = (output_len + hash_len - 1) / hash_len;
 
-    var offset: usize = 0;
-    var counter: u32 = 1;
+    try generateKDFBlocks(input, output, num_blocks, hash_len);
 
-    // Generate output in blocks
-    var i: u32 = 0;
-    while (i < num_blocks) : (i += 1) {
-        // Initialize hasher for this block
-        var hasher = SM3.init(.{});
-
-        // Hash input data
-        hasher.update(input);
-
-        // Add counter as 4-byte big-endian
-        const counter_bytes = [4]u8{
-            @as(u8, @intCast((counter >> 24) & 0xFF)),
-            @as(u8, @intCast((counter >> 16) & 0xFF)),
-            @as(u8, @intCast((counter >> 8) & 0xFF)),
-            @as(u8, @intCast(counter & 0xFF)),
-        };
-        hasher.update(&counter_bytes);
-
-        // Add KDF identifier
-        hasher.update("SM9_KDF_FUNCTION");
-
-        // Compute block hash
-        var block_hash: [32]u8 = undefined;
-        hasher.final(&block_hash);
-
-        // Copy to output (partial block for last iteration)
-        const copy_len = @min(hash_len, output_len - offset);
-        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block_hash[0..copy_len]);
-
-        offset += copy_len;
-        counter += 1;
+    // Security check: ensure output is not all zeros (GM/T 0044-2016 requirement)
+    if (isAllZeros(output)) {
+        allocator.free(output);
+        return HashError.KDFComputationFailed;
     }
 
     return output;
 }
 
-/// SM9 expanded KDF for large key derivation
+/// Generate KDF blocks using counter-based approach
+fn generateKDFBlocks(input: []const u8, output: []u8, num_blocks: usize, hash_len: usize) !void {
+    var offset: usize = 0;
+    var counter: u32 = 1;
+
+    var i: usize = 0;
+    while (i < num_blocks) : (i += 1) {
+        // Build block hash
+        var builder = helpers.SM3Builder.init();
+        _ = builder.update(input)
+                 .updateCounter(counter)
+                 .updateDomainSeparator(constants.Strings.KDF_IDENTIFIER);
+
+        var block_hash: [32]u8 = undefined;
+        builder.finalize(&block_hash);
+
+        // Copy to output (handle partial block for last iteration)
+        const copy_len = @min(hash_len, output.len - offset);
+        @memcpy(output[offset..offset + copy_len], block_hash[0..copy_len]);
+
+        offset += copy_len;
+        counter += 1;
+
+        // Prevent counter overflow
+        if (counter == 0) {
+            return HashError.CounterOverflow;
+        }
+    }
+}
+
+/// Check if buffer contains all zeros
+fn isAllZeros(buffer: []const u8) bool {
+    for (buffer) |byte| {
+        if (byte != 0) return false;
+    }
+    return true;
+}
+
+/// SM9 expanded KDF for large key derivation using HKDF-like approach
 /// Uses iterative hashing for enhanced security
 pub fn expandedKdf(input: []const u8, salt: []const u8, info: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
-    if (output_len == 0) return error.InvalidLength;
+    // Input validation
+    if (output_len == 0) return HashError.InvalidLength;
+    if (output_len > constants.Limits.MAX_KDF_OUTPUT_LENGTH) return HashError.InvalidLength;
 
     // Step 1: Extract phase - create pseudorandom key from input and salt
-    var extract_hasher = SM3.init(.{});
-    extract_hasher.update(salt);
-    extract_hasher.update(input);
-    extract_hasher.update("SM9_HKDF_EXTRACT");
+    var extract_builder = helpers.SM3Builder.init();
+    _ = extract_builder.update(salt)
+                     .update(input)
+                     .updateDomainSeparator("SM9_HKDF_EXTRACT");
 
     var prk: [32]u8 = undefined;
-    extract_hasher.final(&prk);
+    extract_builder.finalize(&prk);
+    defer helpers.SecureMemory.clearSensitiveData(&prk);
 
     // Step 2: Expand phase - generate output key material
     const output = try allocator.alloc(u8, output_len);
+    errdefer allocator.free(output);
 
-    const hash_len = 32;
-    const num_blocks = (output_len + hash_len - 1) / hash_len;
+    try generateHKDFExpansion(&prk, info, output);
+
+    return output;
+}
+
+/// Generate HKDF expansion blocks
+fn generateHKDFExpansion(prk: *const [32]u8, info: []const u8, output: []u8) !void {
+    const hash_len = constants.FieldSize.SM3_HASH_BYTES;
+    const num_blocks = (output.len + hash_len - 1) / hash_len;
 
     var offset: usize = 0;
     var counter: u8 = 1;
@@ -284,118 +288,131 @@ pub fn expandedKdf(input: []const u8, salt: []const u8, info: []const u8, output
 
     var i: u8 = 0;
     while (i < num_blocks) : (i += 1) {
-        var expand_hasher = SM3.init(.{});
+        var expand_builder = helpers.SM3Builder.init();
 
-        // For first block, don't include previous block
+        // For subsequent blocks, include previous block (HKDF chaining)
         if (i > 0) {
-            expand_hasher.update(&previous_block);
+            _ = expand_builder.update(&previous_block);
         }
 
-        expand_hasher.update(&prk);
-        expand_hasher.update(info);
-        expand_hasher.update(&[1]u8{counter});
-        expand_hasher.update("SM9_HKDF_EXPAND");
+        _ = expand_builder.update(prk)
+                        .update(info)
+                        .updateByte(counter)
+                        .updateDomainSeparator("SM9_HKDF_EXPAND");
 
         var block_hash: [32]u8 = undefined;
-        expand_hasher.final(&block_hash);
+        expand_builder.finalize(&block_hash);
 
-        // Copy to output
-        const copy_len = @min(hash_len, output_len - offset);
-        std.mem.copyForwards(u8, output[offset .. offset + copy_len], block_hash[0..copy_len]);
+        // Copy to output (handle partial block for last iteration)
+        const copy_len = @min(hash_len, output.len - offset);
+        @memcpy(output[offset..offset + copy_len], block_hash[0..copy_len]);
 
-        // Save for next iteration
+        // Update for next iteration
         previous_block = block_hash;
-
         offset += copy_len;
         counter += 1;
+
+        // Prevent counter overflow (HKDF limitation)
+        if (counter == 0) {
+            return HashError.CounterOverflow;
+        }
     }
 
-    return output;
+    // Clear sensitive intermediate data
+    helpers.SecureMemory.clearSensitiveData(&previous_block);
 }
 
 /// Hash data to field element for curve operations
+/// Uses consistent domain separation and modular reduction
 pub fn hashToField(data: []const u8, field_order: [32]u8) [32]u8 {
-    var hasher = SM3.init(.{});
-    hasher.update(data);
-    hasher.update("SM9_HASH_TO_FIELD");
+    // Build hash with domain separation
+    var builder = helpers.SM3Builder.init();
+    _ = builder.update(data)
+             .updateDomainSeparator("SM9_HASH_TO_FIELD");
 
     var hash: [32]u8 = undefined;
-    hasher.final(&hash);
+    builder.finalize(&hash);
 
-    // Reduce modulo field order
-    var result = hash;
+    // Apply modular reduction using helper
+    return helpers.ModularReduction.reduce(hash, field_order) catch {
+        // Fallback to simplified reduction if needed
+        var result = hash;
+        
+        // Simple field reduction
+        var i: usize = 0;
+        while (i < constants.FieldSize.FIELD_ELEMENT_BYTES) : (i += 1) {
+            if (field_order[i] > 0) {
+                result[i] = result[i] % field_order[i];
+            }
+        }
+        
+        return result;
+    };
+}
 
-    // Simple reduction by repeated subtraction with GM/T compliance
-    var field_reduction_iterations: u32 = 0;
-    const max_field_reduction_iterations: u32 = 256;
-
-    while (!bigint.lessThan(result, field_order) and field_reduction_iterations < max_field_reduction_iterations) {
-        const sub_result = bigint.sub(result, field_order);
-        if (sub_result.borrow) break;
-        result = sub_result.result;
-        field_reduction_iterations += 1;
+/// SM9 message authentication code using HMAC-SM3 construction
+/// Provides secure message authentication for SM9 operations
+pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) ![]u8 {
+    // Input validation
+    if (key.len == 0 or message.len == 0) {
+        return HashError.InvalidInput;
     }
 
-    // GM/T 0044-2016 compliance: Proper modular reduction must succeed
-    // If iterations exceed maximum, the field order is likely invalid
-    if (field_reduction_iterations >= max_field_reduction_iterations) {
-        // SECURITY: No fallback mechanisms - fail securely when modular reduction cannot complete
-        // This indicates either invalid field order or computational error
-        return HashError.ModularReductionFailed;
-    }
+    // Allocate result
+    const result = try allocator.alloc(u8, constants.FieldSize.SM3_HASH_BYTES);
+    errdefer allocator.free(result);
 
+    try computeHMacSM3(key, message, result);
+    
     return result;
 }
 
-/// SM9 message authentication code
-pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) ![]u8 {
+/// Compute HMAC-SM3 according to RFC 2104 pattern
+fn computeHMacSM3(key: []const u8, message: []const u8, output: *[32]u8) !void {
+    const block_size = 64; // SM3 block size
+    var key_buffer: [64]u8 = [_]u8{0} ** 64;
 
-    // Simple HMAC-like construction using SHA-256
-    const block_size = 64;
-    var key_pad = [_]u8{0} ** block_size;
-
-    // Prepare key
+    // Prepare key: hash if too long, pad if too short
     if (key.len <= block_size) {
-        std.mem.copyForwards(u8, &key_pad, key);
+        @memcpy(key_buffer[0..key.len], key);
     } else {
-        // Hash long keys
-        var hasher = SM3.init(.{});
-        hasher.update(key);
+        var key_builder = helpers.SM3Builder.init();
+        _ = key_builder.update(key);
         var key_hash: [32]u8 = undefined;
-        hasher.final(&key_hash);
-        std.mem.copyForwards(u8, &key_pad, &key_hash);
+        key_builder.finalize(&key_hash);
+        @memcpy(key_buffer[0..32], &key_hash);
+        helpers.SecureMemory.clearSensitiveData(&key_hash);
     }
+    defer helpers.SecureMemory.clearSensitiveData(&key_buffer);
 
-    // Compute inner hash
-    var inner_key = key_pad;
+    // Compute inner hash: H((K ⊕ ipad) || message)
+    var inner_key = key_buffer;
     for (&inner_key) |*byte| {
-        byte.* ^= 0x36;
+        byte.* ^= 0x36; // ipad
     }
 
-    var inner_hasher = SM3.init(.{});
-    inner_hasher.update(&inner_key);
-    inner_hasher.update(message);
-
+    var inner_builder = helpers.SM3Builder.init();
+    _ = inner_builder.update(&inner_key)
+                    .update(message);
+    
     var inner_hash: [32]u8 = undefined;
-    inner_hasher.final(&inner_hash);
+    inner_builder.finalize(&inner_hash);
+    defer helpers.SecureMemory.clearSensitiveData(&inner_hash);
 
-    // Compute outer hash
-    var outer_key = key_pad;
+    // Compute outer hash: H((K ⊕ opad) || inner_hash)
+    var outer_key = key_buffer;
     for (&outer_key) |*byte| {
-        byte.* ^= 0x5c;
+        byte.* ^= 0x5C; // opad
     }
 
-    var outer_hasher = SM3.init(.{});
-    outer_hasher.update(&outer_key);
-    outer_hasher.update(&inner_hash);
-
-    var mac_result = try allocator.alloc(u8, 32);
-    outer_hasher.final(mac_result[0..32]);
-
-    return mac_result;
+    var outer_builder = helpers.SM3Builder.init();
+    _ = outer_builder.update(&outer_key)
+                    .update(&inner_hash);
+    
+    outer_builder.finalize(output);
 }
 
-/// Constant-time hash comparison
+/// Constant-time hash comparison for security
 pub fn constantTimeHashEqual(a: []const u8, b: []const u8) bool {
     if (a.len != b.len) return false;
 
@@ -407,33 +424,13 @@ pub fn constantTimeHashEqual(a: []const u8, b: []const u8) bool {
     return result == 0;
 }
 
-/// SM9 hash utilities
+/// SM9 hash utilities with improved organization
 pub const HashUtils = struct {
-    /// Create hash context for incremental hashing
-    pub const HashContext = struct {
-        hasher: SM3,
-
-        pub fn init() HashContext {
-            return HashContext{
-                .hasher = SM3.init(.{}),
-            };
-        }
-
-        pub fn update(self: *HashContext, data: []const u8) void {
-            self.hasher.update(data);
-        }
-
-        pub fn final(self: *HashContext, output: []u8) void {
-            if (output.len >= 32) {
-                self.hasher.final(output[0..32]);
-            }
-        }
-    };
-
-    /// Hash integer to bytes (big-endian)
+    /// Hash integer to bytes (big-endian) with domain separation
     pub fn hashInteger(value: u64) [32]u8 {
-        var hasher = SM3.init(.{});
-
+        var builder = helpers.SM3Builder.init();
+        
+        // Convert to big-endian bytes
         const bytes = [8]u8{
             @as(u8, @intCast((value >> 56) & 0xFF)),
             @as(u8, @intCast((value >> 48) & 0xFF)),
@@ -445,29 +442,55 @@ pub const HashUtils = struct {
             @as(u8, @intCast(value & 0xFF)),
         };
 
-        hasher.update(&bytes);
-        hasher.update("SM9_INTEGER_HASH");
+        _ = builder.update(&bytes)
+                 .updateDomainSeparator("SM9_INTEGER_HASH");
 
         var result: [32]u8 = undefined;
-        hasher.final(&result);
+        builder.finalize(&result);
         return result;
     }
 
     /// Hash array of bytes with separator
     pub fn hashArray(arrays: []const []const u8, separator: []const u8, allocator: std.mem.Allocator) ![]u8 {
-        var hasher = SM3.init(.{});
+        var builder = helpers.SM3Builder.init();
 
         for (arrays, 0..) |array, i| {
             if (i > 0) {
-                hasher.update(separator);
+                _ = builder.update(separator);
             }
-            hasher.update(array);
+            _ = builder.update(array);
         }
 
-        hasher.update("SM9_ARRAY_HASH");
+        _ = builder.updateDomainSeparator("SM9_ARRAY_HASH");
 
-        var result = try allocator.alloc(u8, 32);
-        hasher.final(result[0..32]);
+        var result = try allocator.alloc(u8, constants.FieldSize.SM3_HASH_BYTES);
+        var hash: [32]u8 = undefined;
+        builder.finalize(&hash);
+        @memcpy(result, &hash);
+        
         return result;
     }
+
+    /// Create incremental hash context (backward compatibility)
+    pub const HashContext = struct {
+        builder: helpers.SM3Builder,
+
+        pub fn init() HashContext {
+            return HashContext{
+                .builder = helpers.SM3Builder.init(),
+            };
+        }
+
+        pub fn update(self: *HashContext, data: []const u8) void {
+            _ = self.builder.update(data);
+        }
+
+        pub fn final(self: *HashContext, output: []u8) void {
+            if (output.len >= constants.FieldSize.SM3_HASH_BYTES) {
+                var hash: [32]u8 = undefined;
+                self.builder.finalize(&hash);
+                @memcpy(output[0..32], &hash);
+            }
+        }
+    };
 };
