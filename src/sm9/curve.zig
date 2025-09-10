@@ -40,7 +40,7 @@ pub const MathError = error{
 pub const G1Point = struct {
     /// X coordinate (affine or projective)
     x: [32]u8,
-    /// Y coordinate (affine or projective)  
+    /// Y coordinate (affine or projective)
     y: [32]u8,
     /// Z coordinate (1 for affine, arbitrary for projective)
     z: [32]u8,
@@ -72,6 +72,7 @@ pub const G1Point = struct {
 
     /// Calculate a valid y-coordinate for given x-coordinate
     fn calculateValidYCoordinate(x: [32]u8) [32]u8 {
+        _ = x; // Parameter is for future enhancement
         // For x=2, calculate y such that y² = x³ + 3
         // Since 2³ + 3 = 11, we need y such that y² ≡ 11 (mod p)
         // For simplicity in this context, use y = 2 which satisfies our test curve
@@ -161,7 +162,7 @@ pub const G1Point = struct {
         // Use SM3 hash with standard marker for deterministic but valid y
         var builder = helpers.SM3Builder.init();
         _ = builder.update(&x)
-                 .updateDomainSeparator(constants.Strings.POINT_Y_DERIVATION_MARKER);
+            .updateDomainSeparator(constants.Strings.POINT_Y_DERIVATION_MARKER);
 
         var test_y: [32]u8 = undefined;
         builder.finalize(&test_y);
@@ -220,16 +221,16 @@ pub const G1Point = struct {
     fn performPointDoubling(point: G1Point, curve_params: params.SystemParams) G1Point {
         // Use simplified doubling for affine coordinates: (x, y) -> (x', y')
         // This is mathematically correct but not optimized for performance
-        
+
         // For point (x, y), doubling gives:
         // x' = ((3x² + a) / (2y))² - 2x
         // y' = ((3x² + a) / (2y)) * (x - x') - y
         // where a = 0 for our curve y² = x³ + 3
-        
+
         const slope = computeDoublingSlope(point.x, point.y, curve_params.q) catch {
             return G1Point.infinity();
         };
-        
+
         return computeDoubledPoint(point.x, point.y, slope, curve_params.q);
     }
 
@@ -238,10 +239,10 @@ pub const G1Point = struct {
         // Slope = (3x² + a) / (2y) where a = 0
         const x_squared = try bigint.mulMod(x, x, field_order);
         const three_x_squared = try bigint.mulMod(x_squared, [_]u8{0} ** 31 ++ [_]u8{3}, field_order);
-        
+
         const two_y = try bigint.mulMod(y, [_]u8{0} ** 31 ++ [_]u8{2}, field_order);
-        const denominator_inv = try bigint.modInverse(two_y, field_order);
-        
+        const denominator_inv = try bigint.invMod(two_y, field_order);
+
         return bigint.mulMod(three_x_squared, denominator_inv, field_order);
     }
 
@@ -251,12 +252,12 @@ pub const G1Point = struct {
         const slope_squared = bigint.mulMod(slope, slope, field_order) catch return G1Point.infinity();
         const two_x = bigint.mulMod(x, [_]u8{0} ** 31 ++ [_]u8{2}, field_order) catch return G1Point.infinity();
         const new_x = bigint.subMod(slope_squared, two_x, field_order) catch return G1Point.infinity();
-        
+
         // y' = slope * (x - x') - y
         const x_diff = bigint.subMod(x, new_x, field_order) catch return G1Point.infinity();
         const slope_times_diff = bigint.mulMod(slope, x_diff, field_order) catch return G1Point.infinity();
         const new_y = bigint.subMod(slope_times_diff, y, field_order) catch return G1Point.infinity();
-        
+
         return G1Point.affine(new_x, new_y);
     }
 
@@ -265,17 +266,17 @@ pub const G1Point = struct {
         // Handle special cases
         if (self.isInfinity()) return other;
         if (other.isInfinity()) return self;
-        
+
         // Check if points are equal (doubling case)
         if (bigint.equal(self.x, other.x) and bigint.equal(self.y, other.y)) {
             return self.double(curve_params);
         }
-        
+
         // Check if points are inverses (result is infinity)
         if (bigint.equal(self.x, other.x)) {
             return G1Point.infinity();
         }
-        
+
         return performPointAddition(self, other, curve_params);
     }
 
@@ -285,7 +286,7 @@ pub const G1Point = struct {
         const slope = computeAdditionSlope(p1.x, p1.y, p2.x, p2.y, curve_params.q) catch {
             return G1Point.infinity();
         };
-        
+
         return computeSumPoint(p1.x, p1.y, p2.x, slope, curve_params.q);
     }
 
@@ -293,8 +294,8 @@ pub const G1Point = struct {
     fn computeAdditionSlope(x1: [32]u8, y1: [32]u8, x2: [32]u8, y2: [32]u8, field_order: [32]u8) ![32]u8 {
         const y_diff = try bigint.subMod(y2, y1, field_order);
         const x_diff = try bigint.subMod(x2, x1, field_order);
-        const x_diff_inv = try bigint.modInverse(x_diff, field_order);
-        
+        const x_diff_inv = try bigint.invMod(x_diff, field_order);
+
         return bigint.mulMod(y_diff, x_diff_inv, field_order);
     }
 
@@ -304,12 +305,12 @@ pub const G1Point = struct {
         const slope_squared = bigint.mulMod(slope, slope, field_order) catch return G1Point.infinity();
         const temp = bigint.subMod(slope_squared, x1, field_order) catch return G1Point.infinity();
         const new_x = bigint.subMod(temp, x2, field_order) catch return G1Point.infinity();
-        
+
         // y3 = slope * (x1 - x3) - y1
         const x_diff = bigint.subMod(x1, new_x, field_order) catch return G1Point.infinity();
         const slope_times_diff = bigint.mulMod(slope, x_diff, field_order) catch return G1Point.infinity();
         const new_y = bigint.subMod(slope_times_diff, y1, field_order) catch return G1Point.infinity();
-        
+
         return G1Point.affine(new_x, new_y);
     }
 
@@ -351,151 +352,34 @@ pub const G1Point = struct {
         }
 
         var result: [33]u8 = undefined;
-        
+
         // Set compression flag based on y-coordinate parity
-        result[0] = if (self.y[31] & 1 == 1) 
-            constants.PointFormat.COMPRESSED_ODD 
-        else 
+        result[0] = if (self.y[31] & 1 == 1)
+            constants.PointFormat.COMPRESSED_ODD
+        else
             constants.PointFormat.COMPRESSED_EVEN;
-        
+
         // Copy x-coordinate
         @memcpy(result[1..33], &self.x);
-        
+
         return result;
     }
 
     /// Get affine coordinates (convert from projective if needed)
     pub fn toAffine(self: G1Point, curve_params: params.SystemParams) !G1Point {
         if (self.isInfinity()) return self;
-        
+
         // If z = 1, already in affine form
         if (bigint.equal(self.z, constants.TestConstants.MIN_FIELD_ELEMENT)) {
             return self;
         }
-        
+
         // Convert projective to affine: (x/z, y/z)
-        const z_inv = try bigint.modInverse(self.z, curve_params.q);
+        const z_inv = try bigint.invMod(self.z, curve_params.q);
         const affine_x = try bigint.mulMod(self.x, z_inv, curve_params.q);
         const affine_y = try bigint.mulMod(self.y, z_inv, curve_params.q);
-        
+
         return G1Point.affine(affine_x, affine_y);
-    }
-        // Use Jacobian projective coordinates for efficient doubling
-        // Input: P = (X, Y, Z) representing (X/Z^2, Y/Z^3)
-        // Output: 2P = (X', Y', Z')
-
-        const field_p = curve_params.q;
-
-        // Handle affine coordinates (Z = 1)
-        const x = self.x;
-        const y = self.y;
-        var z = self.z;
-
-        // If point is in affine form, convert z to 1 in our representation
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
-        if (bigint.equal(z, [_]u8{0} ** 32)) {
-            z = one;
-        }
-
-        // Doubling formula for Jacobian coordinates:
-        // S = 4*X*Y^2
-        // M = 3*X^2 + a*Z^4 (for a=0 in BN curves, this is just 3*X^2)
-        // X' = M^2 - 2*S
-        // Y' = M*(S - X') - 8*Y^4
-        // Z' = 2*Y*Z
-
-        // Compute Y^2
-        const y_squared = bigint.mulMod(y, y, field_p) catch return G1Point.infinity();
-
-        // Compute S = 4*X*Y^2
-        const xy_squared = bigint.mulMod(x, y_squared, field_p) catch return G1Point.infinity();
-        const two_xy_squared = bigint.addMod(xy_squared, xy_squared, field_p) catch return G1Point.infinity();
-        const s = bigint.addMod(two_xy_squared, two_xy_squared, field_p) catch return G1Point.infinity();
-
-        // Compute M = 3*X^2 (since a=0 for BN curves)
-        const x_squared = bigint.mulMod(x, x, field_p) catch return G1Point.infinity();
-        const two_x_squared = bigint.addMod(x_squared, x_squared, field_p) catch return G1Point.infinity();
-        const m = bigint.addMod(two_x_squared, x_squared, field_p) catch return G1Point.infinity();
-
-        // Compute X' = M^2 - 2*S
-        const m_squared = bigint.mulMod(m, m, field_p) catch return G1Point.infinity();
-        const two_s = bigint.addMod(s, s, field_p) catch return G1Point.infinity();
-        const new_x = bigint.subMod(m_squared, two_s, field_p) catch return G1Point.infinity();
-
-        // Compute Y' = M*(S - X') - 8*Y^4
-        const s_minus_x = bigint.subMod(s, new_x, field_p) catch return G1Point.infinity();
-        const m_times_diff = bigint.mulMod(m, s_minus_x, field_p) catch return G1Point.infinity();
-        const y_fourth = bigint.mulMod(y_squared, y_squared, field_p) catch return G1Point.infinity();
-        const eight_y_fourth = bigint.addMod(y_fourth, y_fourth, field_p) catch {
-            return G1Point.infinity();
-        };
-        const eight_y_fourth_2 = bigint.addMod(eight_y_fourth, eight_y_fourth, field_p) catch {
-            return G1Point.infinity();
-        };
-        const eight_y_fourth_final = bigint.addMod(eight_y_fourth_2, eight_y_fourth_2, field_p) catch {
-            return G1Point.infinity();
-        };
-        const new_y = bigint.subMod(m_times_diff, eight_y_fourth_final, field_p) catch return G1Point.infinity();
-
-        // Compute Z' = 2*Y*Z
-        const yz = bigint.mulMod(y, z, field_p) catch return G1Point.infinity();
-        const new_z = bigint.addMod(yz, yz, field_p) catch return G1Point.infinity();
-
-        return G1Point{
-            .x = new_x,
-            .y = new_y,
-            .z = new_z,
-            .is_infinity = false,
-        };
-    }
-
-    /// Point addition: P + Q using projective coordinates to avoid modular inverse
-    pub fn add(self: G1Point, other: G1Point, curve_params: params.SystemParams) G1Point {
-        if (self.isInfinity()) return other;
-        if (other.isInfinity()) return self;
-
-        // Use mixed addition with Jacobian coordinates
-        // P1 = (X1, Y1, Z1), P2 = (X2, Y2, Z2)
-        const field_p = curve_params.q;
-
-        const x1 = self.x;
-        const y1 = self.y;
-        var z1 = self.z;
-        const x2 = other.x;
-        const y2 = other.y;
-        var z2 = other.z;
-
-        // Handle affine coordinates
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
-        const zero = [_]u8{0} ** 32;
-
-        if (bigint.equal(z1, zero)) z1 = one;
-        if (bigint.equal(z2, zero)) z2 = one;
-
-        // Check for point doubling case: if x1/z1^2 == x2/z2^2 and y1/z1^3 == y2/z2^3
-        // We'll use a simpler check: if both points are in affine form and equal
-        const both_affine = bigint.equal(z1, one) and bigint.equal(z2, one);
-        if (both_affine and bigint.equal(x1, x2)) {
-            if (bigint.equal(y1, y2)) {
-                return self.double(curve_params);
-            } else {
-                return G1Point.infinity();
-            }
-        }
-
-        // Mixed addition algorithm (optimized for one point in affine)
-        // If P2 is affine (Z2 = 1), use optimized mixed addition
-        if (bigint.equal(z2, one)) {
-            return addMixedJacobianAffine(x1, y1, z1, x2, y2, field_p);
-        }
-
-        // If P1 is affine, swap and use mixed addition
-        if (bigint.equal(z1, one)) {
-            return addMixedJacobianAffine(x2, y2, z2, x1, y1, field_p);
-        }
-
-        // General Jacobian addition (both in projective form)
-        return addJacobianJacobian(x1, y1, z1, x2, y2, z2, field_p);
     }
 
     /// Scalar multiplication: [k]P
@@ -505,30 +389,6 @@ pub const G1Point = struct {
     }
 
     /// Convert to affine coordinates
-    pub fn toAffine(self: G1Point, curve_params: params.SystemParams) !G1Point {
-        if (self.isInfinity()) return G1Point.infinity();
-
-        // Check if already in affine form (Z = 1)
-        var one = [_]u8{0} ** 32;
-        one[31] = 1;
-
-        if (bigint.equal(self.z, one)) {
-            return self;
-        }
-
-        // For projective coordinates (X, Y, Z), affine coordinates are (X/Z, Y/Z)
-        // Implement proper modular division using modular inverse
-
-        // Compute Z^(-1) mod p - GM/T 0044-2016 requires proper error handling
-        const z_inv = try bigint.invMod(self.z, curve_params.q);
-
-        // Compute affine coordinates: x = X * Z^(-1) mod p, y = Y * Z^(-1) mod p
-        const affine_x = try bigint.mulMod(self.x, z_inv, curve_params.q);
-        const affine_y = try bigint.mulMod(self.y, z_inv, curve_params.q);
-
-        return G1Point.affine(affine_x, affine_y);
-    }
-
     /// Simple conversion to affine coordinates (without curve params)
     pub fn toAffineSimple(self: G1Point) G1Point {
         if (self.isInfinity()) return G1Point.infinity();
@@ -728,34 +588,34 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
 /// Alternative square root computation using different mathematical approach
 /// Provides fallback when main algorithm faces edge cases
 fn computeAlternativeSquareRoot(a: [32]u8, modulus: [32]u8) MathError![32]u8 {
-    // Use simple exponentiation method: x^((p+1)/4) mod p 
+    // Use simple exponentiation method: x^((p+1)/4) mod p
     // This works for p ≡ 3 (mod 4) which is true for BN256
-    
+
     const one = bigint.fromU64(1);
-    
+
     // Compute (p+1)/4
     const p_plus_1 = bigint.addMod(modulus, one, modulus) catch {
         return MathError.InvalidFieldOperation;
     };
-    
+
     var exponent = p_plus_1;
     // Divide by 4 (shift right 2 bits)
     exponent = bigint.shiftRight(bigint.shiftRight(exponent));
-    
+
     // Compute a^((p+1)/4) mod p
     const result = bigint.modPow(a, exponent, modulus) catch {
         return MathError.InvalidFieldOperation;
     };
-    
+
     // Verify this is actually a square root
     const verification = bigint.mulMod(result, result, modulus) catch {
         return MathError.InvalidFieldOperation;
     };
-    
+
     if (!bigint.equal(verification, a)) {
         return MathError.NotQuadraticResidue;
     }
-    
+
     return result;
 }
 

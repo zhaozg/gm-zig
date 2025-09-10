@@ -3,12 +3,11 @@ const std = @import("std");
 /// SM9 Constants and Configuration
 /// Centralizes all magic numbers, strings, and configuration values used throughout SM9 implementation
 /// Based on GM/T 0044-2016 Chinese National Standard
-
 /// Point compression format identifiers
 pub const PointFormat = struct {
     /// Compressed point with even y-coordinate
     pub const COMPRESSED_EVEN: u8 = 0x02;
-    /// Compressed point with odd y-coordinate  
+    /// Compressed point with odd y-coordinate
     pub const COMPRESSED_ODD: u8 = 0x03;
     /// Uncompressed point format
     pub const UNCOMPRESSED: u8 = 0x04;
@@ -67,20 +66,10 @@ pub const Strings = struct {
 /// BN256 curve parameters for SM9 (GM/T 0044-2016 standard)
 pub const BN256Params = struct {
     /// Prime field order q
-    pub const FIELD_ORDER: [32]u8 = [_]u8{
-        0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1,
-        0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45,
-        0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB,
-        0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D
-    };
+    pub const FIELD_ORDER: [32]u8 = [_]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
 
     /// Group order N
-    pub const GROUP_ORDER: [32]u8 = [_]u8{
-        0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1,
-        0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44,
-        0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE,
-        0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25
-    };
+    pub const GROUP_ORDER: [32]u8 = [_]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
 
     /// Curve coefficient b = 3 for equation y² = x³ + b
     pub const CURVE_B: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{3};
@@ -157,15 +146,15 @@ pub const Utils = struct {
     /// Check if a value matches any point format identifier
     pub fn isValidPointFormat(format: u8) bool {
         return format == PointFormat.COMPRESSED_EVEN or
-               format == PointFormat.COMPRESSED_ODD or
-               format == PointFormat.UNCOMPRESSED or
-               format == PointFormat.INFINITY;
+            format == PointFormat.COMPRESSED_ODD or
+            format == PointFormat.UNCOMPRESSED or
+            format == PointFormat.INFINITY;
     }
 
     /// Check if a hash identifier is valid
     pub fn isValidHashIdentifier(hid: u8) bool {
         return hid == HashIdentifier.SIGNATURE or
-               hid == HashIdentifier.ENCRYPTION;
+            hid == HashIdentifier.ENCRYPTION;
     }
 
     /// Get error message for error type
