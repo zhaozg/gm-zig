@@ -81,7 +81,7 @@ test "GM/T 0044-2016 - Hash function H1 compliance" {
         description: []const u8,
     }{
         .{ .user_id = "Alice@bupt.edu.cn", .hid = 0x01, .description = "signature key derivation" },
-        .{ .user_id = "Bob@bupt.edu.cn", .hid = 0x02, .description = "encryption key derivation" },
+        .{ .user_id = "Bob@bupt.edu.cn", .hid = 0x03, .description = "encryption key derivation" },
         .{ .user_id = "Alice", .hid = 0x01, .description = "simplified identifier" },
         .{ .user_id = "测试用户@example.com", .hid = 0x01, .description = "Chinese characters - 测试用户 means 'test user'" },
     };

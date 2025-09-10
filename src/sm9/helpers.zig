@@ -6,7 +6,6 @@ const SM3 = @import("../sm3.zig").SM3;
 /// SM9 Helper Functions
 /// Provides common utility functions to reduce code duplication and improve maintainability
 /// Based on GM/T 0044-2016 standard
-
 /// Hash computation helper errors
 pub const HelperError = error{
     InvalidInput,
@@ -121,7 +120,7 @@ pub const ModularReduction = struct {
     /// Simplified modular reduction for edge cases
     fn simplifiedReduction(value: [32]u8, modulus: [32]u8) [32]u8 {
         var result = value;
-        
+
         // Apply byte-wise modular reduction according to modulus
         var i: usize = 0;
         while (i < constants.FieldSize.FIELD_ELEMENT_BYTES) : (i += 1) {
@@ -129,64 +128,64 @@ pub const ModularReduction = struct {
                 result[i] = result[i] % modulus[i];
             }
         }
-        
+
         // Ensure result is non-zero and valid
         if (bigint.isZero(result)) {
             return constants.TestConstants.MIN_FIELD_ELEMENT;
         }
-        
+
         return result;
     }
 };
 
 /// Counter management for hash iteration
 pub const CounterManager = struct {
-    current: u32,
+    current_value: u32,
     max_value: u32,
 
     /// Initialize counter with default limits
     pub fn init() CounterManager {
         return CounterManager{
-            .current = 1,
+            .current_value = 1,
             .max_value = constants.Limits.MAX_HASH_COUNTER,
         };
     }
 
-    /// Initialize counter with custom limits  
+    /// Initialize counter with custom limits
     pub fn initWithLimit(max_value: u32) CounterManager {
         return CounterManager{
-            .current = 1,
+            .current_value = 1,
             .max_value = max_value,
         };
     }
 
     /// Get current counter value
     pub fn current(self: CounterManager) u32 {
-        return self.current;
+        return self.current_value;
     }
 
     /// Increment counter and check bounds
     pub fn increment(self: *CounterManager) !void {
-        if (self.current >= self.max_value) {
+        if (self.current_value >= self.max_value) {
             return HelperError.CounterOverflow;
         }
-        self.current += 1;
+        self.current_value += 1;
     }
 
     /// Reset counter to initial value
     pub fn reset(self: *CounterManager) void {
-        self.current = 1;
+        self.current_value = 1;
     }
 
     /// Check if counter has reached maximum
     pub fn isAtMax(self: CounterManager) bool {
-        return self.current >= self.max_value;
+        return self.current_value >= self.max_value;
     }
 
     /// Get remaining iterations
     pub fn remaining(self: CounterManager) u32 {
-        if (self.current >= self.max_value) return 0;
-        return self.max_value - self.current;
+        if (self.current_value >= self.max_value) return 0;
+        return self.max_value - self.current_value;
     }
 };
 
@@ -197,12 +196,12 @@ pub const Validation = struct {
         if (user_id.len == 0) {
             return HelperError.InvalidInput;
         }
-        
+
         // Check for reasonable length limits (email addresses, etc.)
         if (user_id.len > 256) {
             return HelperError.InvalidLength;
         }
-        
+
         // Ensure user ID contains printable characters
         for (user_id) |byte| {
             if (byte < 32 or byte > 126) {
@@ -219,7 +218,7 @@ pub const Validation = struct {
         if (message.len == 0) {
             return HelperError.InvalidInput;
         }
-        
+
         // Check message size limits for security
         if (message.len > constants.Security.MAX_MESSAGE_SIZE) {
             return HelperError.InvalidLength;
@@ -231,7 +230,7 @@ pub const Validation = struct {
         if (bigint.isZero(modulus)) {
             return HelperError.InvalidInput;
         }
-        
+
         if (!bigint.lessThan(element, modulus)) {
             return HelperError.InvalidInput;
         }
@@ -313,13 +312,9 @@ pub const ErrorContext = struct {
 
     pub fn format(self: ErrorContext, allocator: std.mem.Allocator) ![]u8 {
         if (self.additional_info.len > 0) {
-            return std.fmt.allocPrint(allocator, "{s} in {s}: {s}", .{
-                self.operation, self.function_name, self.additional_info
-            });
+            return std.fmt.allocPrint(allocator, "{s} in {s}: {s}", .{ self.operation, self.function_name, self.additional_info });
         } else {
-            return std.fmt.allocPrint(allocator, "{s} in {s}", .{
-                self.operation, self.function_name
-            });
+            return std.fmt.allocPrint(allocator, "{s} in {s}", .{ self.operation, self.function_name });
         }
     }
 };

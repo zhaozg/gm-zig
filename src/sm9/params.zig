@@ -56,10 +56,11 @@ pub const SystemParams = struct {
 
     /// Validate system parameters with improved error handling
     pub fn validate(self: SystemParams) bool {
-        return validateCurveType(self) and 
-               validateHashOutput(self) and
-               validateGeneratorPoints(self) and
-               validateFieldParameters(self);
+        return validateCurveType(self) and
+            validateHashOutput(self) and
+            validateGeneratorPoints(self) and
+            validateFieldParameters(self) and
+            validatePointParameters(self);
     }
 
     /// Validate curve type
@@ -100,12 +101,14 @@ pub const SystemParams = struct {
         if (q_zero or N_zero) return false;
 
         // Verify that q and N are odd (primes > 2 are odd)
-        if (self.q[31] & 1 == 0) return false;    // q must be odd
-        if (self.N[31] & 1 == 0) return false;    // N must be odd
+        if (self.q[31] & 1 == 0) return false; // q must be odd
+        if (self.N[31] & 1 == 0) return false; // N must be odd
 
         return true;
     }
 
+    /// Validate point parameters (P1 and P2 are valid points)
+    fn validatePointParameters(self: SystemParams) bool {
         // Check that P1 x-coordinate is within field bounds (< q)
         const p1_x_coord: [32]u8 = self.P1[1..33].*;
         if (!isLessThan(p1_x_coord, self.q)) return false;
