@@ -35,25 +35,25 @@ pub const SystemParams = struct {
         const N_bytes = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
 
         // G1 generator P1 according to GM/T 0044-2016 standard
-        // BN256 G1 standard generator point coordinates  
+        // BN256 G1 standard generator point coordinates
         // Use a mathematically valid x-coordinate that we can verify works
         // For BN256, we'll use x=2 since x=1 might not be yielding valid square roots
         var P1_bytes = [_]u8{0x02} ++ [_]u8{0} ** 32;
         const g1_x_bytes = [32]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02 };
         std.mem.copyForwards(u8, P1_bytes[1..], &g1_x_bytes);
 
-        // G2 generator P2 according to GM/T 0044-2016 standard  
+        // G2 generator P2 according to GM/T 0044-2016 standard
         // BN256 G2 generator point in uncompressed format (0x04 prefix + 64 bytes coordinates)
         // For now, use a valid simple G2 point to fix validation issues
         var P2_bytes: [65]u8 = undefined;
         P2_bytes[0] = 0x04; // Uncompressed point format prefix
-        
+
         // Use simple valid coordinates for G2 generator (32 bytes each for x and y)
         // This ensures validation passes while maintaining mathematical validity
         const g2_coord = [32]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
-        
-        std.mem.copyForwards(u8, P2_bytes[1..33], &g2_coord);   // x-coordinate
-        std.mem.copyForwards(u8, P2_bytes[33..65], &g2_coord);  // y-coordinate
+
+        std.mem.copyForwards(u8, P2_bytes[1..33], &g2_coord); // x-coordinate
+        std.mem.copyForwards(u8, P2_bytes[33..65], &g2_coord); // y-coordinate
 
         return SystemParams{
             .curve = .bn256,
@@ -178,57 +178,57 @@ pub const SignMasterKeyPair = struct {
         // In proper implementation, this would use P2 * private_key
         // For now, use deterministic generation based on private key
         var public_key: [65]u8 = undefined;
-        
+
         // Set uncompressed point prefix
         public_key[0] = 0x04;
-        
+
         // Generate deterministic G2 point components from private key
         // Use SM3 hash for deterministic derivation
         var hasher = crypto.hash.sha3.Sha3_256.init(.{});
         hasher.update("GM/T 0044-2016 Sign Master Public Key");
         hasher.update(&private_key);
-        
+
         var x_seed: [32]u8 = undefined;
         hasher.final(&x_seed);
-        
+
         // Generate y component with different salt
         var y_hasher = crypto.hash.sha3.Sha3_256.init(.{});
         y_hasher.update("GM/T 0044-2016 Sign Master Public Y");
         y_hasher.update(&private_key);
         y_hasher.update(&x_seed);
-        
+
         var y_seed: [32]u8 = undefined;
         y_hasher.final(&y_seed);
-        
+
         // Ensure coordinates are valid field elements (< q)
         // Use a simple but effective reduction strategy
         var x_reduced = x_seed;
         var y_reduced = y_seed;
-        
+
         // Simple reduction: ensure the coordinates are smaller than the modulus
         // by masking the high bits to be smaller than the modulus first byte
         const q_high_byte = params.q[0];
-        
+
         // Reduce X coordinate
         if (x_reduced[0] >= q_high_byte) {
             x_reduced[0] = q_high_byte >> 1; // Make it definitely smaller
         }
-        
-        // Reduce Y coordinate  
+
+        // Reduce Y coordinate
         if (y_reduced[0] >= q_high_byte) {
             y_reduced[0] = q_high_byte >> 1; // Make it definitely smaller
         }
-        
+
         // Copy reduced coordinates to public key
         @memcpy(public_key[1..33], &x_reduced);
         @memcpy(public_key[33..65], &y_reduced);
-        
+
         // Ensure coordinates are non-zero for valid point
         if (isZero(x_reduced)) {
             public_key[32] = 0x01; // Make x non-zero
         }
         if (isZero(y_reduced)) {
-            public_key[64] = 0x01; // Make y non-zero  
+            public_key[64] = 0x01; // Make y non-zero
         }
 
         return SignMasterKeyPair{
@@ -260,10 +260,10 @@ pub const SignMasterKeyPair = struct {
             const field = @import("field.zig");
             const x_coord = self.public_key[1..33];
             const y_coord = self.public_key[33..65];
-            
+
             // Check if coordinates are valid field elements (< q)
             return field.isValidFieldElement(x_coord.*, params.q) and
-                   field.isValidFieldElement(y_coord.*, params.q);
+                field.isValidFieldElement(y_coord.*, params.q);
         } else if (self.public_key[0] == 0x02 or self.public_key[0] == 0x03) {
             // Compressed G2 point - verify x coordinate is valid field element
             const field = @import("field.zig");
@@ -273,7 +273,7 @@ pub const SignMasterKeyPair = struct {
             // Infinity point is valid
             return true;
         }
-        
+
         return false;
     }
 };
@@ -325,35 +325,35 @@ pub const EncryptMasterKeyPair = struct {
         // In proper implementation, this would use P1 * private_key
         // For now, use deterministic generation based on private key
         var public_key: [33]u8 = undefined;
-        
+
         // Set compressed point prefix (use 0x02 for even y-coordinate)
         public_key[0] = 0x02;
-        
+
         // Generate deterministic G1 point x-coordinate from private key
         // Use SM3 hash for deterministic derivation
         var hasher = crypto.hash.sha3.Sha3_256.init(.{});
         hasher.update("GM/T 0044-2016 Encrypt Master Public Key");
         hasher.update(&private_key);
-        
+
         var x_coord: [32]u8 = undefined;
         hasher.final(&x_coord);
-        
+
         // Ensure coordinate is a valid field element (< q)
         // Use a simple but effective reduction strategy
         var x_reduced = x_coord;
-        
+
         // Simple reduction: ensure the coordinate is smaller than the modulus
         // by masking the high bits to be smaller than the modulus first byte
         const q_high_byte = params.q[0];
-        
+
         // Reduce X coordinate
         if (x_reduced[0] >= q_high_byte) {
             x_reduced[0] = q_high_byte >> 1; // Make it definitely smaller
         }
-        
+
         // Copy reduced coordinate to public key
         @memcpy(public_key[1..33], &x_reduced);
-        
+
         // Ensure coordinate is non-zero for valid point
         if (isZero(x_reduced)) {
             public_key[32] = 0x01; // Make x non-zero
@@ -389,7 +389,7 @@ pub const EncryptMasterKeyPair = struct {
             // Infinity point is valid
             return true;
         }
-        
+
         return false;
     }
 };
@@ -455,7 +455,7 @@ pub const SM9System = struct {
         };
 
         const encrypt_master = EncryptMasterKeyPair.fromPrivateKey(params, encrypt_private_key) catch {
-            // SECURITY: Master key derivation failure indicates system configuration error  
+            // SECURITY: Master key derivation failure indicates system configuration error
             // GM/T 0044-2016 requires deterministic master key generation for interoperability
             // Return error rather than using fallback to maintain cryptographic integrity
             return ParameterError.MasterKeyGenerationFailed;

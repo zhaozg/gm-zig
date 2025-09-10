@@ -32,7 +32,7 @@ pub const EncryptionError = error{
     KDFCounterOverflow,
     KDFOutputAllZeros,
     InvalidKDFOutput,
-    
+
     // User key derivation errors
     InvalidUserPublicKey,
     // System parameter validation errors
@@ -268,7 +268,7 @@ pub const EncryptionContext = struct {
 
         // Parse P1 (generator point) from system parameters
         const p1_point = curve_ops.G1Point.generator(self.system_params) catch {
-            // Use identity element to maintain mathematical integrity  
+            // Use identity element to maintain mathematical integrity
             curve_ops.G1Point.identity();
         };
 
@@ -302,41 +302,41 @@ pub const EncryptionContext = struct {
         pairing_hasher.update(&self.system_params.q);
         var pairing_seed: [32]u8 = undefined;
         pairing_hasher.final(&pairing_seed);
-        
+
         // Create a deterministic GT element based on user_id and system parameters
         const w_gt_element = pairing.GtElement.random(&pairing_seed);
 
         // Convert GT element to bytes for KDF input (proper mathematical approach)
         const w_bytes = w_gt_element.toBytes();
-            // Continue with KDF computation...
+        // Continue with KDF computation...
 
-            // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
-            const kdf_len = options.kdf_len orelse message.len;
-            const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
-            defer self.allocator.free(K);
+        // Step 6: Compute K = KDF(C1 || w || ID_B, klen)
+        const kdf_len = options.kdf_len orelse message.len;
+        const K = try EncryptionUtils.kdf(w_bytes[0..32], kdf_len, self.allocator);
+        defer self.allocator.free(K);
 
-            // Step 7: Encrypt message: C2 = M ⊕ K (XOR encryption)
-            var c2 = try self.allocator.alloc(u8, message.len);
-            for (message, K[0..message.len], 0..) |m, k, i| {
-                c2[i] = m ^ k;
-            }
-
-            // Step 8: Compute C3 = MAC(C1 || M || padding)
-            var c3 = [_]u8{0} ** 32;
-            var c3_hasher = SM3.init(.{});
-            c3_hasher.update(&c1);
-            c3_hasher.update(message);
-            c3_hasher.update("C3_MAC");
-            c3_hasher.final(&c3);
-
-            return Ciphertext.initTakeOwnership(
-                self.allocator,
-                c1,
-                c2,
-                c3,
-                options.format,
-            );
+        // Step 7: Encrypt message: C2 = M ⊕ K (XOR encryption)
+        var c2 = try self.allocator.alloc(u8, message.len);
+        for (message, K[0..message.len], 0..) |m, k, i| {
+            c2[i] = m ^ k;
         }
+
+        // Step 8: Compute C3 = MAC(C1 || M || padding)
+        var c3 = [_]u8{0} ** 32;
+        var c3_hasher = SM3.init(.{});
+        c3_hasher.update(&c1);
+        c3_hasher.update(message);
+        c3_hasher.update("C3_MAC");
+        c3_hasher.final(&c3);
+
+        return Ciphertext.initTakeOwnership(
+            self.allocator,
+            c1,
+            c2,
+            c3,
+            options.format,
+        );
+    }
 
     /// Decrypt ciphertext with user private key
     pub fn decrypt(
@@ -364,7 +364,7 @@ pub const EncryptionContext = struct {
         pairing_hasher.update(&self.system_params.q);
         var pairing_seed: [32]u8 = undefined;
         pairing_hasher.final(&pairing_seed);
-        
+
         // Create the same deterministic GT element used in encryption
         const w_gt_element = pairing.GtElement.random(&pairing_seed);
 
@@ -449,14 +449,14 @@ pub const KEMContext = struct {
         // Generate a deterministic key based on user_id for reproducible tests
         const key_data = try self.encryption_context.allocator.alloc(u8, key_length);
         defer self.encryption_context.allocator.free(key_data); // Free temporary allocation
-        
+
         // Fill with deterministic data based on user_id
         var hasher = SM3.init(.{});
         hasher.update(user_id);
         hasher.update("KEM_ENCAPSULATION");
         var seed: [32]u8 = undefined;
         hasher.final(&seed);
-        
+
         // Generate key data from seed
         for (key_data, 0..) |*byte, i| {
             var byte_hasher = SM3.init(.{});
@@ -466,12 +466,12 @@ pub const KEMContext = struct {
             byte_hasher.final(&byte_hash);
             byte.* = byte_hash[0];
         }
-        
+
         // Create encapsulation data (simplified - in production would use proper KEM)
         var encapsulation_data: [64]u8 = undefined;
         @memcpy(encapsulation_data[0..32], &seed);
         @memcpy(encapsulation_data[32..64], &seed); // Duplicate for now
-        
+
         // KeyEncapsulation.init will make its own copy of the key data
         return try KeyEncapsulation.init(self.encryption_context.allocator, key_data, encapsulation_data);
     }
@@ -485,14 +485,14 @@ pub const KEMContext = struct {
         // Basic KEM decapsulation - recreate the same key that was encapsulated
         // This is a simplified implementation for testing
         _ = user_private_key; // For now, not using private key in simplified version
-        
+
         // Extract the seed from encapsulation data
         const seed = encapsulation_data[0..32];
-        
+
         // Default key length for this implementation
         const key_length = 32;
         const key_data = try self.encryption_context.allocator.alloc(u8, key_length);
-        
+
         // Recreate the same key that was encapsulated
         for (key_data, 0..) |*byte, i| {
             var byte_hasher = SM3.init(.{});
@@ -502,7 +502,7 @@ pub const KEMContext = struct {
             byte_hasher.final(&byte_hash);
             byte.* = byte_hash[0];
         }
-        
+
         return key_data;
     }
 };
@@ -548,7 +548,7 @@ pub const EncryptionUtils = struct {
     fn standardCompliantKdf(input: []const u8, output_len: usize, allocator: std.mem.Allocator) ![]u8 {
         if (output_len == 0) return error.InvalidKDFLength;
         if (input.len == 0) return error.InvalidKDFInput;
-        
+
         // Allocate output buffer
         var result = try allocator.alloc(u8, output_len);
         errdefer allocator.free(result);
@@ -559,10 +559,10 @@ pub const EncryptionUtils = struct {
 
         while (offset < output_len) {
             var hasher = SM3.init(.{});
-            
+
             // Step 1: Hash the input material
             hasher.update(input);
-            
+
             // Step 2: Add counter as 4-byte big-endian (GM/T 0044-2016 requirement)
             const counter_bytes = [4]u8{
                 @as(u8, @intCast((counter >> 24) & 0xFF)),
@@ -582,7 +582,7 @@ pub const EncryptionUtils = struct {
 
             offset += copy_len;
             counter += 1;
-            
+
             // Prevent infinite loop in case of implementation error
             if (counter > 0x1000000) { // Reasonable upper limit
                 return error.KDFCounterOverflow;
@@ -599,7 +599,7 @@ pub const EncryptionUtils = struct {
                 break;
             }
         }
-        
+
         if (all_zero) {
             // This is a cryptographic failure condition per GM/T 0044-2016
             // Do not modify the output - return error instead
@@ -682,7 +682,7 @@ pub const EncryptionUtils = struct {
             return false;
         }
 
-        // GM/T 0044-2016 compliance: For testing purposes, accept well-formatted points  
+        // GM/T 0044-2016 compliance: For testing purposes, accept well-formatted points
         // In production, this would include complete Fp2 curve equation validation
         return true; // Accept points that pass basic format and field checks
     }

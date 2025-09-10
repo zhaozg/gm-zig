@@ -94,7 +94,7 @@ pub const EphemeralKeyPair = struct {
                 break;
             }
         }
-        
+
         if (all_zero) {
             return KeyAgreementError.InvalidPublicKey;
         }
@@ -207,7 +207,7 @@ pub const KeyAgreementContext = struct {
         var buffer: [1024]u8 = undefined;
         var fba = std.heap.FixedBufferAllocator.init(&buffer);
         const temp_allocator = fba.allocator();
-        
+
         const peer_public_key = key_extract.UserPublicKey.deriveForSignature(
             peer_user_id,
             self.system_params,
@@ -222,7 +222,7 @@ pub const KeyAgreementContext = struct {
         // if (!peer_public_key.validate(self.system_params)) {
         //     return KeyAgreementError.InvalidPublicKey;
         // }
-        
+
         // Basic sanity check instead
         if (peer_public_key.hid != 0x01 and peer_public_key.hid != 0x03) {
             return KeyAgreementError.InvalidPublicKey;
@@ -250,7 +250,7 @@ pub const KeyAgreementContext = struct {
         var buffer2: [1024]u8 = undefined;
         var fba2 = std.heap.FixedBufferAllocator.init(&buffer2);
         const temp_allocator2 = fba2.allocator();
-        
+
         const my_public_key = key_extract.UserPublicKey.deriveForSignature(
             my_user_id,
             self.system_params,

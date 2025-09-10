@@ -77,7 +77,7 @@ pub const SignUserPrivateKey = struct {
         // Step 5: Generate user private key using mathematical approach
         // GM/T 0044-2016: User private key = t1_inv * P1
         // Instead of decompressing potentially invalid P1, use a valid generator approach
-        
+
         // Create a mathematically valid G1 point for key generation
         // This maintains algorithmic correctness while avoiding decompression issues
         const g1_base = curve.G1Point.generator(system_params) catch {
@@ -182,7 +182,7 @@ pub const EncryptUserPrivateKey = struct {
             return KeyExtractionError.KeyGenerationFailed;
         };
 
-        // Step 3: Handle t2 = 0 case according to GM/T 0044-2016  
+        // Step 3: Handle t2 = 0 case according to GM/T 0044-2016
         if (bigint.isZero(t2)) {
             // According to GM/T 0044-2016, if t2 ≡ 0 (mod N), the master key pair is invalid
             // This should be extremely rare with proper random master key generation
@@ -499,5 +499,3 @@ pub fn h2Hash(message: []const u8, w: []const u8, order: [32]u8, allocator: std.
     const hash = @import("hash.zig");
     return hash.h2Hash(message, w, order, allocator);
 }
-
-

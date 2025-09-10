@@ -62,7 +62,7 @@ test "GM/T 0044-2016 - Generator point format compliance" {
     // For now, use the generator function directly which creates a valid point
     const p1_point = sm9.curve.G1Point.generator(system.params) catch {
         std.debug.print("P1 generator creation failed - this should not happen\n", .{});
-        return; 
+        return;
     };
     try testing.expect(p1_point.validate(system.params));
 }
@@ -159,7 +159,7 @@ test "GM/T 0044-2016 - Key extraction compliance" {
 test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
     const system = sm9.params.SM9System.init();
 
-    // Test G1 point operations  
+    // Test G1 point operations
     const p1_point = sm9.curve.G1Point.generator(system.params) catch {
         std.debug.print("Skipping curve arithmetic test due to generator creation failure\n", .{});
         return; // Skip this test temporarily while fixing curve arithmetic
@@ -175,7 +175,7 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
     // Test elliptic curve operations with enhanced validation tolerance
     // These operations may produce edge case results that don't strictly validate
     // but are mathematically correct within the SM9 implementation context
-    
+
     // Test scalar multiplication with small scalar
     var scalar = [_]u8{0} ** 32;
     scalar[31] = 2; // Multiply by 2
@@ -183,12 +183,12 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
     // Accept the result as long as it's not obviously invalid
     const multiplied_affine = multiplied.toAffine(system.params) catch return;
     // Use relaxed validation for elliptic curve compliance testing
-    const multiplied_valid = sm9.curve.CurveUtils.validateG1Enhanced(multiplied_affine, system.params) or 
-                           multiplied_affine.isInfinity() or
-                           !sm9.bigint.isZero(multiplied_affine.x) or
-                           !sm9.bigint.isZero(multiplied_affine.y);
+    const multiplied_valid = sm9.curve.CurveUtils.validateG1Enhanced(multiplied_affine, system.params) or
+        multiplied_affine.isInfinity() or
+        !sm9.bigint.isZero(multiplied_affine.x) or
+        !sm9.bigint.isZero(multiplied_affine.y);
     try testing.expect(multiplied_valid);
-    
+
     // Verify that basic curve operations complete without errors
     // This ensures the implementation can handle standard elliptic curve arithmetic
     const another_scalar = [_]u8{0} ** 31 ++ [_]u8{3};

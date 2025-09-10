@@ -438,7 +438,7 @@ pub const SignatureContext = struct {
         // Compute user's public key point using h1 value
         const user_pub_point = curve_module.CurveUtils.scalarMultiplyG2(P2_point, h1_value, self.system_params);
 
-        // Perform bilinear pairing verification: e(S, P2) = e(verification_point, user_pub_point)  
+        // Perform bilinear pairing verification: e(S, P2) = e(verification_point, user_pub_point)
         // CRITICAL: Pairing verification is fundamental to SM9 digital signature security
         const left_pairing = pairing_module.pairing(S_point, P2_point, self.system_params) catch {
             // SECURITY: Pairing failure in signature verification indicates cryptographic error
@@ -446,7 +446,7 @@ pub const SignatureContext = struct {
         };
 
         const right_pairing = pairing_module.pairing(verification_point, user_pub_point, self.system_params) catch {
-            // SECURITY: Pairing failure in signature verification indicates cryptographic error  
+            // SECURITY: Pairing failure in signature verification indicates cryptographic error
             return SignatureError.PairingVerificationFailed;
         };
 
