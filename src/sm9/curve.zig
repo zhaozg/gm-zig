@@ -159,10 +159,10 @@ pub const G1Point = struct {
                     // Final fallback: Use simple valid y-coordinate
                     var minimal_y = [_]u8{0} ** 32;
                     minimal_y[31] = 1; // Smallest positive field element
-                    return minimal_y;
+                    break :blk minimal_y;
                 };
                 
-                return reduced_y;
+                break :blk reduced_y;
             };
             
             // Apply correct sign based on compression flag
