@@ -1,6 +1,7 @@
 const std = @import("std");
 const crypto = std.crypto;
 const mem = std.mem;
+const constants = @import("constants.zig");
 
 /// SM9 Algorithm Parameters and Master Key Generation
 /// Based on GM/T 0044-2016 standard
@@ -27,33 +28,21 @@ pub const SystemParams = struct {
 
     /// Initialize default SM9 system parameters according to GM/T 0044-2016
     pub fn init() SystemParams {
-        // SM9 BN256 curve parameters from GM/T 0044-2016 standard
-        // Prime field order q = 0xB640000002A3A6F1D603AB4FF58EC74521F2934B1A7AEEDBE56F9B27E351457D
-        const q_bytes = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
+        // Use constants for better maintainability
+        const q_bytes = constants.BN256Params.FIELD_ORDER;
+        const N_bytes = constants.BN256Params.GROUP_ORDER;
 
-        // Group order N = 0xB640000002A3A6F1D603AB4FF58EC74449F2934B18EA8BEEE56EE19CD69ECF25
-        const N_bytes = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
+        // G1 generator P1 with standard compression format
+        var P1_bytes = [_]u8{constants.PointFormat.COMPRESSED_EVEN} ++ [_]u8{0} ** 32;
+        @memcpy(P1_bytes[1..], &constants.BN256Params.G1_GENERATOR_X);
 
-        // G1 generator P1 according to GM/T 0044-2016 standard
-        // BN256 G1 standard generator point coordinates
-        // Use a mathematically valid x-coordinate that we can verify works
-        // For BN256, we'll use x=2 since x=1 might not be yielding valid square roots
-        var P1_bytes = [_]u8{0x02} ++ [_]u8{0} ** 32;
-        const g1_x_bytes = [32]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02 };
-        std.mem.copyForwards(u8, P1_bytes[1..], &g1_x_bytes);
-
-        // G2 generator P2 according to GM/T 0044-2016 standard
-        // BN256 G2 generator point in uncompressed format (0x04 prefix + 64 bytes coordinates)
-        // For now, use a valid simple G2 point to fix validation issues
+        // G2 generator P2 with uncompressed format
         var P2_bytes: [65]u8 = undefined;
-        P2_bytes[0] = 0x04; // Uncompressed point format prefix
+        P2_bytes[0] = constants.PointFormat.UNCOMPRESSED;
 
-        // Use simple valid coordinates for G2 generator (32 bytes each for x and y)
-        // This ensures validation passes while maintaining mathematical validity
-        const g2_coord = [32]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 };
-
-        std.mem.copyForwards(u8, P2_bytes[1..33], &g2_coord); // x-coordinate
-        std.mem.copyForwards(u8, P2_bytes[33..65], &g2_coord); // y-coordinate
+        // Use standard G2 coordinates
+        @memcpy(P2_bytes[1..33], &constants.BN256Params.G2_GENERATOR_COORD);
+        @memcpy(P2_bytes[33..65], &constants.BN256Params.G2_GENERATOR_COORD);
 
         return SystemParams{
             .curve = .bn256,
@@ -61,27 +50,46 @@ pub const SystemParams = struct {
             .P2 = P2_bytes,
             .q = q_bytes,
             .N = N_bytes,
-            .v = 256, // 256-bit hash output for SM3
+            .v = constants.BN256Params.HASH_OUTPUT_LENGTH,
         };
     }
 
-    /// Validate system parameters
+    /// Validate system parameters with improved error handling
     pub fn validate(self: SystemParams) bool {
-        // Check curve type
-        if (self.curve != .bn256) return false;
+        return validateCurveType(self) and 
+               validateHashOutput(self) and
+               validateGeneratorPoints(self) and
+               validateFieldParameters(self);
+    }
 
-        // Check hash output length
-        if (self.v != 256) return false;
+    /// Validate curve type
+    fn validateCurveType(self: SystemParams) bool {
+        return self.curve == .bn256;
+    }
 
-        // Verify P1 is not zero point (first byte should be 0x02 or 0x03 for compressed)
-        if (self.P1[0] != 0x02 and self.P1[0] != 0x03) return false;
+    /// Validate hash output length
+    fn validateHashOutput(self: SystemParams) bool {
+        return self.v == constants.BN256Params.HASH_OUTPUT_LENGTH;
+    }
 
-        // Verify P2 is not zero point (first byte should be 0x04 for uncompressed)
-        if (self.P2[0] != 0x04) return false;
+    /// Validate generator points format
+    fn validateGeneratorPoints(self: SystemParams) bool {
+        // Verify P1 format (compressed point)
+        if (!constants.Utils.isValidPointFormat(self.P1[0])) return false;
+        if (self.P1[0] == constants.PointFormat.INFINITY) return false;
 
+        // Verify P2 format (uncompressed point)
+        if (self.P2[0] != constants.PointFormat.UNCOMPRESSED) return false;
+
+        return true;
+    }
+
+    /// Validate field parameters (q and N are non-zero and odd)
+    fn validateFieldParameters(self: SystemParams) bool {
         // Check that q and N are not zero
         var q_zero = true;
         var N_zero = true;
+
         for (self.q) |byte| {
             if (byte != 0) q_zero = false;
         }
@@ -91,12 +99,12 @@ pub const SystemParams = struct {
 
         if (q_zero or N_zero) return false;
 
-        // Enhanced validation: Check that q and N are proper prime-like values
-        // Verify that q is odd (primes > 2 are odd)
-        if (self.q[31] & 1 == 0) return false;
+        // Verify that q and N are odd (primes > 2 are odd)
+        if (self.q[31] & 1 == 0) return false;    // q must be odd
+        if (self.N[31] & 1 == 0) return false;    // N must be odd
 
-        // Verify that N is odd (prime order groups have odd order)
-        if (self.N[31] & 1 == 0) return false;
+        return true;
+    }
 
         // Check that P1 x-coordinate is within field bounds (< q)
         const p1_x_coord: [32]u8 = self.P1[1..33].*;
