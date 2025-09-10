@@ -76,14 +76,10 @@ pub const EphemeralKeyPair = struct {
         // Compress the public key - no fallback validation
         const public_key = public_point.compress();
 
-        // Validate the generated key pair - use permissive validation for testing
+        // Validate the generated key pair - strict GM/T 0044-2016 compliance
         const test_point = curve.G1Point.fromCompressed(public_key) catch {
-            // If point decompression fails, still proceed with a fallback
-            // This ensures tests can proceed while maintaining the key generation contract
-            return EphemeralKeyPair{
-                .private_key = private_key,
-                .public_key = public_key,
-            };
+            // GM/T 0044-2016 compliance: Point decompression failure indicates invalid key
+            return KeyAgreementError.InvalidPublicKey;
         };
 
         // Very permissive validation - just check it's not all zeros

@@ -81,9 +81,8 @@ pub const SignUserPrivateKey = struct {
         // Create a mathematically valid G1 point for key generation
         // This maintains algorithmic correctness while avoiding decompression issues
         const g1_base = curve.G1Point.generator(system_params) catch {
-            // If generator fails, create a simple valid point
-            // Use the identity element as a safe fallback that maintains mathematical properties
-            curve.G1Point.identity();
+            // GM/T 0044-2016 compliance: Fail securely instead of using fallback
+            return KeyExtractionError.KeyGenerationFailed;
         };
 
         // Apply the key derivation scalar
