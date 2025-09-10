@@ -27,7 +27,7 @@ test "SM9 hash functions" {
     const allocator = gpa.allocator();
 
     const data = "test@example.com";
-    
+
     // Use proper SM9 group order N from GM/T 0044-2016 standard instead of artificial small value
     // This ensures the hash function operates within its intended parameter range
     const params = sm9.params.SystemParams.init();
@@ -122,7 +122,7 @@ test "SM9 pairing operations" {
     try testing.expect(!non_identity_gt.isIdentity());
 
     // Test that identity raised to any power remains identity (using exponent 1 to avoid infinite loops)
-    const simple_exponent = sm9.bigint.fromU64(1);  
+    const simple_exponent = sm9.bigint.fromU64(1);
     const identity_pow = identity_gt.pow(simple_exponent);
     try testing.expect(identity_pow.isIdentity());
 }

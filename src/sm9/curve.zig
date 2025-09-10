@@ -64,14 +64,14 @@ pub const G1Point = struct {
         // Use a simple but mathematically valid generator
         // For BN256, we can use (1, 2) which satisfies y^2 = x^3 + 3 since 4 = 1 + 3
         _ = curve_params; // Acknowledge parameter for interface compatibility
-        
+
         // Create a simple valid point: x=1, y=2 (since 2^2 = 4 = 1^3 + 3)
         var x = [_]u8{0} ** 32;
         x[31] = 1; // x = 1
-        
+
         var y = [_]u8{0} ** 32;
         y[31] = 2; // y = 2
-        
+
         return affine(x, y);
     }
 
@@ -138,25 +138,25 @@ pub const G1Point = struct {
             return error.InvalidPointFormat;
         };
 
-        // Step 3: Compute square root with fallback for invalid points  
+        // Step 3: Compute square root with fallback for invalid points
         // For BN256 field where p ≡ 3 (mod 4), sqrt(a) = a^((p+1)/4) mod p
         const y = computeSquareRoot(y_squared, curve_params.q, compressed[0] == 0x03) catch blk: {
             // Fallback: If square root computation fails, generate a valid y-coordinate
             // This maintains point format compatibility while ensuring functionality
             var fallback_y = [_]u8{0} ** 32;
-            
+
             // Use x-coordinate to derive a deterministic but valid y-coordinate
             // This ensures the same input always produces the same output
             for (x, 0..) |byte, i| {
                 const index = @as(u16, @intCast(i & 0xFFFF)); // Safely cast to u16
                 fallback_y[i] = @as(u8, @intCast((@as(u16, byte) * 7 + index) % 251));
             }
-            
+
             // Ensure the result is not zero
             if (bigint.isZero(fallback_y)) {
                 fallback_y[31] = 1;
             }
-            
+
             break :blk fallback_y;
         };
 
@@ -431,15 +431,15 @@ pub const G1Point = struct {
         // Implement proper point compression according to GM/T 0044-2016
         // For compressed format: [prefix][x_coordinate]
         // prefix = 0x02 if y is even, 0x03 if y is odd
-        
+
         // Use the point's x coordinate directly (assuming it's already in affine form)
         std.mem.copyForwards(u8, result[1..33], &self.x);
-        
+
         // Determine the correct prefix based on y-coordinate parity
         // For simplicity and mathematical correctness, use 0x02 (even y)
         // This maintains the compressed point format while ensuring valid data
         result[0] = 0x02;
-        
+
         return result;
     }
 
@@ -467,16 +467,16 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
 
     // For BN256 curve (q ≡ 3 mod 4), we can directly use Tonelli-Shanks simplification
     // Since q ≡ 3 mod 4, square root can be computed as: sqrt(a) = a^((q+1)/4) mod q
-    
+
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    
+
     // Compute (q+1)/4 directly without checking Legendre symbol first
     // Add 1 to modulus
     const q_plus_1 = bigint.addMod(modulus, one, modulus) catch {
         // If this fails, the modulus is invalid
         return MathError.InvalidFieldOperation;
     };
-    
+
     // Divide by 4: shift right twice to get (q+1)/4
     const exp = bigint.shiftRight(bigint.shiftRight(q_plus_1));
 
@@ -485,7 +485,7 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
         return MathError.InvalidFieldOperation;
     };
 
-    // CRITICAL: Verify that result^2 ≡ a (mod q)  
+    // CRITICAL: Verify that result^2 ≡ a (mod q)
     // This is essential for cryptographic correctness
     const result_squared = bigint.mulMod(result, result, modulus) catch {
         return MathError.InvalidFieldOperation;
@@ -496,13 +496,13 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
         // This could indicate either invalid input (not a quadratic residue) or computational error
         // Check if it's a quadratic residue by computing Legendre symbol
         const q_minus_1 = bigint.subMod(modulus, one, modulus) catch {
-            return MathError.InvalidFieldOperation;  
+            return MathError.InvalidFieldOperation;
         };
         const legendre_exp = bigint.shiftRight(q_minus_1);
         const legendre_result = bigint.modPow(a, legendre_exp, modulus) catch {
             return MathError.InvalidFieldOperation;
         };
-        
+
         if (bigint.equal(legendre_result, one)) {
             // It's a quadratic residue but our computation failed - this is an algorithm error
             return MathError.InvalidFieldOperation;
@@ -515,7 +515,7 @@ fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u
     // Adjust for correct parity (odd/even) as specified
     const is_result_odd = (result[31] & 1) == 1;
     if (is_odd_y != is_result_odd) {
-        // Negate result: result = q - result  
+        // Negate result: result = q - result
         const negate_result = bigint.subMod(modulus, result, modulus) catch {
             return MathError.InvalidFieldOperation;
         };
@@ -562,21 +562,21 @@ pub const G2Point = struct {
     /// Get a standard generator point for the G2 curve
     pub fn generator(curve_params: params.SystemParams) !G2Point {
         _ = curve_params; // Acknowledge parameter for interface compatibility
-        
+
         // Create a valid G2 point using non-zero coordinates
         // For BN256 G2, we need valid Fp2 elements that work with the twist curve
         // Use a simple approach: create a point that's not at infinity
         var x: [64]u8 = [_]u8{0} ** 64;
         var y: [64]u8 = [_]u8{0} ** 64;
-        
+
         // Set x = (2, 0) in Fp2 (x0 = 2, x1 = 0)
         x[31] = 2; // x0 = 2
         x[63] = 0; // x1 = 0
-        
-        // Set y = (3, 0) in Fp2 (y0 = 3, y1 = 0)  
+
+        // Set y = (3, 0) in Fp2 (y0 = 3, y1 = 0)
         y[31] = 3; // y0 = 3
         y[63] = 0; // y1 = 0
-        
+
         return affine(x, y);
     }
 
@@ -620,10 +620,10 @@ pub const G2Point = struct {
         // Implement basic G2 point doubling
         // For testing purposes, use a simplified approach that maintains point structure
         var result = self;
-        
+
         // Use curve parameters to ensure we're working within the field
         _ = curve_params.q; // Use the field modulus for validation
-        
+
         // Simple transformation that maintains the point format while avoiding infinity
         // This is not mathematically correct Fp2 arithmetic but prevents scalar multiplication failures
         for (result.x, 0..) |byte, i| {
@@ -636,7 +636,7 @@ pub const G2Point = struct {
                 result.y[i] = @as(u8, @intCast((@as(u16, byte) * 3) % 251));
             }
         }
-        
+
         return result;
     }
 
@@ -653,10 +653,10 @@ pub const G2Point = struct {
         // Basic G2 point addition approximation
         // This is not mathematically correct Fp2 arithmetic but prevents scalar multiplication failures
         var result = self;
-        
+
         // Use curve parameters to ensure we're working within the field
         _ = curve_params.q; // Use the field modulus for validation
-        
+
         // Simple field-like addition that maintains point structure
         for (self.x, other.x, 0..) |a, b, i| {
             result.x[i] = @as(u8, @intCast((@as(u16, a) + @as(u16, b)) % 251));
@@ -664,7 +664,7 @@ pub const G2Point = struct {
         for (self.y, other.y, 0..) |a, b, i| {
             result.y[i] = @as(u8, @intCast((@as(u16, a) + @as(u16, b) + 1) % 251));
         }
-        
+
         return result;
     }
 
@@ -802,7 +802,8 @@ pub const CurveUtils = struct {
     /// Hash to G1 point (simplified)
     /// GM/T 0044-2016 compliant - proper error handling
     pub fn hashToG1(data: []const u8, curve_params: params.SystemParams) !G1Point {
-        _ = data; _ = curve_params; // Acknowledge parameters for proper GM/T 0044-2016 interface
+        _ = data;
+        _ = curve_params; // Acknowledge parameters for proper GM/T 0044-2016 interface
         _ = data;
 
         // GM/T 0044-2016 compliance: Proper hash-to-curve requires complete implementation
@@ -813,7 +814,8 @@ pub const CurveUtils = struct {
     /// Hash to G2 point (simplified)
     /// GM/T 0044-2016 compliant - proper error handling
     pub fn hashToG2(data: []const u8, curve_params: params.SystemParams) !G2Point {
-        _ = data; _ = curve_params; // Acknowledge parameters for proper GM/T 0044-2016 interface
+        _ = data;
+        _ = curve_params; // Acknowledge parameters for proper GM/T 0044-2016 interface
         _ = data;
 
         // GM/T 0044-2016 compliance: Proper hash-to-curve requires complete implementation
@@ -881,7 +883,7 @@ pub const CurveUtils = struct {
     /// Validate G1 point with enhanced security checks and boundary condition handling
     pub fn validateG1Enhanced(point: G1Point, curve_params: params.SystemParams) bool {
         _ = curve_params; // Not used in this permissive implementation
-        
+
         // Basic infinity check - allow infinity for mathematical operations
         if (point.isInfinity()) return true;
 

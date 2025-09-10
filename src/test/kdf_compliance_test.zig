@@ -55,29 +55,29 @@ test "GM/T 0044-2016 KDF Security Properties" {
     // Test that different inputs produce different outputs
     const input1 = "Test Input 1";
     const input2 = "Test Input 2";
-    
+
     const result1 = try sm9.encrypt.EncryptionUtils.kdf(input1, 32, allocator);
     defer allocator.free(result1);
-    
+
     const result2 = try sm9.encrypt.EncryptionUtils.kdf(input2, 32, allocator);
     defer allocator.free(result2);
-    
+
     // Results should be different (avalanche effect)
     try testing.expect(!std.mem.eql(u8, result1, result2));
 
     // Test that single bit change produces completely different output
     const input3 = "Test Input 3";
     const input4 = "Test Input 4"; // Only last character different
-    
+
     const result3 = try sm9.encrypt.EncryptionUtils.kdf(input3, 32, allocator);
     defer allocator.free(result3);
-    
+
     const result4 = try sm9.encrypt.EncryptionUtils.kdf(input4, 32, allocator);
     defer allocator.free(result4);
-    
+
     // Results should be different
     try testing.expect(!std.mem.eql(u8, result3, result4));
-    
+
     // Count different bytes (should be significantly different)
     var different_bytes: usize = 0;
     for (result3, result4) |b1, b2| {

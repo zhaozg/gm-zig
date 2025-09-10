@@ -28,23 +28,23 @@ pub const GtElement = struct {
     pub fn isIdentity(self: GtElement) bool {
         // Check if c0 = 1 and c1 = 0
         // c0 should be (1, 0, 0) in Fp6, c1 should be (0, 0, 0) in Fp6
-        
+
         // Check c1 (bytes 192-383) are all zero
         for (self.data[192..384]) |byte| {
             if (byte != 0) return false;
         }
-        
+
         // Check c0 first Fp2 element is (1, 0)
         for (self.data[0..31]) |byte| {
             if (byte != 0) return false;
         }
         if (self.data[31] != 1) return false;
-        
+
         // Check remaining Fp2 elements in c0 are zero
         for (self.data[32..192]) |byte| {
             if (byte != 0) return false;
         }
-        
+
         return true;
     }
 
@@ -56,7 +56,7 @@ pub const GtElement = struct {
         if (other.isIdentity()) return self;
 
         var result = GtElement{ .data = [_]u8{0} ** 384 };
-        
+
         // Simple field multiplication approximation
         // For full GM/T 0044-2016 compliance, this should implement proper Fp12 multiplication
         for (self.data, other.data, 0..) |a, b, i| {
@@ -64,7 +64,7 @@ pub const GtElement = struct {
             const product = (@as(u16, a) * @as(u16, b)) % 251; // Use prime modulus
             result.data[i] = @as(u8, @intCast(product));
         }
-        
+
         // Ensure result is not identity unless both inputs are identity
         if (!self.isIdentity() and !other.isIdentity()) {
             // Ensure at least one non-zero byte in a non-identity position
@@ -72,7 +72,7 @@ pub const GtElement = struct {
                 result.data[32] = 1; // Set a non-identity component
             }
         }
-        
+
         return result;
     }
 
@@ -80,14 +80,14 @@ pub const GtElement = struct {
     fn getFp6Component(self: GtElement, comptime component: u8) [192]u8 {
         var result: [192]u8 = undefined;
         const start = if (component == 0) 0 else 192;
-        @memcpy(&result, self.data[start..start + 192]);
+        @memcpy(&result, self.data[start .. start + 192]);
         return result;
     }
 
-    /// Set Fp6 component (0 for c0, 1 for c1)  
+    /// Set Fp6 component (0 for c0, 1 for c1)
     fn setFp6Component(self: *GtElement, comptime component: u8, value: [192]u8) void {
         const start = if (component == 0) 0 else 192;
-        @memcpy(self.data[start..start + 192], &value);
+        @memcpy(self.data[start .. start + 192], &value);
     }
 
     /// Exponentiate Gt element using proper field arithmetic
@@ -113,11 +113,11 @@ pub const GtElement = struct {
         // For larger exponents or complex operations, implement proper Fp12 arithmetic
         var result = GtElement.identity();
         const base = self;
-        
+
         // Check for small exponent values that we can handle
         var small_exp: u64 = 0;
         var is_small = true;
-        
+
         // Convert to u64 if possible (for exponents up to 2^64-1)
         for (exponent[0..24]) |byte| {
             if (byte != 0) {
@@ -125,23 +125,23 @@ pub const GtElement = struct {
                 break;
             }
         }
-        
+
         if (is_small) {
             small_exp = (@as(u64, exponent[31]) << 0) |
-                       (@as(u64, exponent[30]) << 8) |
-                       (@as(u64, exponent[29]) << 16) |
-                       (@as(u64, exponent[28]) << 24) |
-                       (@as(u64, exponent[27]) << 32) |
-                       (@as(u64, exponent[26]) << 40) |
-                       (@as(u64, exponent[25]) << 48) |
-                       (@as(u64, exponent[24]) << 56);
-            
+                (@as(u64, exponent[30]) << 8) |
+                (@as(u64, exponent[29]) << 16) |
+                (@as(u64, exponent[28]) << 24) |
+                (@as(u64, exponent[27]) << 32) |
+                (@as(u64, exponent[26]) << 40) |
+                (@as(u64, exponent[25]) << 48) |
+                (@as(u64, exponent[24]) << 56);
+
             // Simple repeated squaring for small exponents
-            if (small_exp <= 1000) {  // Limit to prevent long computations
+            if (small_exp <= 1000) { // Limit to prevent long computations
                 result = GtElement.identity();
                 var temp_base = base;
                 var exp = small_exp;
-                
+
                 while (exp > 0) {
                     if (exp & 1 == 1) {
                         result = result.mul(temp_base);
@@ -152,7 +152,7 @@ pub const GtElement = struct {
                 return result;
             }
         }
-        
+
         // For complex exponents, use simplified approach that avoids identity
         // This provides non-trivial results for testing while maintaining mathematical properties
         return self.mul(self); // Return self^2 as a non-trivial result
@@ -164,13 +164,13 @@ pub const GtElement = struct {
         if (self.isIdentity()) {
             return GtElement.identity();
         }
-        
+
         // For non-identity elements, implement basic inversion
         // For full GM/T 0044-2016 compliance, this should implement proper Fp12 inversion
         // Using simplified approach that maintains mathematical properties
-        
+
         var result = self;
-        
+
         // Basic inversion approximation - modify the data while preserving structure
         // Use a safer approach that won't cause crashes
         for (result.data, 0..) |byte, i| {
@@ -179,7 +179,7 @@ pub const GtElement = struct {
                 result.data[i] = 255 - byte;
             }
         }
-        
+
         return result;
     }
 
@@ -242,20 +242,19 @@ pub const GtElement = struct {
 
 /// Fp6 field arithmetic for GM/T 0044-2016 compliance
 /// Fp6 = Fp2[v]/(v^3 - xi) where xi is a non-residue in Fp2
-
 /// Add two Fp6 elements: (a0, a1, a2) + (b0, b1, b2) = (a0+b0, a1+b1, a2+b2)
 fn fp6Add(a: [192]u8, b: [192]u8) [192]u8 {
     var result: [192]u8 = undefined;
-    
+
     // Add three Fp2 components
     for (0..3) |i| {
         const start = i * 64;
-        const a_comp = a[start..start + 64];
-        const b_comp = b[start..start + 64];
+        const a_comp = a[start .. start + 64];
+        const b_comp = b[start .. start + 64];
         const sum = fp2Add(a_comp[0..64].*, b_comp[0..64].*);
-        @memcpy(result[start..start + 64], &sum);
+        @memcpy(result[start .. start + 64], &sum);
     }
-    
+
     return result;
 }
 
@@ -264,48 +263,48 @@ fn fp6Add(a: [192]u8, b: [192]u8) [192]u8 {
 fn fp6Multiply(a: [192]u8, b: [192]u8) [192]u8 {
     // Extract Fp2 components
     const a0 = a[0..64].*;
-    const a1 = a[64..128].*;  
+    const a1 = a[64..128].*;
     const a2 = a[128..192].*;
     const b0 = b[0..64].*;
     const b1 = b[64..128].*;
     const b2 = b[128..192].*;
-    
+
     // Compute products
     const a0b0 = fp2Multiply(a0, b0);
     const a1b1 = fp2Multiply(a1, b1);
     const a2b2 = fp2Multiply(a2, b2);
-    
+
     // Compute cross terms
     const a0_plus_a1 = fp2Add(a0, a1);
     const b0_plus_b1 = fp2Add(b0, b1);
     const t1 = fp2Multiply(a0_plus_a1, b0_plus_b1); // (a0+a1)(b0+b1)
     const t1_minus_a0b0_a1b1 = fp2Sub(fp2Sub(t1, a0b0), a1b1); // a0*b1 + a1*b0
-    
+
     const a0_plus_a2 = fp2Add(a0, a2);
     const b0_plus_b2 = fp2Add(b0, b2);
     const t2 = fp2Multiply(a0_plus_a2, b0_plus_b2); // (a0+a2)(b0+b2)
     const t2_minus_a0b0_a2b2 = fp2Sub(fp2Sub(t2, a0b0), a2b2); // a0*b2 + a2*b0
-    
+
     const a1_plus_a2 = fp2Add(a1, a2);
     const b1_plus_b2 = fp2Add(b1, b2);
     const t3 = fp2Multiply(a1_plus_a2, b1_plus_b2); // (a1+a2)(b1+b2)
     const t3_minus_a1b1_a2b2 = fp2Sub(fp2Sub(t3, a1b1), a2b2); // a1*b2 + a2*b1
-    
+
     // Apply Fp6 reduction: v^3 = xi
     // Result = (a0*b0 + xi*(a1*b2 + a2*b1), a0*b1 + a1*b0 + xi*a2*b2, a0*b2 + a2*b0 + a1*b1)
     const xi_a1b2_plus_a2b1 = fp2MultiplyByXi(t3_minus_a1b1_a2b2);
     const c0 = fp2Add(a0b0, xi_a1b2_plus_a2b1);
-    
+
     const xi_a2b2 = fp2MultiplyByXi(a2b2);
     const c1 = fp2Add(t1_minus_a0b0_a1b1, xi_a2b2);
-    
+
     const c2 = fp2Add(t2_minus_a0b0_a2b2, a1b1);
-    
+
     var result: [192]u8 = undefined;
     @memcpy(result[0..64], &c0);
     @memcpy(result[64..128], &c1);
     @memcpy(result[128..192], &c2);
-    
+
     return result;
 }
 
@@ -316,55 +315,54 @@ fn fp6MultiplyByXi(a: [192]u8) [192]u8 {
     const a0 = a[0..64].*;
     const a1 = a[64..128].*;
     const a2 = a[128..192].*;
-    
+
     // Multiply by xi: xi*(a0 + a1*v + a2*v^2) = xi*a0 + xi*a1*v + xi*a2*v^2
     // Where xi*v^3 = xi^2 (since v^3 = xi)
     // Result = (xi*a2, xi*a0, xi*a1) due to v^3 = xi reduction
     var result: [192]u8 = undefined;
-    @memcpy(result[0..64], &fp2MultiplyByXi(a2));    // xi*a2
-    @memcpy(result[64..128], &fp2MultiplyByXi(a0));  // xi*a0  
+    @memcpy(result[0..64], &fp2MultiplyByXi(a2)); // xi*a2
+    @memcpy(result[64..128], &fp2MultiplyByXi(a0)); // xi*a0
     @memcpy(result[128..192], &fp2MultiplyByXi(a1)); // xi*a1
-    
+
     return result;
 }
 
 /// Fp2 field arithmetic for GM/T 0044-2016 compliance
 /// Fp2 = Fp[i]/(i^2 + 1) where i^2 = -1
-
-/// Add two Fp2 elements: (a0, a1) + (b0, b1) = (a0+b0, a1+b1) 
+/// Add two Fp2 elements: (a0, a1) + (b0, b1) = (a0+b0, a1+b1)
 fn fp2Add(a: [64]u8, b: [64]u8) [64]u8 {
     var result: [64]u8 = undefined;
-    
+
     // Add two Fp components (each 32 bytes)
     const a0 = a[0..32].*;
     const a1 = a[32..64].*;
     const b0 = b[0..32].*;
     const b1 = b[32..64].*;
-    
+
     const c0 = fpAdd(a0, b0);
     const c1 = fpAdd(a1, b1);
-    
+
     @memcpy(result[0..32], &c0);
     @memcpy(result[32..64], &c1);
-    
+
     return result;
 }
 
 /// Subtract two Fp2 elements: (a0, a1) - (b0, b1) = (a0-b0, a1-b1)
 fn fp2Sub(a: [64]u8, b: [64]u8) [64]u8 {
     var result: [64]u8 = undefined;
-    
+
     const a0 = a[0..32].*;
     const a1 = a[32..64].*;
     const b0 = b[0..32].*;
     const b1 = b[32..64].*;
-    
+
     const c0 = fpSub(a0, b0);
     const c1 = fpSub(a1, b1);
-    
+
     @memcpy(result[0..32], &c0);
     @memcpy(result[32..64], &c1);
-    
+
     return result;
 }
 
@@ -372,25 +370,25 @@ fn fp2Sub(a: [64]u8, b: [64]u8) [64]u8 {
 /// Uses the relation i^2 = -1
 fn fp2Multiply(a: [64]u8, b: [64]u8) [64]u8 {
     var result: [64]u8 = undefined;
-    
+
     const a0 = a[0..32].*;
     const a1 = a[32..64].*;
     const b0 = b[0..32].*;
     const b1 = b[32..64].*;
-    
+
     // Compute products
     const a0b0 = fpMultiply(a0, b0);
     const a1b1 = fpMultiply(a1, b1);
     const a0b1 = fpMultiply(a0, b1);
     const a1b0 = fpMultiply(a1, b0);
-    
+
     // Apply i^2 = -1: result = (a0*b0 - a1*b1, a0*b1 + a1*b0)
     const c0 = fpSub(a0b0, a1b1);
     const c1 = fpAdd(a0b1, a1b0);
-    
+
     @memcpy(result[0..32], &c0);
     @memcpy(result[32..64], &c1);
-    
+
     return result;
 }
 
@@ -401,11 +399,11 @@ fn fp2MultiplyByXi(a: [64]u8) [64]u8 {
     // This uses i^2 = -1 in the multiplication
     const a0 = a[0..32].*;
     const a1 = a[32..64].*;
-    
+
     var result: [64]u8 = undefined;
     @memcpy(result[0..32], &fpSub(a0, a1)); // a0 - a1
     @memcpy(result[32..64], &fpAdd(a0, a1)); // a0 + a1
-    
+
     return result;
 }
 
@@ -413,17 +411,12 @@ fn fp2MultiplyByXi(a: [64]u8) [64]u8 {
 /// Uses the curve prime p = 0xB640000002A3A6F1D603AB4FF58EC74449F2934B18EA8BEEE56EE19CD69ECF25
 
 // SM9 curve prime modulus
-const CURVE_PRIME: [32]u8 = [_]u8{
-    0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1,
-    0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44,
-    0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE,
-    0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25
-};
+const CURVE_PRIME: [32]u8 = [_]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
 
 fn fpAdd(a: [32]u8, b: [32]u8) [32]u8 {
     var result: [32]u8 = undefined;
     var carry: u16 = 0;
-    
+
     // Perform addition with carry propagation
     var i: usize = 32;
     while (i > 0) {
@@ -432,18 +425,18 @@ fn fpAdd(a: [32]u8, b: [32]u8) [32]u8 {
         result[i] = @as(u8, @intCast(sum & 0xFF));
         carry = sum >> 8;
     }
-    
+
     // Reduce modulo curve prime if result >= p
     if (carry != 0 or compareBytes(result, CURVE_PRIME) >= 0) {
         result = subtractBytes(result, CURVE_PRIME);
     }
-    
+
     return result;
 }
 
 fn fpSub(a: [32]u8, b: [32]u8) [32]u8 {
     var result: [32]u8 = undefined;
-    
+
     // If a >= b, compute a - b directly
     if (compareBytes(a, b) >= 0) {
         var borrow: i16 = 0;
@@ -464,32 +457,32 @@ fn fpSub(a: [32]u8, b: [32]u8) [32]u8 {
         const a_plus_p = fpAdd(a, CURVE_PRIME);
         return fpSub(a_plus_p, b);
     }
-    
+
     return result;
 }
 
 fn fpMultiply(a: [32]u8, b: [32]u8) [32]u8 {
     // Simplified multiplication with modular reduction - GM/T 0044-2016 compliant
     // In full production: use Montgomery multiplication for efficiency
-    
+
     // Perform multiplication using schoolbook method
     var result: [64]u8 = [_]u8{0} ** 64;
-    
+
     for (0..32) |i| {
-        if (a[31-i] == 0) continue;
-        
+        if (a[31 - i] == 0) continue;
+
         var carry: u32 = 0;
         for (0..32) |j| {
-            const prod = @as(u32, a[31-i]) * @as(u32, b[31-j]) + 
-                        @as(u32, result[63-i-j]) + carry;
-            result[63-i-j] = @as(u8, @intCast(prod & 0xFF));
+            const prod = @as(u32, a[31 - i]) * @as(u32, b[31 - j]) +
+                @as(u32, result[63 - i - j]) + carry;
+            result[63 - i - j] = @as(u8, @intCast(prod & 0xFF));
             carry = prod >> 8;
         }
-        if (31-i > 0) {
-            result[63-i-32] = @as(u8, @intCast(carry));
+        if (31 - i > 0) {
+            result[63 - i - 32] = @as(u8, @intCast(carry));
         }
     }
-    
+
     // Reduce modulo curve prime using simple division
     return reduceModulo(result);
 }
@@ -507,7 +500,7 @@ fn compareBytes(a: [32]u8, b: [32]u8) i8 {
 fn subtractBytes(a: [32]u8, b: [32]u8) [32]u8 {
     var result: [32]u8 = undefined;
     var borrow: i16 = 0;
-    
+
     var i: usize = 32;
     while (i > 0) {
         i -= 1;
@@ -520,7 +513,7 @@ fn subtractBytes(a: [32]u8, b: [32]u8) [32]u8 {
             borrow = 0;
         }
     }
-    
+
     return result;
 }
 
@@ -530,23 +523,23 @@ fn reduceModulo(wide_result: [64]u8) [32]u8 {
     // In production, use Barrett reduction or Montgomery arithmetic
     var result: [32]u8 = undefined;
     @memcpy(&result, wide_result[32..64]);
-    
+
     // Add high part contribution (simplified)
     const high_part = wide_result[0..32];
     var carry: u16 = 0;
-    
+
     for (0..32) |i| {
         const idx = 31 - i;
         const sum = @as(u16, result[idx]) + @as(u16, high_part[idx]) + carry;
         result[idx] = @as(u8, @intCast(sum & 0xFF));
         carry = sum >> 8;
     }
-    
+
     // Reduce if result >= prime
     while (compareBytes(result, CURVE_PRIME) >= 0) {
         result = subtractBytes(result, CURVE_PRIME);
     }
-    
+
     return result;
 }
 
@@ -563,7 +556,7 @@ pub const PairingError = error{
 pub fn pairing(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemParams) PairingError!GtElement {
     // Validate input points are on the curve and in correct subgroups
     // GM/T 0044-2016 requires strict validation
-    
+
     // Handle special cases per GM/T standard
     if (P.isInfinity() or Q.isInfinity()) {
         return GtElement.identity();
@@ -698,48 +691,47 @@ fn evaluateLineFunctionEnhanced(A: curve.G2Point, B: curve.G2Point, P: curve.G1P
     }
 
     // For proper Miller algorithm, we need to compute:
-    // 1. Line coefficients for the line through A and B (or tangent if A == B)  
+    // 1. Line coefficients for the line through A and B (or tangent if A == B)
     // 2. Evaluate this line at point P
     // 3. Return result in Fp12 (Gt group)
-    
+
     // Determine if this is a doubling (A == B) or addition step (A != B)
     const is_doubling = pointsEqual(A, B);
-    
+
     var result = GtElement.identity();
-    
+
     if (is_doubling) {
         // Tangent line evaluation for point doubling
         // For elliptic curve y^2 = x^3 + ax + b, tangent slope = (3x^2 + a) / (2y)
         // Line equation: y - y_A = slope * (x - x_A)
-        // Evaluated at P: (y_P - y_A) - slope * (x_P - x_A) 
-        
+        // Evaluated at P: (y_P - y_A) - slope * (x_P - x_A)
+
         // Compute tangent slope components (simplified for Fp2 arithmetic)
         const slope_num = computeTangentNumerator(A);
         const slope_den = computeTangentDenominator(A);
-        
+
         // Evaluate at point P with proper field arithmetic
         result = evaluateLineAtPoint(slope_num, slope_den, A, P);
-        
     } else {
         // Chord line evaluation for point addition
         // Line through A and B: slope = (y_B - y_A) / (x_B - x_A)
         // Line equation: y - y_A = slope * (x - x_A)
-        
+
         // Compute chord slope components
         const slope_num = computeChordNumerator(A, B);
         const slope_den = computeChordDenominator(A, B);
-        
+
         // Evaluate at point P
         result = evaluateLineAtPoint(slope_num, slope_den, A, P);
     }
-    
+
     // SECURITY: If line function evaluation results in identity element,
     // this indicates a mathematical error in the pairing computation
     // GM/T 0044-2016 requires proper error handling - no fallback mechanisms
     if (result.isIdentity()) {
         return PairingError.InvalidFieldElement;
     }
-    
+
     return result;
 }
 
@@ -751,11 +743,11 @@ fn computeTangentNumerator(point: curve.G2Point) [64]u8 {
     hasher.update(&point.x);
     hasher.update(&point.x); // Square effect
     hasher.update("TANGENT_NUMERATOR_3X2_A");
-    
+
     var result: [64]u8 = undefined;
     var hash: [32]u8 = undefined;
     hasher.final(&hash);
-    
+
     @memcpy(result[0..32], &hash);
     @memcpy(result[32..64], &hash); // Duplicate for Fp2
     return result;
@@ -767,11 +759,11 @@ fn computeTangentDenominator(point: curve.G2Point) [64]u8 {
     var hasher = SM3.init(.{});
     hasher.update(&point.y);
     hasher.update("TANGENT_DENOMINATOR_2Y");
-    
+
     var result: [64]u8 = undefined;
     var hash: [32]u8 = undefined;
     hasher.final(&hash);
-    
+
     @memcpy(result[0..32], &hash);
     @memcpy(result[32..64], &hash);
     return result;
@@ -784,28 +776,28 @@ fn computeChordNumerator(A: curve.G2Point, B: curve.G2Point) [64]u8 {
     hasher.update(&B.y);
     hasher.update(&A.y);
     hasher.update("CHORD_NUMERATOR_YB_YA");
-    
+
     var result: [64]u8 = undefined;
     var hash: [32]u8 = undefined;
     hasher.final(&hash);
-    
+
     @memcpy(result[0..32], &hash);
     @memcpy(result[32..64], &hash);
     return result;
 }
 
-/// Compute denominator for chord slope: x_B - x_A  
+/// Compute denominator for chord slope: x_B - x_A
 fn computeChordDenominator(A: curve.G2Point, B: curve.G2Point) [64]u8 {
     // Simplified computation: B.x - A.x
     var hasher = SM3.init(.{});
     hasher.update(&B.x);
     hasher.update(&A.x);
     hasher.update("CHORD_DENOMINATOR_XB_XA");
-    
+
     var result: [64]u8 = undefined;
     var hash: [32]u8 = undefined;
     hasher.final(&hash);
-    
+
     @memcpy(result[0..32], &hash);
     @memcpy(result[32..64], &hash);
     return result;
@@ -829,7 +821,7 @@ fn pointsEqual(A: curve.G2Point, B: curve.G2Point) bool {
     // Handle infinity cases
     if (A.isInfinity() and B.isInfinity()) return true;
     if (A.isInfinity() or B.isInfinity()) return false;
-    
+
     // Compare coordinates (simplified comparison for test compatibility)
     return std.mem.eql(u8, &A.x, &B.x) and std.mem.eql(u8, &A.y, &B.y);
 }

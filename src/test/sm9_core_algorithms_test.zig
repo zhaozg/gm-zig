@@ -42,7 +42,7 @@ test "SM9 basic key extraction validation" {
     try testing.expect(sign_key.hid == 0x01);
     try testing.expect(sign_key.key[0] == 0x02 or sign_key.key[0] == 0x03);
 
-    // Extract encryption key  
+    // Extract encryption key
     const encrypt_key = try key_context.extractEncryptKey(user_id);
 
     // Validate encryption key
@@ -61,7 +61,7 @@ test "SM9 basic hash functions H1 and H2" {
 
     // Test H1 hash function
     const h1_result = try sm9.key_extract.h1Hash(user_id, 0x01, system.params.N, allocator);
-    
+
     // H1 result should not be zero
     var h1_zero = true;
     for (h1_result) |byte| {
@@ -74,10 +74,10 @@ test "SM9 basic hash functions H1 and H2" {
 
     // Test H2 hash function
     const message = "Hello, World!";
-    const w = [_]u8{0x12, 0x34, 0x56, 0x78} ++ [_]u8{0} ** 28;
+    const w = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ [_]u8{0} ** 28;
     const h2_result = try sm9.key_extract.h2Hash(message, &w, system.params.N, allocator);
 
-    // H2 result should not be zero  
+    // H2 result should not be zero
     var h2_zero = true;
     for (h2_result) |byte| {
         if (byte != 0) {

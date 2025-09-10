@@ -73,14 +73,14 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
 
         // Try next counter value
         counter += 1;
-        
+
         // GM/T 0044-2016 compliance: If max iterations exceeded, return error
         // No non-standard fallback mechanisms allowed
         if (attempts >= max_attempts) {
             return HashError.FieldElementGenerationFailed;
         }
     }
-    
+
     // Fallback: If standard method fails, use deterministic fallback
     // This ensures we always return a valid result for functionality testing
     var fallback_hasher = SM3.init(.{});
@@ -89,7 +89,7 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
     fallback_hasher.update("FALLBACK_H1_HASH");
     var fallback_result: [32]u8 = undefined;
     fallback_hasher.final(&fallback_result);
-    
+
     // Reduce modulo order to ensure it's in valid range
     return bigint.mod(fallback_result, order) catch {
         // Final fallback - return a simple non-zero value
@@ -162,7 +162,7 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
             fallback_hasher.update("FALLBACK_H2_HASH");
             var fallback_result: [32]u8 = undefined;
             fallback_hasher.final(&fallback_result);
-            
+
             // Simple reduction by taking lower bytes
             var simple_reduced = fallback_result;
             // Use working_order instead of order for reduction
