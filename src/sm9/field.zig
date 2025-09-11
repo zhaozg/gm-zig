@@ -15,7 +15,6 @@ const bigint = @import("bigint.zig");
 /// - All operations are cryptographically secure and GM/T 0044-2016 compliant
 /// - Focus on correctness and security over raw performance
 /// - Memory-efficient algorithms suitable for production use
-
 /// Field element representation (256-bit, big-endian)
 pub const FieldElement = [32]u8;
 
@@ -69,7 +68,7 @@ pub const Fp2Element = struct {
         // Then result = (A-B) + (C-A-B)*i
         const a1_a2 = try bigint.mulMod(self.a, other.a, modulus);
         const b1_b2 = try bigint.mulMod(self.b, other.b, modulus);
-        
+
         const a1_plus_b1 = try bigint.addMod(self.a, self.b, modulus);
         const a2_plus_b2 = try bigint.addMod(other.a, other.b, modulus);
         const c = try bigint.mulMod(a1_plus_b1, a2_plus_b2, modulus);
@@ -77,7 +76,7 @@ pub const Fp2Element = struct {
         // Real part: a1*a2 - b1*b2
         const real = try bigint.subMod(a1_a2, b1_b2, modulus);
 
-        // Imaginary part: C - A - B = (a1+b1)*(a2+b2) - a1*a2 - b1*b2  
+        // Imaginary part: C - A - B = (a1+b1)*(a2+b2) - a1*a2 - b1*b2
         const imag_temp = try bigint.subMod(c, a1_a2, modulus);
         const imag = try bigint.subMod(imag_temp, b1_b2, modulus);
 
@@ -110,7 +109,7 @@ pub const FieldError = error{
     RandomGenerationFailed,
 };
 
-/// Binary Extended Euclidean Algorithm for modular inverse  
+/// Binary Extended Euclidean Algorithm for modular inverse
 /// Computes a^(-1) mod m using constant-time algorithm
 /// More secure and efficient than brute force approaches
 pub fn modularInverseBinaryEEA(a: FieldElement, m: FieldElement) FieldError!FieldElement {
@@ -118,7 +117,7 @@ pub fn modularInverseBinaryEEA(a: FieldElement, m: FieldElement) FieldError!Fiel
     if (bigint.isZero(a)) return FieldError.NotInvertible;
 
     // Use the bigint modular inverse implementation
-    return bigint.modInverse(a, m) catch FieldError.NotInvertible;
+    return bigint.invMod(a, m) catch FieldError.NotInvertible;
 }
 
 /// Optimized modular exponentiation using bigint modPow

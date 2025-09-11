@@ -6,7 +6,7 @@ pub fn Writer(comptime Context: type, comptime WriteError: type, comptime writeF
     if (comptime builtin.zig_version.minor < 14) {
         @compileError("Zig version 0.14 or newer is required");
     }
-    
+
     // Zig 0.14.0+ uses std.io.Writer
     return std.io.Writer(Context, WriteError, writeFn);
 }
