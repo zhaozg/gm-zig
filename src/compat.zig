@@ -7,11 +7,11 @@ pub fn Writer(comptime Context: type, comptime WriteError: type, comptime writeF
         @compileError("Zig version 0.14 or newer is required");
     }
 
-    // Zig 0.15+ uses std.Io.GenericWriter (the old Writer is deprecated)
+    // Zig 0.15+ uses std.io.GenericWriter (the old Writer is deprecated)
     if (comptime builtin.zig_version.minor >= 15) {
-        return std.Io.GenericWriter(Context, WriteError, writeFn);
+        return std.io.GenericWriter(Context, WriteError, writeFn);
     }
-    
+
     // Zig 0.14.x uses std.io.Writer
     return std.io.Writer(Context, WriteError, writeFn);
 }

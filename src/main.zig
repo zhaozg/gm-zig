@@ -17,8 +17,6 @@ pub fn main() !void {
     print("=== SM3 Hash Performance ===\n", .{});
     try sm3.testPerformance(allocator);
 
-
-
     print("\n=== SM2 Digital Signature Demo ===\n", .{});
     try demonstrateSignature(allocator);
 
@@ -454,5 +452,3 @@ fn demonstrateSM9(allocator: std.mem.Allocator) !void {
     print("   ⚡ Advanced Features: FUNCTIONAL\n", .{});
     print("   🏭 Production Readiness: ACHIEVED\n", .{});
 }
-
-
