@@ -182,6 +182,30 @@ pub fn fp2Inv(x: Fp2Element, m: FieldElement) FieldError!Fp2Element {
     return Fp2Element.init(real_part, imag_part);
 }
 
+/// Legendre symbol: returns 1 if x is a quadratic residue, -1 if not, 0 if x = 0
+pub fn legendreSymbol(x: FieldElement, p: FieldElement) FieldError!i8 {
+    if (bigint.isZero(x)) return 0;
+
+    // Compute x^((p-1)/2) mod p
+    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const p_minus_1 = bigint.sub(p, one);
+    var exponent = p_minus_1.result;
+
+    // Divide by 2 (shift right by 1 bit)
+    exponent = bigint.shiftRightOne(exponent);
+
+    const result = try modularExponentiation(x, exponent, p);
+
+    // Check if result is 1 or p-1
+    if (bigint.equal(result, one)) {
+        return 1;
+    } else if (bigint.equal(result, p_minus_1.result)) {
+        return -1;
+    } else {
+        return 0; // This shouldn't happen for prime p
+    }
+}
+
 /// Square root in Fp using Tonelli-Shanks algorithm
 /// For fields where p ≡ 3 (mod 4), we can use the simple formula: x^((p+1)/4)
 pub fn fieldSqrt(x: FieldElement, p: FieldElement) FieldError!FieldElement {
