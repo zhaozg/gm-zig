@@ -17,9 +17,6 @@ pub fn main() !void {
     print("=== SM3 Hash Performance ===\n", .{});
     try sm3.testPerformance(allocator);
 
-    print("\n=== SM9 P1 Field Operations Performance ===\n", .{});
-    try demonstrateP1Performance(allocator);
-
     print("\n=== SM2 Digital Signature Demo ===\n", .{});
     try demonstrateSignature(allocator);
 
@@ -454,20 +451,4 @@ fn demonstrateSM9(allocator: std.mem.Allocator) !void {
     print("   🔒 Security Features: ENABLED\n", .{});
     print("   ⚡ Advanced Features: FUNCTIONAL\n", .{});
     print("   🏭 Production Readiness: ACHIEVED\n", .{});
-}
-
-/// P1 Performance Optimization Demonstration
-/// Shows the performance improvements from SIMD-accelerated field operations
-fn demonstrateP1Performance(allocator: std.mem.Allocator) !void {
-    print("🚀 Initializing SM9 P1.1 Field Operations Performance Tests...\n", .{});
-
-    // Run the P1 performance suite
-    try sm9.field.P1Benchmark.runP1PerformanceSuite(allocator);
-
-    print("📊 P1.1 Performance Summary:\n", .{});
-    print("   🎯 Target Performance: 300+ MB/s field operations\n", .{});
-    print("   ⚡ SIMD Optimizations: ENABLED\n", .{});
-    print("   🔧 Montgomery Multiplication: VECTORIZED\n", .{});
-    print("   🛡️  Constant-Time Operations: VERIFIED\n", .{});
-    print("   📈 P1.1 Field Optimization: COMPLETE\n", .{});
 }

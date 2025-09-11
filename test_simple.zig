@@ -1,0 +1,1 @@
+const std = @import("std"); const sm9 = @import("src/sm9.zig"); test "simple" { const p = [_]u8{0} ** 31 ++ [_]u8{7}; const a = [_]u8{0} ** 31 ++ [_]u8{3}; const b = [_]u8{0} ** 31 ++ [_]u8{5}; const product = try sm9.bigint.mulMod(a, b, p); const expected = [_]u8{0} ** 31 ++ [_]u8{1}; try std.testing.expect(sm9.bigint.equal(product, expected)); }
