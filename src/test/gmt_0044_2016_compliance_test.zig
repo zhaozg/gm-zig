@@ -27,8 +27,6 @@ test "GM/T 0044-2016 H2 Hash Function Strict Compliance" {
     const bigint = sm9.bigint;
     try testing.expect(!bigint.isZero(result));
     try testing.expect(bigint.lessThan(result, order));
-
-    std.debug.print("✅ GM/T 0044-2016 H2 Hash Strict Compliance Test Passed!\n", .{});
 }
 
 // Test GM/T 0044-2016 compliance for H1 hash function
@@ -54,8 +52,6 @@ test "GM/T 0044-2016 H1 Hash Function Strict Compliance" {
     const bigint = sm9.bigint;
     try testing.expect(!bigint.isZero(result));
     try testing.expect(bigint.lessThan(result, order));
-
-    std.debug.print("✅ GM/T 0044-2016 H1 Hash Strict Compliance Test Passed!\n", .{});
 }
 
 // Test GM/T 0044-2016 compliance for key extraction
@@ -84,8 +80,6 @@ test "GM/T 0044-2016 Key Extraction Strict Compliance" {
     // If successful, validate the key is properly formatted
     try testing.expect(sign_key.hid == 0x01);
     try testing.expect(sign_key.key[0] == 0x02 or sign_key.key[0] == 0x03);
-
-    std.debug.print("✅ GM/T 0044-2016 Key Extraction Strict Compliance Test Passed!\n", .{});
 }
 
 // Test GM/T 0044-2016 compliance for random number generation
@@ -104,8 +98,6 @@ test "GM/T 0044-2016 Random Generation Strict Compliance" {
 
     // If successful, validate the point is not infinity (which would indicate fallback use)
     try testing.expect(!g1_point.isInfinity());
-
-    std.debug.print("✅ GM/T 0044-2016 Random Generation Strict Compliance Test Passed!\n", .{});
 }
 
 // Test that non-compliant fallback mechanisms have been removed
@@ -123,13 +115,10 @@ test "GM/T 0044-2016 No Fallback Mechanisms Verification" {
 
     const result = sm9.hash.h2Hash(message, additional_data, order, allocator) catch {
         // It's acceptable for the function to fail under strict compliance
-        std.debug.print("✅ GM/T 0044-2016 No Fallback Mechanisms Test Passed (Expected failure)!\n", .{});
         return;
     };
 
     // If it succeeds, the result should not be the hardcoded MIN_FIELD_ELEMENT
     const min_element = [_]u8{0} ** 31 ++ [_]u8{1};
     try testing.expect(!std.mem.eql(u8, &result, &min_element));
-
-    std.debug.print("✅ GM/T 0044-2016 No Fallback Mechanisms Test Passed!\n", .{});
 }

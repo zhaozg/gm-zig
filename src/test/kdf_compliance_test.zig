@@ -47,8 +47,6 @@ test "GM/T 0044-2016 Compliant KDF Implementation" {
 
     // Test very large output should fail (security limit)
     try testing.expectError(error.KDFComputationFailed, sm9.encrypt.EncryptionUtils.kdf(input, 0x200000, allocator));
-
-    std.debug.print("✅ GM/T 0044-2016 Compliant KDF Implementation Test Passed!\n", .{});
 }
 
 test "GM/T 0044-2016 KDF Security Properties" {
@@ -85,8 +83,6 @@ test "GM/T 0044-2016 KDF Security Properties" {
     }
     // Should have significant difference (avalanche property)
     try testing.expect(different_bytes >= 16); // At least 50% different
-
-    std.debug.print("✅ GM/T 0044-2016 KDF Security Properties Test Passed!\n", .{});
 }
 
 test "GM/T 0044-2016 KDF Standard Compliance" {
@@ -117,6 +113,4 @@ test "GM/T 0044-2016 KDF Standard Compliance" {
         }
         try testing.expect(non_zero == tv.expected_non_zero);
     }
-
-    std.debug.print("✅ GM/T 0044-2016 KDF Standard Compliance Test Passed!\n", .{});
 }

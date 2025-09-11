@@ -199,7 +199,7 @@ pub fn shiftRightOne(a: BigInt) BigInt {
     var i: usize = 0;
     while (i < 32) : (i += 1) {
         const new_carry = (a[i] & 1) << 7; // Save LSB of current byte, shift to MSB position for next byte
-        result[i] = (a[i] >> 1) | carry;   // Shift current byte right and add carry from previous byte
+        result[i] = (a[i] >> 1) | carry; // Shift current byte right and add carry from previous byte
         carry = new_carry;
     }
 
@@ -821,7 +821,7 @@ fn binaryExtendedGcd(a: BigInt, m: BigInt) BigIntError!BigInt {
 /// More reliable than Fermat's Little Theorem for debugging
 fn extendedEuclideanAlgorithm(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(a) or isZero(m)) return BigIntError.NotInvertible;
-    
+
     // Use a simpler approach: fallback to Fermat's Little Theorem for SM9 primes
     // since they are known to be prime, so we can compute a^(-1) = a^(p-2) mod p
     return fermatsLittleTheoremInverse(a, m);
@@ -1341,15 +1341,15 @@ fn simpleExtendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
     var candidate = [_]u8{0} ** 31 ++ [_]u8{1};
     var iterations: u32 = 0;
     const max_iterations: u32 = 10000; // Sufficient for values ≤ 1000
-    
+
     while (iterations < max_iterations) {
         const product = mulMod(a, candidate, m) catch return BigIntError.NotInvertible;
         const one = [_]u8{0} ** 31 ++ [_]u8{1};
-        
+
         if (equal(product, one)) {
             return candidate;
         }
-        
+
         // Increment candidate (big-endian addition)
         var carry: u8 = 1;
         for (0..32) |i| {
@@ -1359,12 +1359,12 @@ fn simpleExtendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
             carry = @as(u8, @intCast(sum >> 8));
             if (carry == 0) break;
         }
-        
+
         // If we've overflowed, break
         if (carry > 0) break;
-        
+
         iterations += 1;
     }
-    
+
     return BigIntError.NotInvertible;
 }

@@ -1,1 +1,0 @@
-const std = @import("std"); const sm9 = @import("src/sm9.zig"); test "fermat_inverse" { const a = [_]u8{0} ** 31 ++ [_]u8{3}; const p = [_]u8{0} ** 31 ++ [_]u8{7}; const inv_a = try sm9.bigint.invMod(a, p); std.debug.print("3^(-1) mod 7 = {}\n", .{inv_a[31]}); const expected = [_]u8{0} ** 31 ++ [_]u8{5}; try std.testing.expect(sm9.bigint.equal(inv_a, expected)); }
