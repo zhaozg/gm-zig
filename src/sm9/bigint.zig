@@ -195,10 +195,11 @@ pub fn shiftRightOne(a: BigInt) BigInt {
     var result = [_]u8{0} ** 32;
     var carry: u8 = 0;
 
+    // For big-endian format, process from MSB (index 0) to LSB (index 31)
     var i: usize = 0;
     while (i < 32) : (i += 1) {
-        const new_carry = a[i] & 1;
-        result[i] = (a[i] >> 1) | (carry << 7);
+        const new_carry = (a[i] & 1) << 7; // Save LSB of current byte, shift to MSB position for next byte
+        result[i] = (a[i] >> 1) | carry;   // Shift current byte right and add carry from previous byte
         carry = new_carry;
     }
 
@@ -245,8 +246,10 @@ fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     }
 
     // Use repeated addition for small b (up to 64 for performance)
+    // But disable this optimization for SM9 field operations to ensure correctness
+    const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
     const b_small = toU32(b_red);
-    if (b_small <= 64 and equal(b_red, fromU32(b_small))) {
+    if (!equal(m, sm9_q) and b_small <= 64 and equal(b_red, fromU32(b_small))) {
         var result = [_]u8{0} ** 32;
         for (0..b_small) |_| {
             result = addMod(result, a_red, m) catch return BigIntError.Overflow;
