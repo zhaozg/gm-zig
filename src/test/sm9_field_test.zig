@@ -9,6 +9,8 @@ test "SM9 Field Operations - Binary Extended Euclidean Algorithm" {
     const a = [_]u8{0} ** 31 ++ [_]u8{3}; // a = 3
     const p = params.q;
 
+    std.debug.print("DEBUG: Computing 3^(-1) mod p in SM9 field\n", .{});
+
     // Compute inverse
     const inv_a = sm9.field.modularInverseBinaryEEA(a, p) catch |err| {
         // Handle expected errors
@@ -21,6 +23,18 @@ test "SM9 Field Operations - Binary Extended Euclidean Algorithm" {
     // Verify that a * inv_a ≡ 1 (mod p)
     const product = try sm9.bigint.mulMod(a, inv_a, p);
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
+
+    std.debug.print("DEBUG: product = [", .{});
+    for (product) |byte| {
+        std.debug.print(" {}", .{byte});
+    }
+    std.debug.print(" ]\n", .{});
+
+    std.debug.print("DEBUG: one = [", .{});
+    for (one) |byte| {
+        std.debug.print(" {}", .{byte});
+    }
+    std.debug.print(" ]\n", .{});
 
     try testing.expect(sm9.bigint.equal(product, one));
 }
