@@ -6,8 +6,7 @@ comptime {
         @compileError("Zig version 0.14 or newer is required");
     }
     if (builtin.zig_version.major == 0 and builtin.zig_version.minor > 15) {
-        // Temporarily allow 0.16 for testing - will be reverted to support only 0.14-0.15
-        // @compileError("Zig version 0.16 or newer is not supported yet");
+        @compileError("Zig version 0.16 or newer is not supported yet - use Zig 0.14.x or 0.15.x");
     }
 }
 
