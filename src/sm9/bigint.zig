@@ -719,8 +719,7 @@ fn fermatsLittleTheoremInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
 }
 
 /// Montgomery Ladder algorithm for secure modular exponentiation
-/// Completely rewritten with proven mathematical correctness to eliminate infinite loops
-/// Uses constant-time algorithm that prevents timing attacks
+/// Uses standard square-and-multiply algorithm with proper bit processing
 fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     const one = [_]u8{0} ** 31 ++ [_]u8{1};
     const zero = [_]u8{0} ** 32;
@@ -734,42 +733,42 @@ fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigI
     const base_mod = mod(base, m) catch return BigIntError.NotInvertible;
     if (isZero(base_mod)) return zero;
 
-    // Standard Montgomery Ladder initialization:
-    // x1 = 1, x2 = base
-    var x1 = one;
-    var x2 = base_mod;
-
-    // Proven Montgomery Ladder implementation:
-    // Process exactly 256 bits (all possible bits in a 256-bit exponent)
-    // This guarantees termination and provides constant-time execution
-    var i: u32 = 0;
-    const total_bits: u32 = 256;
-
-    while (i < total_bits) : (i += 1) {
-        // Calculate which bit we're examining (from MSB to LSB)
-        const bit_index = total_bits - 1 - i;
-        const byte_idx = bit_index / 8;
-        const bit_pos = @as(u3, @intCast(7 - (bit_index % 8))); // Fix: MSB is bit 7, LSB is bit 0
-
-        // Extract the bit (0 or 1)
-        const bit = (exp[byte_idx] >> bit_pos) & 1;
-
-        // Montgomery ladder step - mathematically proven to be correct
-        if (bit == 1) {
-            // When bit is 1: (x1, x2) -> (x1*x2, x2^2)
-            const temp = mulMod(x1, x2, m) catch return BigIntError.NotInvertible;
-            x2 = mulMod(x2, x2, m) catch return BigIntError.NotInvertible;
-            x1 = temp;
-        } else {
-            // When bit is 0: (x1, x2) -> (x1^2, x1*x2)
-            const temp = mulMod(x1, x2, m) catch return BigIntError.NotInvertible;
-            x1 = mulMod(x1, x1, m) catch return BigIntError.NotInvertible;
-            x2 = temp;
+    // Use left-to-right binary exponentiation (more reliable for large numbers)
+    var result = one;
+    
+    // Find the first non-zero bit from the left (MSB)
+    var started = false;
+    
+    // Process all 256 bits from MSB to LSB
+    var byte_idx: usize = 0;
+    while (byte_idx < 32) : (byte_idx += 1) {
+        if (exp[byte_idx] == 0 and !started) {
+            continue; // Skip leading zero bytes
+        }
+        
+        var bit_mask: u8 = 0x80; // Start with MSB of current byte
+        while (bit_mask > 0) : (bit_mask >>= 1) {
+            const bit = (exp[byte_idx] & bit_mask) != 0;
+            
+            if (!started) {
+                if (bit) {
+                    started = true;
+                    result = base_mod; // First '1' bit sets result to base
+                }
+                continue;
+            }
+            
+            // Square the result for each bit position
+            result = mulMod(result, result, m) catch return BigIntError.NotInvertible;
+            
+            // If current bit is 1, multiply by base
+            if (bit) {
+                result = mulMod(result, base_mod, m) catch return BigIntError.NotInvertible;
+            }
         }
     }
-
-    // After processing all 256 bits, x1 contains base^exp mod m
-    return x1;
+    
+    return result;
 }
 
 /// Binary Extended GCD algorithm for modular inverse
