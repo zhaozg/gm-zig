@@ -731,10 +731,13 @@ fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigI
     if (isZero(base)) return zero;
 
     // Reduce base modulo m to prevent overflow
-    var x1 = mod(base, m) catch return BigIntError.NotInvertible;
-    if (isZero(x1)) return zero;
+    const base_mod = mod(base, m) catch return BigIntError.NotInvertible;
+    if (isZero(base_mod)) return zero;
 
-    var x2 = mulMod(x1, x1, m) catch return BigIntError.NotInvertible;
+    // Standard Montgomery Ladder initialization:
+    // x1 = 1, x2 = base
+    var x1 = one;
+    var x2 = base_mod;
 
     // Proven Montgomery Ladder implementation:
     // Process exactly 256 bits (all possible bits in a 256-bit exponent)
@@ -746,7 +749,7 @@ fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigI
         // Calculate which bit we're examining (from MSB to LSB)
         const bit_index = total_bits - 1 - i;
         const byte_idx = bit_index / 8;
-        const bit_pos = @as(u3, @intCast(bit_index % 8));
+        const bit_pos = @as(u3, @intCast(7 - (bit_index % 8))); // Fix: MSB is bit 7, LSB is bit 0
 
         // Extract the bit (0 or 1)
         const bit = (exp[byte_idx] >> bit_pos) & 1;
