@@ -84,15 +84,15 @@ pub fn sign(message: []const u8, private_key: PrivateKey) !Signature {
     // Validate inputs
     if (message.len == 0) return error.EmptyMessage;
     if (!private_key.isValid()) return error.InvalidPrivateKey;
-    
+
     // Use constant-time operations to prevent timing attacks
     var k = try generateSecureNonce();
     defer crypto.utils.secureZero(@ptrCast([*]u8, &k)[0..@sizeOf(@TypeOf(k))]);
-    
+
     // SM2 signature implementation with proper error handling
     const r = try computeR(message, k);
     const s = try computeS(message, private_key, k, r);
-    
+
     return Signature{ .r = r, .s = s };
 }
 ```

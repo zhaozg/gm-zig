@@ -206,11 +206,11 @@ test "SM2 signature roundtrip" {
     const allocator = testing.allocator;
     const keypair = try SM2.generateKeyPair(allocator);
     defer keypair.deinit();
-    
+
     const message = "test message";
     const signature = try SM2.sign(message, keypair.private_key);
     const is_valid = try SM2.verify(message, signature, keypair.public_key);
-    
+
     try testing.expect(is_valid);
 }
 ```
@@ -250,10 +250,6 @@ test "SM2 signature roundtrip" {
 
 - `README.md` - Project overview and quick start
 - `.github/copilot-instructions.md` - Comprehensive Copilot guidance
-- `AGENTS.md` - Developer and AI agent guide
-- `SM2_IMPLEMENTATION.md` - SM2 algorithm details
-- `SM9_IMPLEMENTATION.md` - SM9 algorithm details
-- `GM_ZIG_ANALYSIS_REPORT.md` - Complete project analysis
 
 ### Learning Resources
 

@@ -39,7 +39,7 @@ jobs:
       run: |
         # Install jq for JSON processing
         sudo apt-get update && sudo apt-get install -y jq
-        
+
         # Run performance data collection with error handling
         if ./scripts/collect-performance-data.sh; then
           echo "✅ Performance data collected successfully"
