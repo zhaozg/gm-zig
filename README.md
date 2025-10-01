@@ -14,9 +14,9 @@ A comprehensive implementation of Chinese National Cryptographic Standards (GM/T
 
 **Current Project Status (September 2025):**
 
-- **✅ PRODUCTION READY**: SM2, SM3, SM4, SM9 algorithms - Fully compliant and suitable for production use
+- **✅ PRODUCTION READY**: ZUC, SM2, SM3, SM4, SM9 algorithms - Fully compliant and suitable for production use
 - **📊 Test Status**: **All tests passing with complete cryptographic functionality**
-- **🔧 Standards Compliance**: All algorithms (SM2, SM3, SM4, SM9) fully compliant with Chinese National Standards
+- **🔧 Standards Compliance**: All algorithms (ZUC, SM2, SM3, SM4, SM9) fully compliant with Chinese National Standards
 - **🔬 Current Status**: All cryptographic operations working reliably ✅, Ready for production deployment ✅
 
 **All GM/T cryptographic algorithms now fully implemented with complete standards compliance and ready for production use.**
@@ -28,6 +28,11 @@ GM-Zig is a high-performance, memory-safe implementation of the Guomi (国密) c
 The library is designed with security, performance, and ease-of-use in mind, leveraging Zig's compile-time safety guarantees and zero-cost abstractions to deliver production-ready cryptographic operations. Recent security enhancements focus on constant-time implementations and timing attack prevention.
 
 ## ✨ Features
+
+- **🔒 ZUC Stream Cipher**
+  - 128-bit block size with 128-bit key (GM/T 0001.1-2012)
+  - 128-EEA3: The encryption algorithm using ZUC. (GM/T 0001.2-2012)
+  - 128-EIA3: The integrity algorithm using ZUC. (GM/T 0001.3-2012)
 
 - **🔐 SM2 Elliptic Curve Cryptography**
   - Digital signature algorithm (GM/T 0003.2-2012)
