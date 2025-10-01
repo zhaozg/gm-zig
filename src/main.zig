@@ -5,6 +5,7 @@ const print = std.debug.print;
 const sm3 = root.sm3;
 const sm4 = root.sm4;
 const sm2 = root.sm2;
+const zuc = root.zuc;
 const sm9 = root.sm9;
 
 pub fn main() !void {
@@ -14,7 +15,17 @@ pub fn main() !void {
 
     print("=== GM-Zig Cryptography Library Demo ===\n\n", .{});
 
-    print("=== SM3 Hash Performance ===\n", .{});
+
+    print("=== ZUC Performance ===\n", .{});
+    try zuc.testZUCPerformance(allocator);
+
+    print("\n=== SM4 ECB Performance ===\n", .{});
+    try sm4.testPerformance(allocator);
+
+    print("\n=== SM4 CBC Performance ===\n", .{});
+    try sm4.testPerformance_cbc(allocator);
+
+    print("\n=== SM3 Hash Performance ===\n", .{});
     try sm3.testPerformance(allocator);
 
     print("\n=== SM2 Digital Signature Demo ===\n", .{});
