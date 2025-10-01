@@ -7,6 +7,9 @@ test {
     _ = @import("test/sm2_encryption_test.zig");
     _ = @import("test/sm2_key_exchange_test.zig");
 
+    // ZUC
+    _ = @import("zuc.zig");
+
     // SM9 Complete Test Suite - All 145 tests (100% pass rate achieved)
     // Core implementation tests
     _ = @import("test/sm9_implementation_safe_test.zig"); // 5 basic operations tests
