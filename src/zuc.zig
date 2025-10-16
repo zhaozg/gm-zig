@@ -2,6 +2,13 @@
 const std = @import("std");
 const mem = std.mem;
 const math = std.math;
+const builtin = @import("builtin");
+
+/// Conditional compilation for Zig version compatibility
+const isZig015OrNewer = blk: {
+    const version = builtin.zig_version;
+    break :blk (version.major == 0 and version.minor >= 15);
+};
 
 const S0 = [256]u8{
     0x3e, 0x72, 0x5b, 0x47, 0xca, 0xe0, 0x00, 0x33, 0x04, 0xd1, 0x54, 0x98, 0x09, 0xb9, 0x6d, 0xcb,
@@ -1052,7 +1059,10 @@ pub fn testZUCPerformance(allocator: std.mem.Allocator) !void {
 
     for (test_sizes) |size| {
         // 分配输入缓冲区
-        const alignment = 16;
+        const alignment = if (isZig015OrNewer)
+            @as(std.mem.Alignment, @enumFromInt(16))
+        else
+            @as(u29, 16);
         const input = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(input);
 

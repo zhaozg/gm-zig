@@ -1,6 +1,13 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const print = std.debug.print;
+const builtin = @import("builtin");
+
+/// Conditional compilation for Zig version compatibility
+const isZig015OrNewer = blk: {
+    const version = builtin.zig_version;
+    break :blk (version.major == 0 and version.minor >= 15);
+};
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
@@ -269,7 +276,10 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
 
     for (test_sizes) |size| {
         // 分配对齐的内存以提高性能
-        const alignment = 16;
+        const alignment = if (isZig015OrNewer)
+            @as(std.mem.Alignment, @enumFromInt(16))
+        else
+            @as(u29, 16);
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
