@@ -329,7 +329,13 @@ test "ZUC-128 standard test vector 1" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-    const expected = [_]u32{ 0x27BEDE74, 0x018082DA, 0x87D4E5B6, 0x9F18BF66, 0x32070E0F, 0x39B7B692, 0xB4673EDC, 0x3184A48E, 0x27636F44, 0x14510D62 };
+
+    // zig fmt: off
+    const expected = [_]u32{
+        0x27BEDE74, 0x018082DA, 0x87D4E5B6, 0x9F18BF66, 0x32070E0F,
+        0x39B7B692, 0xB4673EDC, 0x3184A48E, 0x27636F44, 0x14510D62
+    };
+    // zig fmt: on
 
     for (keystream, expected) |got, exp| {
         try testing.expectEqual(exp, got);
@@ -344,7 +350,12 @@ test "ZUC-128 standard test vector 2" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-    const expected = [_]u32{ 0x0657CFA0, 0x7096398B, 0x734B6CB4, 0x883EEDF4, 0x257A76EB, 0x97595208, 0xD884ADCD, 0xB1CBFFB8, 0xE0F9D158, 0x46A0EED0 };
+    // zig fmt: off
+    const expected = [_]u32{
+        0x0657CFA0, 0x7096398B, 0x734B6CB4, 0x883EEDF4, 0x257A76EB,
+        0x97595208, 0xD884ADCD, 0xB1CBFFB8, 0xE0F9D158, 0x46A0EED0
+    };
+    // zig fmt: on
 
     for (keystream, expected) |got, exp| {
         try testing.expectEqual(exp, got);
@@ -365,7 +376,12 @@ test "ZUC-128 standard test vector 3" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-    const expected = [_]u32{ 0x14f1c272, 0x3279c419, 0x4b8ea41d, 0x0cc80863, 0xd28062e1, 0xe71d3dda, 0xe3c4d158, 0xa7f067ac, 0x94935056, 0x8ee5c63d };
+    // zig fmt: off
+    const expected = [_]u32{
+        0x14f1c272, 0x3279c419, 0x4b8ea41d, 0x0cc80863, 0xd28062e1,
+        0xe71d3dda, 0xe3c4d158, 0xa7f067ac, 0x94935056, 0x8ee5c63d
+    };
+    // zig fmt: on
 
     for (keystream, expected) |got, exp| {
         try testing.expectEqual(exp, got);
