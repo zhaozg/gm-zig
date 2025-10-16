@@ -47,9 +47,9 @@ const MAC_KEY_LEN = 16; // MAC密钥长度
 
 pub const ZUC = struct {
     // State registers
-    lfsr: [16]u32,  // 31-bit LFSR registers
-    r1: u32,        // F register R1
-    r2: u32,        // F register R2
+    lfsr: [16]u32, // 31-bit LFSR registers
+    r1: u32, // F register R1
+    r2: u32, // F register R2
 
     // Constants from C implementation
     const KD = [16]u16{
@@ -210,12 +210,12 @@ fn rot31(a: u32, k: u5) u32 {
 
 fn l1(x: u32) u32 {
     return x ^ math.rotl(u32, x, 2) ^ math.rotl(u32, x, 10) ^
-           math.rotl(u32, x, 18) ^ math.rotl(u32, x, 24);
+        math.rotl(u32, x, 18) ^ math.rotl(u32, x, 24);
 }
 
 fn l2(x: u32) u32 {
     return x ^ math.rotl(u32, x, 8) ^ math.rotl(u32, x, 14) ^
-           math.rotl(u32, x, 22) ^ math.rotl(u32, x, 30);
+        math.rotl(u32, x, 22) ^ math.rotl(u32, x, 30);
 }
 
 // 确保比特重组完全匹配C代码
@@ -322,11 +322,7 @@ test "ZUC-128 standard test vector 1" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-    const expected = [_]u32{
-        0x27BEDE74, 0x018082DA, 0x87D4E5B6, 0x9F18BF66,
-        0x32070E0F, 0x39B7B692, 0xB4673EDC, 0x3184A48E,
-        0x27636F44, 0x14510D62
-    };
+    const expected = [_]u32{ 0x27BEDE74, 0x018082DA, 0x87D4E5B6, 0x9F18BF66, 0x32070E0F, 0x39B7B692, 0xB4673EDC, 0x3184A48E, 0x27636F44, 0x14510D62 };
 
     for (keystream, expected) |got, exp| {
         try testing.expectEqual(exp, got);
@@ -341,11 +337,7 @@ test "ZUC-128 standard test vector 2" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-    const expected = [_]u32{
-        0x0657CFA0, 0x7096398B, 0x734B6CB4, 0x883EEDF4,
-        0x257A76EB, 0x97595208, 0xD884ADCD, 0xB1CBFFB8,
-        0xE0F9D158, 0x46A0EED0
-    };
+    const expected = [_]u32{ 0x0657CFA0, 0x7096398B, 0x734B6CB4, 0x883EEDF4, 0x257A76EB, 0x97595208, 0xD884ADCD, 0xB1CBFFB8, 0xE0F9D158, 0x46A0EED0 };
 
     for (keystream, expected) |got, exp| {
         try testing.expectEqual(exp, got);
@@ -366,11 +358,7 @@ test "ZUC-128 standard test vector 3" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-    const expected = [_]u32{
-        0x14f1c272,0x3279c419,0x4b8ea41d,0x0cc80863,
-        0xd28062e1,0xe71d3dda,0xe3c4d158,0xa7f067ac,
-        0x94935056,0x8ee5c63d
-    };
+    const expected = [_]u32{ 0x14f1c272, 0x3279c419, 0x4b8ea41d, 0x0cc80863, 0xd28062e1, 0xe71d3dda, 0xe3c4d158, 0xa7f067ac, 0x94935056, 0x8ee5c63d };
 
     for (keystream, expected) |got, exp| {
         try testing.expectEqual(exp, got);
@@ -495,7 +483,7 @@ test "ZUC encryption/decryption with 3 bytes" {
     const key = [_]u8{0x33} ** 16;
     const iv = [_]u8{0x44} ** 16;
 
-    const plaintext = [_]u8{0x01, 0x02, 0x03};
+    const plaintext = [_]u8{ 0x01, 0x02, 0x03 };
     var ciphertext: [3]u8 = undefined;
     var decrypted: [3]u8 = undefined;
 
@@ -707,9 +695,7 @@ test "ZUC performance" {
 
     const mbps = (@as(f64, @floatFromInt(total_bytes)) / (1024 * 1024)) / (elapsed_ms / 1000);
 
-    std.debug.print("\nZUC Performance: {d:.2} MB/s ({d} bytes in {d} ms)\n", .{
-        mbps, total_bytes, elapsed_ms
-    });
+    std.debug.print("\nZUC Performance: {d:.2} MB/s ({d} bytes in {d} ms)\n", .{ mbps, total_bytes, elapsed_ms });
 
     // 性能测试不失败，只是输出信息
     try testing.expect(true);
@@ -743,7 +729,7 @@ test "ZUC MAC generation - full word" {
     const iv = [_]u8{0x66} ** 16;
 
     var zuc = ZUC.init(&key, &iv);
-    const message = [_]u8{0x01, 0x02, 0x03, 0x04};
+    const message = [_]u8{ 0x01, 0x02, 0x03, 0x04 };
     const mac = zuc.generateMAC(&message);
 
     try testing.expect(mac != 0);
@@ -765,7 +751,7 @@ test "ZUC MAC generation - partial word" {
     const iv = [_]u8{0xAA} ** 16;
 
     var zuc = ZUC.init(&key, &iv);
-    const message = [_]u8{0x01, 0x02, 0x03}; // 3字节
+    const message = [_]u8{ 0x01, 0x02, 0x03 }; // 3字节
     const mac = zuc.generateMAC(&message);
 
     try testing.expect(mac != 0);
@@ -885,7 +871,7 @@ test "ZUC MAC with special patterns" {
         0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
     };
 
-    const message = [_]u8{0x00, 0xFF, 0x00, 0xFF};
+    const message = [_]u8{ 0x00, 0xFF, 0x00, 0xFF };
     const mac = ZUC.generateMACWithKey(&key, &iv, &message);
 
     try testing.expect(mac != 0);
@@ -907,13 +893,10 @@ test "ZUC MAC performance" {
     const end_time = std.time.milliTimestamp();
     const elapsed_ms = @as(f64, @floatFromInt(end_time - start_time));
 
-    std.debug.print("\nZUC MAC Performance: {d} MACs in {d} ms ({d:.2} MACs/ms)\n", .{
-        iterations, elapsed_ms, @as(f64, @floatFromInt(iterations)) / elapsed_ms
-    });
+    std.debug.print("\nZUC MAC Performance: {d} MACs in {d} ms ({d:.2} MACs/ms)\n", .{ iterations, elapsed_ms, @as(f64, @floatFromInt(iterations)) / elapsed_ms });
 
     try testing.expect(true);
 }
-
 
 // 添加GMT 0001.3标准测试向量
 test "ZUC-128-MAC standard test vector 1" {
@@ -971,7 +954,7 @@ test "ZUC MAC with null pointers" {
     try testing.expectEqual(@as(u32, 0), mac1);
 
     // 测试有效消息
-    const message = [_]u8{0x01, 0x02, 0x03};
+    const message = [_]u8{ 0x01, 0x02, 0x03 };
     const mac2 = ZUC.generateMACWithKey(&key, &iv, &message);
     try testing.expect(mac2 != 0);
 }
@@ -1004,9 +987,7 @@ test "ZUC MAC benchmark" {
         const ns_per_mac = elapsed_ns / @as(f64, @floatFromInt(iterations));
         const mbps = (@as(f64, @floatFromInt(size)) / (1024 * 1024)) / (ns_per_mac / 1e9);
 
-        std.debug.print("ZUC MAC {d} bytes: {d:.2} ns/MAC, {d:.2} MB/s\n", .{
-            size, ns_per_mac, mbps
-        });
+        std.debug.print("ZUC MAC {d} bytes: {d:.2} ns/MAC, {d:.2} MB/s\n", .{ size, ns_per_mac, mbps });
     }
 
     try testing.expect(true);
@@ -1049,7 +1030,6 @@ test "ZUC MAC usage example" {
     try testing.expect(!is_tampered_valid);
 }
 
-
 pub fn testZUCPerformance(allocator: std.mem.Allocator) !void {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -1061,9 +1041,9 @@ pub fn testZUCPerformance(allocator: std.mem.Allocator) !void {
     };
 
     const test_sizes = [_]usize{
-        1024,           // 1KB
-        1024 * 16,      // 16KB
-        1024 * 1024,    // 1MB
+        1024, // 1KB
+        1024 * 16, // 16KB
+        1024 * 1024, // 1MB
         10 * 1024 * 1024, // 10MB
     };
 

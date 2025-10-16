@@ -15,7 +15,6 @@ pub fn main() !void {
 
     print("=== GM-Zig Cryptography Library Demo ===\n\n", .{});
 
-
     print("=== ZUC Performance ===\n", .{});
     try zuc.testZUCPerformance(allocator);
 
