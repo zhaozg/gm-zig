@@ -107,4 +107,24 @@ pub fn build(b: *std.Build) void {
 
     const analyze_step = b.step("analyze", "Analyze performance data");
     analyze_step.dependOn(&analyze_cmd.step);
+
+    // Add SIMD benchmark executable
+    const simd_benchmark_mod = b.createModule(.{
+        .root_source_file = b.path("src/simd_benchmark.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    simd_benchmark_mod.addImport("gmlib", lib_mod);
+
+    const simd_benchmark_exe = b.addExecutable(.{
+        .name = "simd-benchmark",
+        .root_module = simd_benchmark_mod,
+    });
+    b.installArtifact(simd_benchmark_exe);
+
+    const simd_benchmark_cmd = b.addRunArtifact(simd_benchmark_exe);
+    simd_benchmark_cmd.step.dependOn(b.getInstallStep());
+
+    const simd_benchmark_step = b.step("simd-bench", "Run SIMD performance benchmarks");
+    simd_benchmark_step.dependOn(&simd_benchmark_cmd.step);
 }

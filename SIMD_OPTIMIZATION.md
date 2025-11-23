@@ -9,29 +9,29 @@ This document describes the SIMD (Single Instruction Multiple Data) optimization
 ### SM4 Block Cipher
 
 #### ECB Mode (Electronic Codebook)
-- **Optimization**: Parallel block encryption/decryption
-- **Benefit**: Independent blocks can be processed simultaneously
-- **Performance**: 
-  - Debug build: ~35 MB/s throughput with SIMD parallelization
-  - ReleaseFast build: ~140 MB/s throughput (4x improvement)
-- **Vector Size**: Processes 4 blocks (64 bytes) in parallel on AVX2-capable systems
+- **Optimization**: Parallel block processing
+- **Benefit**: Independent blocks can be processed with loop unrolling
+- **Performance (Scalar vs SIMD in same build)**: 
+  - Debug build: ~35 MB/s (scalar) vs ~35 MB/s (SIMD) - **~1.0x speedup**
+  - ReleaseFast build: ~140 MB/s (scalar) vs ~135 MB/s (SIMD) - **~0.95x (no benefit)**
+- **Note**: Current implementation uses loop unrolling rather than actual SIMD vector instructions. Compiler auto-vectorization in ReleaseFast already achieves optimal performance.
 
 #### CBC Mode (Cipher Block Chaining)
-- **Encryption**: Not SIMD-optimized (sequential dependency)
-- **Decryption**: SIMD-optimized parallel decryption
-- **Benefit**: Decryption blocks can be processed in parallel
-- **Performance**: 
-  - Debug build: ~28 MB/s throughput for decryption with SIMD
-  - ReleaseFast build: ~121 MB/s throughput (4x improvement)
+- **Encryption**: Not optimized (sequential dependency prevents parallelization)
+- **Decryption**: Parallel block processing
+- **Benefit**: Decrypt blocks can be processed with loop unrolling, then XORed
+- **Performance (Scalar vs SIMD in same build)**: 
+  - Debug build: ~29 MB/s (scalar) vs ~29 MB/s (SIMD) - **~1.0x speedup**
+  - ReleaseFast build: ~123 MB/s (scalar) vs ~122 MB/s (SIMD) - **~0.99x (no benefit)**
 
 ### SM3 Hash Function
 
-- **Optimization**: SIMD-optimized message expansion
-- **Benefit**: Parallel computation of message schedule words
-- **Performance**: 
-  - Debug build: ~19 MB/s throughput with SIMD
-  - ReleaseFast build: ~235 MB/s throughput (12x improvement)
-- **Details**: Message expansion processes multiple W values simultaneously
+- **Optimization**: Message expansion loop unrolling
+- **Benefit**: Processes two schedule words per iteration
+- **Performance (Scalar vs SIMD in same build)**: 
+  - Debug build: ~19 MB/s (scalar) vs ~19 MB/s (SIMD) - **~1.0x speedup**
+  - ReleaseFast build: ~245 MB/s (scalar) vs ~248 MB/s (SIMD) - **~1.01x speedup**
+- **Note**: Minimal benefit as compiler auto-vectorization is already highly effective
 
 ## SIMD Capability Detection
 

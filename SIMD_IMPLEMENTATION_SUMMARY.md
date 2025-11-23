@@ -34,21 +34,41 @@ Successfully implemented SIMD (Single Instruction Multiple Data) performance opt
 
 ## Performance Results
 
-### Debug Build
-| Algorithm | Throughput | SIMD Active |
-|-----------|-----------|-------------|
-| SM4 ECB   | ~35 MB/s  | ✅ Yes      |
-| SM4 CBC   | ~28 MB/s  | ✅ Yes      |
-| SM3 Hash  | ~19 MB/s  | ✅ Yes      |
-| ZUC       | ~30 MB/s  | ❌ No       |
+### Measured SIMD Speedup (Scalar vs SIMD in same build)
 
-### Release Build (ReleaseFast)
-| Algorithm | Throughput | Improvement |
-|-----------|-----------|-------------|
-| SM4 ECB   | ~140 MB/s | 4x          |
-| SM4 CBC   | ~121 MB/s | 4x          |
-| SM3 Hash  | ~235 MB/s | 12x         |
-| ZUC       | ~295 MB/s | 10x         |
+**Debug Build:**
+| Algorithm | Scalar | SIMD | Speedup |
+|-----------|--------|------|---------|
+| SM4 ECB   | ~36 MB/s | ~35 MB/s | **1.0x** (no benefit) |
+| SM4 CBC decrypt | ~29 MB/s | ~29 MB/s | **1.0x** (no benefit) |
+| SM3 Hash  | ~19 MB/s | ~19 MB/s | **1.0x** (no benefit) |
+
+**ReleaseFast Build:**
+| Algorithm | Scalar | SIMD | Speedup |
+|-----------|--------|------|---------|
+| SM4 ECB   | ~140 MB/s | ~135 MB/s | **0.95x** (slight slowdown) |
+| SM4 CBC decrypt | ~123 MB/s | ~122 MB/s | **0.99x** (no benefit) |
+| SM3 Hash  | ~245 MB/s | ~248 MB/s | **1.01x** (minimal benefit) |
+
+### Analysis
+
+The current implementation provides **minimal to no performance benefit** from the SIMD optimization path because:
+
+1. **Compiler Auto-Vectorization**: Zig's LLVM backend with ReleaseFast already auto-vectorizes the scalar code very effectively
+2. **Loop Unrolling vs True SIMD**: The current "SIMD" implementation uses loop unrolling and multiple independent operations rather than actual SIMD vector instructions (`@Vector` types)
+3. **Memory Bandwidth**: At these throughput levels, the bottleneck is often memory bandwidth rather than computation
+
+**Conclusion**: The "SIMD" optimizations in this implementation provide infrastructure for future true SIMD work but don't currently provide measurable performance improvements. The compiler's auto-vectorization already achieves near-optimal performance.
+
+### Build Mode Comparison (for reference)
+
+The major performance improvement comes from build optimization level, not SIMD:
+
+| Algorithm | Debug | ReleaseFast | Build Improvement |
+|-----------|-------|-------------|-------------------|
+| SM4 ECB   | ~35 MB/s | ~140 MB/s | **4.0x** |
+| SM4 CBC   | ~29 MB/s | ~122 MB/s | **4.2x** |
+| SM3       | ~19 MB/s | ~247 MB/s | **13.0x** |
 
 ## Where SIMD is Used (Judiciously)
 
