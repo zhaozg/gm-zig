@@ -320,7 +320,7 @@ pub const SM4_CTR = struct {
         };
     }
 
-    fn incrementCounter(counter: *[SM4_BLOCK_SIZE]u8) void {
+    pub fn incrementCounter(counter: *[SM4_BLOCK_SIZE]u8) void {
         var i: usize = SM4_BLOCK_SIZE;
         while (i > 0) {
             i -= 1;
@@ -434,44 +434,64 @@ pub const SM4_GCM = struct {
         @memcpy(counter[0..12], nonce);
         counter[15] = 1;
 
-        // Generate GHASH input
-        var ghash_input = std.ArrayList(u8).init(std.heap.page_allocator);
-        defer ghash_input.deinit();
-
         // Encrypt plaintext using CTR mode
-        var ctr_ctx = SM4_CTR.init(@ptrCast(&self.sm4.rk), &counter);
-        ctr_ctx.sm4 = self.sm4;
-        ctr_ctx.encrypt(plaintext, ciphertext);
+        var ctr_counter = counter;
+        var i: usize = 0;
+        while (i < plaintext.len) {
+            var keystream: [16]u8 = undefined;
+            self.sm4.encryptBlock(&ctr_counter, &keystream);
+            SM4_CTR.incrementCounter(&ctr_counter);
 
-        // Prepare GHASH input: AAD || 0* || C || 0* || len(AAD) || len(C)
-        ghash_input.appendSlice(additional_data) catch unreachable;
-        
-        // Pad AAD to block size
-        const aad_pad = (16 - (additional_data.len % 16)) % 16;
-        ghash_input.appendNTimes(0, aad_pad) catch unreachable;
-        
-        ghash_input.appendSlice(ciphertext[0..plaintext.len]) catch unreachable;
-        
-        // Pad ciphertext to block size
-        const ct_pad = (16 - (plaintext.len % 16)) % 16;
-        ghash_input.appendNTimes(0, ct_pad) catch unreachable;
+            const remaining = @min(16, plaintext.len - i);
+            for (0..remaining) |j| {
+                ciphertext[i + j] = plaintext[i + j] ^ keystream[j];
+            }
+            i += remaining;
+        }
 
-        // Append lengths
+        // Compute GHASH incrementally
+        var y = [_]u8{0} ** 16;
+        
+        // Process additional data
+        i = 0;
+        while (i < additional_data.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, additional_data.len - i);
+            @memcpy(block[0..remaining], additional_data[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process ciphertext
+        i = 0;
+        while (i < plaintext.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, plaintext.len - i);
+            @memcpy(block[0..remaining], ciphertext[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process length block
         var len_block: [16]u8 = undefined;
         std.mem.writeInt(u64, len_block[0..8], @as(u64, additional_data.len) * 8, .big);
         std.mem.writeInt(u64, len_block[8..16], @as(u64, plaintext.len) * 8, .big);
-        ghash_input.appendSlice(&len_block) catch unreachable;
-
-        // Compute GHASH
-        const ghash_result = ghash(&self.h, ghash_input.items);
+        for (0..16) |j| {
+            y[j] ^= len_block[j];
+        }
+        y = gfMul(&y, &self.h);
 
         // Compute tag: GHASH(H, A, C) XOR E(K, Y0)
         counter[15] = 1; // Reset to initial counter
         var y0_encrypted: [16]u8 = undefined;
         self.sm4.encryptBlock(&counter, &y0_encrypted);
 
-        for (0..16) |i| {
-            tag[i] = ghash_result[i] ^ y0_encrypted[i];
+        for (0..16) |j| {
+            tag[j] = y[j] ^ y0_encrypted[j];
         }
     }
 
@@ -485,51 +505,78 @@ pub const SM4_GCM = struct {
     ) bool {
         assert(plaintext.len >= ciphertext.len);
 
-        // Verify tag first
-        var computed_tag: [16]u8 = undefined;
-        
-        // We need to compute tag without decrypting first for verification
+        // Verify tag first by computing GHASH incrementally
         var counter: [16]u8 = [_]u8{0} ** 16;
         @memcpy(counter[0..12], nonce);
         counter[15] = 1;
 
-        var ghash_input = std.ArrayList(u8).init(std.heap.page_allocator);
-        defer ghash_input.deinit();
-
-        ghash_input.appendSlice(additional_data) catch unreachable;
-        const aad_pad = (16 - (additional_data.len % 16)) % 16;
-        ghash_input.appendNTimes(0, aad_pad) catch unreachable;
+        // Compute GHASH incrementally
+        var y = [_]u8{0} ** 16;
         
-        ghash_input.appendSlice(ciphertext) catch unreachable;
-        const ct_pad = (16 - (ciphertext.len % 16)) % 16;
-        ghash_input.appendNTimes(0, ct_pad) catch unreachable;
-
+        // Process additional data
+        var i: usize = 0;
+        while (i < additional_data.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, additional_data.len - i);
+            @memcpy(block[0..remaining], additional_data[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process ciphertext
+        i = 0;
+        while (i < ciphertext.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, ciphertext.len - i);
+            @memcpy(block[0..remaining], ciphertext[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process length block
         var len_block: [16]u8 = undefined;
         std.mem.writeInt(u64, len_block[0..8], @as(u64, additional_data.len) * 8, .big);
         std.mem.writeInt(u64, len_block[8..16], @as(u64, ciphertext.len) * 8, .big);
-        ghash_input.appendSlice(&len_block) catch unreachable;
+        for (0..16) |j| {
+            y[j] ^= len_block[j];
+        }
+        y = gfMul(&y, &self.h);
 
-        const ghash_result = ghash(&self.h, ghash_input.items);
-
+        // Compute tag
         var y0_encrypted: [16]u8 = undefined;
         self.sm4.encryptBlock(&counter, &y0_encrypted);
 
-        for (0..16) |i| {
-            computed_tag[i] = ghash_result[i] ^ y0_encrypted[i];
+        var computed_tag: [16]u8 = undefined;
+        for (0..16) |j| {
+            computed_tag[j] = y[j] ^ y0_encrypted[j];
         }
 
         // Constant-time comparison
         var diff: u8 = 0;
-        for (0..16) |i| {
-            diff |= computed_tag[i] ^ tag[i];
+        for (0..16) |j| {
+            diff |= computed_tag[j] ^ tag[j];
         }
 
         if (diff != 0) return false;
 
-        // Decrypt if tag is valid
-        var ctr_ctx = SM4_CTR.init(@ptrCast(&self.sm4.rk), &counter);
-        ctr_ctx.sm4 = self.sm4;
-        ctr_ctx.decrypt(ciphertext, plaintext);
+        // Decrypt if tag is valid using CTR mode
+        var ctr_counter = counter;
+        i = 0;
+        while (i < ciphertext.len) {
+            var keystream: [16]u8 = undefined;
+            self.sm4.encryptBlock(&ctr_counter, &keystream);
+            SM4_CTR.incrementCounter(&ctr_counter);
+
+            const remaining = @min(16, ciphertext.len - i);
+            for (0..remaining) |j| {
+                plaintext[i + j] = ciphertext[i + j] ^ keystream[j];
+            }
+            i += remaining;
+        }
 
         return true;
     }
