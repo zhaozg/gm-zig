@@ -24,9 +24,13 @@ pub const SimdCapabilities = struct {
                 caps.has_aes_ni = std.Target.x86.featureSetHas(native_target.cpu.features, .aes);
                 caps.has_avx2 = std.Target.x86.featureSetHas(native_target.cpu.features, .avx2);
             },
-            .aarch64, .arm => {
+            .aarch64 => {
                 // Check for ARM NEON features
                 caps.has_neon = std.Target.aarch64.featureSetHas(native_target.cpu.features, .neon);
+            },
+            .arm => {
+                // Check for ARM NEON features on 32-bit ARM
+                caps.has_neon = std.Target.arm.featureSetHas(native_target.cpu.features, .neon);
             },
             else => {},
         }
@@ -48,6 +52,9 @@ pub fn getOptimalVectorSize() usize {
     
     return 1; // No SIMD, process 1 block at a time
 }
+
+/// Maximum possible vector size across all platforms
+pub const MAX_VECTOR_SIZE = 4; // AVX2 can process 4 blocks
 
 /// SM4 SIMD-optimized implementations
 pub const SM4_SIMD = struct {
@@ -116,8 +123,8 @@ pub const SM4_SIMD = struct {
         // Process blocks in parallel when possible
         while (i + vector_bytes <= input.len) : (i += vector_bytes) {
             // Decrypt multiple blocks in parallel
-            var temp_blocks: [4][SM4_BLOCK_SIZE]u8 = undefined;
-            var cipher_blocks: [4][SM4_BLOCK_SIZE]u8 = undefined;
+            var temp_blocks: [MAX_VECTOR_SIZE][SM4_BLOCK_SIZE]u8 = undefined;
+            var cipher_blocks: [MAX_VECTOR_SIZE][SM4_BLOCK_SIZE]u8 = undefined;
             
             var j: usize = 0;
             while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {

@@ -289,8 +289,8 @@ pub const SM4_CBC = struct {
         // Process blocks in parallel when possible
         while (i + vector_bytes <= input.len) : (i += vector_bytes) {
             // Decrypt multiple blocks in parallel
-            var temp_blocks: [4][SM4_BLOCK_SIZE]u8 = undefined;
-            var cipher_blocks: [4][SM4_BLOCK_SIZE]u8 = undefined;
+            var temp_blocks: [simd.MAX_VECTOR_SIZE][SM4_BLOCK_SIZE]u8 = undefined;
+            var cipher_blocks: [simd.MAX_VECTOR_SIZE][SM4_BLOCK_SIZE]u8 = undefined;
             
             var j: usize = 0;
             while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
