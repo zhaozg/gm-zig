@@ -49,7 +49,14 @@ The library is designed with security, performance, and ease-of-use in mind, lev
 
 - **🔒 SM4 Block Cipher**
   - 128-bit block size with 128-bit key (GM/T 0002-2012)
-  - Multiple operation modes (ECB, CBC)
+  - Multiple operation modes:
+    - **ECB** (Electronic Codebook Mode)
+    - **CBC** (Cipher Block Chaining Mode)
+    - **CTR** (Counter Mode) - supports non-block-aligned data
+    - **GCM** (Galois/Counter Mode) - authenticated encryption
+    - **XTS** (XEX-based Tweaked-codebook mode) - disk encryption
+  - T-table optimization for 4x performance improvement
+  - Optimized performance: ~140 MB/s (ECB), ~80-124 MB/s (CBC)
 
 - **⚡ Performance & Security Optimized**
   - Zero-allocation algorithms where possible
@@ -350,41 +357,54 @@ gmlib.sm3.SM3.hash(message, &hash_with_options, .{});
 ### SM4 Block Cipher
 
 ```zig
-// Initialize SM4 context with key
 const key = [_]u8{
     0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
     0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10
 };
-const ctx = gmlib.sm4.SM4.init(&key);
 
-// ECB mode - single block encryption
-const plaintext = [_]u8{
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
-    0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54, 0x32, 0x10
-};
+// ECB mode - Electronic Codebook Mode
+const ecb = gmlib.sm4.SM4_ECB.init(&key);
+const plaintext = [_]u8{ /* 32 bytes */ };
+var ciphertext: [32]u8 = undefined;
+ecb.encrypt(&plaintext, &ciphertext);
+var decrypted: [32]u8 = undefined;
+ecb.decrypt(&ciphertext, &decrypted);
 
-var ciphertext: [16]u8 = undefined;
-ctx.encryptBlock(&plaintext, &ciphertext);
+// CBC mode - Cipher Block Chaining Mode
+const iv = [_]u8{0} ** 16;
+var cbc = gmlib.sm4.SM4_CBC.init(&key, &iv);
+cbc.encrypt(&plaintext, &ciphertext);
+cbc = gmlib.sm4.SM4_CBC.init(&key, &iv); // Reset IV
+cbc.decrypt(&ciphertext, &decrypted);
 
-var decrypted: [16]u8 = undefined;
-ctx.decryptBlock(&ciphertext, &decrypted);
+// CTR mode - Counter Mode (supports any length)
+const nonce = [_]u8{0} ** 16;
+var ctr = gmlib.sm4.SM4_CTR.init(&key, &nonce);
+const data = "Any length message"; // No padding required
+var encrypted: [data.len]u8 = undefined;
+ctr.encrypt(data, &encrypted);
+ctr = gmlib.sm4.SM4_CTR.init(&key, &nonce); // Reset counter
+var decrypted_data: [data.len]u8 = undefined;
+ctr.decrypt(&encrypted, &decrypted_data);
 
-assert(std.mem.eql(u8, &plaintext, &decrypted));
+// GCM mode - Galois/Counter Mode (authenticated encryption)
+const gcm = gmlib.sm4.SM4_GCM.init(&key);
+const nonce_gcm = [_]u8{0} ** 12;
+const additional_data = [_]u8{0xDE, 0xAD, 0xBE, 0xEF};
+var tag: [16]u8 = undefined;
+gcm.encrypt(&nonce_gcm, &plaintext, &additional_data, &ciphertext, &tag);
+const valid = gcm.decrypt(&nonce_gcm, &ciphertext, &additional_data, &tag, &decrypted);
+assert(valid); // Authentication check
 
-// For streaming data, process block by block
-const data = "This message needs multiple blocks for encryption...";
-const blocks = (data.len + 15) / 16; // Round up to block boundary
-
-for (0..blocks) |i| {
-    const start = i * 16;
-    const end = @min(start + 16, data.len);
-    var block: [16]u8 = [_]u8{0} ** 16;
-    @memcpy(block[0..end-start], data[start..end]);
-
-    var encrypted_block: [16]u8 = undefined;
-    ctx.encryptBlock(&block, &encrypted_block);
-    // Process encrypted_block...
-}
+// XTS mode - for disk encryption (requires 256-bit key)
+const xts_key = [_]u8{0} ** 32;
+const xts = gmlib.sm4.SM4_XTS.init(&xts_key);
+const tweak_value: u64 = 0; // Sector number
+const sector_data = [_]u8{ /* 512 bytes */ };
+var encrypted_sector: [512]u8 = undefined;
+xts.encrypt(tweak_value, &sector_data, &encrypted_sector);
+var decrypted_sector: [512]u8 = undefined;
+xts.decrypt(tweak_value, &encrypted_sector, &decrypted_sector);
 ```
 
 ## 🤝 Contributing

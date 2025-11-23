@@ -68,26 +68,31 @@ var T3: [256]u32 = undefined;
 var tables_initialized = false;
 
 // Initialize T-tables for optimized lookup
-// Each table T[i] contains the result of: L(S(i) || S(i) || S(i) || S(i))
-// where the byte is in different positions
+// T0[v] = L(S(v) || 0 || 0 || 0)
+// T1[v] = L(0 || S(v) || 0 || 0)
+// T2[v] = L(0 || 0 || S(v) || 0)
+// T3[v] = L(0 || 0 || 0 || S(v))
 fn initTables() void {
     if (tables_initialized) return;
     
     for (0..256) |i| {
         const sbox_val = @as(u32, SBOX[i]);
         
-        // Create a word with S-box output in each byte
-        const sbox_word = sbox_val | (sbox_val << 8) | (sbox_val << 16) | (sbox_val << 24);
+        // T0: S-box value in most significant byte (bits 24-31)
+        const b0: u32 = sbox_val << 24;
+        T0[i] = b0 ^ rotl(b0, 2) ^ rotl(b0, 10) ^ rotl(b0, 18) ^ rotl(b0, 24);
         
-        // Apply linear transformation L
-        const l_result = sbox_word ^ rotl(sbox_word, 2) ^ rotl(sbox_word, 10) ^ rotl(sbox_word, 18) ^ rotl(sbox_word, 24);
+        // T1: S-box value in byte 1 (bits 16-23)
+        const b1: u32 = sbox_val << 16;
+        T1[i] = b1 ^ rotl(b1, 2) ^ rotl(b1, 10) ^ rotl(b1, 18) ^ rotl(b1, 24);
         
-        // For each byte position in the input, we need different rotations
-        // T0 handles byte 0 (bits 24-31), T1 handles byte 1 (bits 16-23), etc.
-        T0[i] = l_result;
-        T1[i] = rotl(l_result, 8);
-        T2[i] = rotl(l_result, 16);
-        T3[i] = rotl(l_result, 24);
+        // T2: S-box value in byte 2 (bits 8-15)
+        const b2: u32 = sbox_val << 8;
+        T2[i] = b2 ^ rotl(b2, 2) ^ rotl(b2, 10) ^ rotl(b2, 18) ^ rotl(b2, 24);
+        
+        // T3: S-box value in least significant byte (bits 0-7)
+        const b3: u32 = sbox_val;
+        T3[i] = b3 ^ rotl(b3, 2) ^ rotl(b3, 10) ^ rotl(b3, 18) ^ rotl(b3, 24);
     }
     
     tables_initialized = true;
@@ -99,6 +104,8 @@ pub const SM4 = struct {
 
     // Initialize SM4 context with key
     pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4 {
+        initTables(); // Initialize T-tables for optimization
+        
         var ctx: SM4 = undefined;
         var k: [4]u32 = undefined;
 
@@ -165,21 +172,18 @@ pub const SM4 = struct {
         return b ^ rotl(b, 13) ^ rotl(b, 23);
     }
 
-    // Optimized round function - inline S-box and linear transformation
+    // Optimized round function using T-tables
     fn round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
         const t = x1 ^ x2 ^ x3 ^ rk;
         
-        // Apply S-box transformation
-        const sbox_out = tau(t);
+        // Extract bytes and use T-table lookup
+        const b0 = @as(u8, @truncate(t >> 24));
+        const b1 = @as(u8, @truncate(t >> 16));
+        const b2 = @as(u8, @truncate(t >> 8));
+        const b3 = @as(u8, @truncate(t));
         
-        // Apply linear transformation L
-        const l = sbox_out ^
-            rotl(sbox_out, 2) ^
-            rotl(sbox_out, 10) ^
-            rotl(sbox_out, 18) ^
-            rotl(sbox_out, 24);
-        
-        return x0 ^ l;
+        // L(τ(t)) = T0[b0] ⊕ T1[b1] ⊕ T2[b2] ⊕ T3[b3]
+        return x0 ^ (T0[b0] ^ T1[b1] ^ T2[b2] ^ T3[b3]);
     }
 
     // Nonlinear transformation τ (S-box substitution)
