@@ -4,6 +4,7 @@ const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
 const compat = @import("compat.zig");
+const simd = @import("simd.zig");
 
 const builtin = @import("builtin");
 
@@ -28,9 +29,11 @@ pub const SM3 = struct {
     buf: [block_length]u8,
     buf_len: u8,
     total_len: u64,
+    use_simd: bool,
 
     pub fn init(options: Options) Self {
         _ = options;
+        const caps = simd.SimdCapabilities.detect();
         return Self{
             .s = [_]u32{
                 0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
@@ -39,6 +42,7 @@ pub const SM3 = struct {
             .buf = undefined,
             .buf_len = 0,
             .total_len = 0,
+            .use_simd = caps.canUseSIMD(),
         };
     }
 
@@ -110,15 +114,20 @@ pub const SM3 = struct {
         var w: [68]u32 = undefined;
         var w1: [64]u32 = undefined;
 
-        // 消息字加载 - 大端序
-        for (0..16) |j| {
-            w[j] = mem.readInt(u32, block[j * 4 ..][0..4], .big);
-        }
+        // Use SIMD-optimized message expansion when available
+        if (d.use_simd) {
+            simd.SM3_SIMD.expandMessageSIMD(block, &w);
+        } else {
+            // 消息字加载 - 大端序
+            for (0..16) |j| {
+                w[j] = mem.readInt(u32, block[j * 4 ..][0..4], .big);
+            }
 
-        // 消息扩展
-        for (16..68) |j| {
-            w[j] = p1(w[j - 16] ^ w[j - 9] ^ math.rotl(u32, w[j - 3], 15)) ^
-                math.rotl(u32, w[j - 13], 7) ^ w[j - 6];
+            // 消息扩展
+            for (16..68) |j| {
+                w[j] = p1(w[j - 16] ^ w[j - 9] ^ math.rotl(u32, w[j - 3], 15)) ^
+                    math.rotl(u32, w[j - 13], 7) ^ w[j - 6];
+            }
         }
 
         // 计算W'

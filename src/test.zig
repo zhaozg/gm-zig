@@ -7,6 +7,9 @@ test {
     _ = @import("test/sm2_encryption_test.zig");
     _ = @import("test/sm2_key_exchange_test.zig");
 
+    // SIMD performance tests
+    _ = @import("test/simd_performance.zig");
+
     // ZUC
     _ = @import("zuc.zig");
 

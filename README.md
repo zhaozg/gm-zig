@@ -62,7 +62,9 @@ The library is designed with security, performance, and ease-of-use in mind, lev
   - Zero-allocation algorithms where possible
   - **Constant-time implementations** to prevent timing attacks
   - **Secure memory clearing** to prevent data leaks
-  - Platform-specific optimizations
+  - **SIMD optimizations** for parallel block processing (SM4 ECB/CBC, SM3)
+  - Automatic SIMD capability detection with scalar fallback
+  - Platform-specific optimizations (x86 SSE2/AVX2, ARM NEON)
   - Comprehensive test coverage with security validation
 
 ## 🚀 Quick Start

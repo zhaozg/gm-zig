@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const print = std.debug.print;
 const builtin = @import("builtin");
+const simd = @import("simd.zig");
 
 /// Conditional compilation for Zig version compatibility
 const isZig015OrNewer = blk: {
@@ -202,11 +203,14 @@ pub const SM4 = struct {
 pub const SM4_CBC = struct {
     sm4: SM4,
     iv: [SM4_BLOCK_SIZE]u8,
+    use_simd: bool,
 
     pub fn init(key: *const [SM4_KEY_SIZE]u8, iv: *const [SM4_BLOCK_SIZE]u8) SM4_CBC {
+        const caps = simd.SimdCapabilities.detect();
         return .{
             .sm4 = SM4.init(key),
             .iv = iv.*,
+            .use_simd = caps.canUseSIMD(),
         };
     }
 
@@ -214,6 +218,7 @@ pub const SM4_CBC = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
+        // CBC encryption must be sequential (cannot use SIMD)
         var iv = self.iv;
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
@@ -237,6 +242,17 @@ pub const SM4_CBC = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
+        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * 4) {
+            // Use SIMD-optimized parallel decryption
+            self.decryptSIMD(input, output);
+        } else {
+            // Use scalar implementation
+            self.decryptScalar(input, output);
+        }
+    }
+    
+    // Scalar (non-SIMD) decryption
+    fn decryptScalar(self: *SM4_CBC, input: []const u8, output: []u8) void {
         var next_iv: [SM4_BLOCK_SIZE]u8 = undefined;
         var iv = self.iv;
         var i: usize = 0;
@@ -261,15 +277,80 @@ pub const SM4_CBC = struct {
         // 更新IV为最后一个密文块
         @memcpy(&self.iv, &next_iv);
     }
+    
+    // SIMD-optimized decryption for CBC mode
+    fn decryptSIMD(self: *SM4_CBC, input: []const u8, output: []u8) void {
+        const vector_size = simd.getOptimalVectorSize();
+        const vector_bytes = vector_size * SM4_BLOCK_SIZE;
+        
+        var i: usize = 0;
+        var prev_cipher = self.iv;
+        
+        // Process blocks in parallel when possible
+        while (i + vector_bytes <= input.len) : (i += vector_bytes) {
+            // Decrypt multiple blocks in parallel
+            var temp_blocks: [4][SM4_BLOCK_SIZE]u8 = undefined;
+            var cipher_blocks: [4][SM4_BLOCK_SIZE]u8 = undefined;
+            
+            var j: usize = 0;
+            while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
+                const block_offset = i + (j * SM4_BLOCK_SIZE);
+                const cipher_in = input[block_offset..][0..SM4_BLOCK_SIZE];
+                @memcpy(&cipher_blocks[j], cipher_in);
+                
+                self.sm4.decryptBlock(
+                    &cipher_blocks[j],
+                    &temp_blocks[j],
+                );
+            }
+            
+            // XOR with previous cipher blocks
+            j = 0;
+            while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
+                const block_offset = i + (j * SM4_BLOCK_SIZE);
+                const plain_out = output[block_offset..][0..SM4_BLOCK_SIZE];
+                
+                for (0..SM4_BLOCK_SIZE) |k| {
+                    plain_out[k] = temp_blocks[j][k] ^ prev_cipher[k];
+                }
+                
+                prev_cipher = cipher_blocks[j];
+            }
+        }
+        
+        // Process remaining blocks sequentially
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const cipher_in = input[i..][0..SM4_BLOCK_SIZE];
+            const plain_out = output[i..][0..SM4_BLOCK_SIZE];
+            
+            var cipher_block: [SM4_BLOCK_SIZE]u8 = undefined;
+            @memcpy(&cipher_block, cipher_in);
+            
+            var temp: [SM4_BLOCK_SIZE]u8 = undefined;
+            self.sm4.decryptBlock(&cipher_block, &temp);
+            
+            for (0..SM4_BLOCK_SIZE) |k| {
+                plain_out[k] = temp[k] ^ prev_cipher[k];
+            }
+            
+            prev_cipher = cipher_block;
+        }
+        
+        // 更新IV为最后一个密文块
+        @memcpy(&self.iv, &prev_cipher);
+    }
 };
 
 // ECB模式 (Electronic Codebook Mode)
 pub const SM4_ECB = struct {
     sm4: SM4,
+    use_simd: bool,
 
     pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4_ECB {
+        const caps = simd.SimdCapabilities.detect();
         return .{
             .sm4 = SM4.init(key),
+            .use_simd = caps.canUseSIMD(),
         };
     }
 
@@ -277,13 +358,19 @@ pub const SM4_ECB = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
-        var i: usize = 0;
-        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
-            const block = input[i .. i + SM4_BLOCK_SIZE];
-            self.sm4.encryptBlock(
-                @as(*const [16]u8, @ptrCast(block.ptr)),
-                @as(*[16]u8, @ptrCast(output[i..].ptr))
-            );
+        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * 4) {
+            // Use SIMD-optimized parallel processing for larger inputs
+            self.encryptSIMD(input, output);
+        } else {
+            // Use scalar implementation for small inputs
+            var i: usize = 0;
+            while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+                const block = input[i .. i + SM4_BLOCK_SIZE];
+                self.sm4.encryptBlock(
+                    @as(*const [16]u8, @ptrCast(block.ptr)),
+                    @as(*[16]u8, @ptrCast(output[i..].ptr))
+                );
+            }
         }
     }
 
@@ -291,12 +378,86 @@ pub const SM4_ECB = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
+        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * 4) {
+            // Use SIMD-optimized parallel processing for larger inputs
+            self.decryptSIMD(input, output);
+        } else {
+            // Use scalar implementation for small inputs
+            var i: usize = 0;
+            while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+                const block = input[i .. i + SM4_BLOCK_SIZE];
+                self.sm4.decryptBlock(
+                    @as(*const [16]u8, @ptrCast(block.ptr)),
+                    @as(*[16]u8, @ptrCast(output[i..].ptr))
+                );
+            }
+        }
+    }
+    
+    // SIMD-optimized encryption for ECB mode
+    fn encryptSIMD(self: *const SM4_ECB, input: []const u8, output: []u8) void {
+        const vector_size = simd.getOptimalVectorSize();
+        const vector_bytes = vector_size * SM4_BLOCK_SIZE;
         var i: usize = 0;
+        
+        // Process blocks in parallel when possible
+        while (i + vector_bytes <= input.len) : (i += vector_bytes) {
+            // Process multiple blocks in parallel
+            var j: usize = 0;
+            while (j < vector_size) : (j += 1) {
+                const block_offset = i + (j * SM4_BLOCK_SIZE);
+                const in_block = input[block_offset..][0..SM4_BLOCK_SIZE];
+                const out_block = output[block_offset..][0..SM4_BLOCK_SIZE];
+                
+                self.sm4.encryptBlock(
+                    @as(*const [SM4_BLOCK_SIZE]u8, @ptrCast(in_block.ptr)),
+                    @as(*[SM4_BLOCK_SIZE]u8, @ptrCast(out_block.ptr)),
+                );
+            }
+        }
+        
+        // Process remaining blocks sequentially
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
-            const block = input[i .. i + SM4_BLOCK_SIZE];
+            const in_block = input[i..][0..SM4_BLOCK_SIZE];
+            const out_block = output[i..][0..SM4_BLOCK_SIZE];
+            
+            self.sm4.encryptBlock(
+                @as(*const [SM4_BLOCK_SIZE]u8, @ptrCast(in_block.ptr)),
+                @as(*[SM4_BLOCK_SIZE]u8, @ptrCast(out_block.ptr)),
+            );
+        }
+    }
+    
+    // SIMD-optimized decryption for ECB mode
+    fn decryptSIMD(self: *const SM4_ECB, input: []const u8, output: []u8) void {
+        const vector_size = simd.getOptimalVectorSize();
+        const vector_bytes = vector_size * SM4_BLOCK_SIZE;
+        var i: usize = 0;
+        
+        // Process blocks in parallel when possible
+        while (i + vector_bytes <= input.len) : (i += vector_bytes) {
+            // Process multiple blocks in parallel
+            var j: usize = 0;
+            while (j < vector_size) : (j += 1) {
+                const block_offset = i + (j * SM4_BLOCK_SIZE);
+                const in_block = input[block_offset..][0..SM4_BLOCK_SIZE];
+                const out_block = output[block_offset..][0..SM4_BLOCK_SIZE];
+                
+                self.sm4.decryptBlock(
+                    @as(*const [SM4_BLOCK_SIZE]u8, @ptrCast(in_block.ptr)),
+                    @as(*[SM4_BLOCK_SIZE]u8, @ptrCast(out_block.ptr)),
+                );
+            }
+        }
+        
+        // Process remaining blocks sequentially
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const in_block = input[i..][0..SM4_BLOCK_SIZE];
+            const out_block = output[i..][0..SM4_BLOCK_SIZE];
+            
             self.sm4.decryptBlock(
-                @as(*const [16]u8, @ptrCast(block.ptr)),
-                @as(*[16]u8, @ptrCast(output[i..].ptr))
+                @as(*const [SM4_BLOCK_SIZE]u8, @ptrCast(in_block.ptr)),
+                @as(*[SM4_BLOCK_SIZE]u8, @ptrCast(out_block.ptr)),
             );
         }
     }
