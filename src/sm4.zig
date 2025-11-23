@@ -59,44 +59,40 @@ fn rotl(x: u32, n: u5) u32 {
     return (x << n) | (x >> @as(u5, @intCast(@as(u6, 32) - n)));
 }
 
-// Precomputed T-table for optimization (S-box + linear transformation combined)
-// This significantly improves performance by reducing computation
-var T0: [256]u32 = undefined;
-var T1: [256]u32 = undefined;
-var T2: [256]u32 = undefined;
-var T3: [256]u32 = undefined;
-var tables_initialized = false;
-
-// Initialize T-tables for optimized lookup
+// Compile-time T-table initialization
 // T0[v] = L(S(v) || 0 || 0 || 0)
 // T1[v] = L(0 || S(v) || 0 || 0)
 // T2[v] = L(0 || 0 || S(v) || 0)
 // T3[v] = L(0 || 0 || 0 || S(v))
-fn initTables() void {
-    if (tables_initialized) return;
+fn computeTTable(comptime byte_position: u2) [256]u32 {
+    @setEvalBranchQuota(10000);
+    var table: [256]u32 = undefined;
+    
+    const shift_amount: u5 = comptime switch (byte_position) {
+        0 => 24,
+        1 => 16,
+        2 => 8,
+        3 => 0,
+    };
     
     for (0..256) |i| {
         const sbox_val = @as(u32, SBOX[i]);
         
-        // T0: S-box value in most significant byte (bits 24-31)
-        const b0: u32 = sbox_val << 24;
-        T0[i] = b0 ^ rotl(b0, 2) ^ rotl(b0, 10) ^ rotl(b0, 18) ^ rotl(b0, 24);
+        // Place S-box value in the correct byte position
+        const b: u32 = sbox_val << shift_amount;
         
-        // T1: S-box value in byte 1 (bits 16-23)
-        const b1: u32 = sbox_val << 16;
-        T1[i] = b1 ^ rotl(b1, 2) ^ rotl(b1, 10) ^ rotl(b1, 18) ^ rotl(b1, 24);
-        
-        // T2: S-box value in byte 2 (bits 8-15)
-        const b2: u32 = sbox_val << 8;
-        T2[i] = b2 ^ rotl(b2, 2) ^ rotl(b2, 10) ^ rotl(b2, 18) ^ rotl(b2, 24);
-        
-        // T3: S-box value in least significant byte (bits 0-7)
-        const b3: u32 = sbox_val;
-        T3[i] = b3 ^ rotl(b3, 2) ^ rotl(b3, 10) ^ rotl(b3, 18) ^ rotl(b3, 24);
+        // Apply linear transformation L
+        table[i] = b ^ rotl(b, 2) ^ rotl(b, 10) ^ rotl(b, 18) ^ rotl(b, 24);
     }
     
-    tables_initialized = true;
+    return table;
 }
+
+// Precomputed T-tables at compile time for optimal performance
+const T0: [256]u32 = computeTTable(0); // Byte 0 (most significant)
+const T1: [256]u32 = computeTTable(1); // Byte 1
+const T2: [256]u32 = computeTTable(2); // Byte 2
+const T3: [256]u32 = computeTTable(3); // Byte 3 (least significant)
 
 // SM4 context structure
 pub const SM4 = struct {
@@ -104,8 +100,6 @@ pub const SM4 = struct {
 
     // Initialize SM4 context with key
     pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4 {
-        initTables(); // Initialize T-tables for optimization
-        
         var ctx: SM4 = undefined;
         var k: [4]u32 = undefined;
 
