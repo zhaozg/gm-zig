@@ -54,6 +54,46 @@ const CK = [32]u32{
     0x10171e25, 0x2c333a41, 0x484f565d, 0x646b7279,
 };
 
+// Rotate left helper function (needed for T-table initialization)
+fn rotl(x: u32, n: u5) u32 {
+    return (x << n) | (x >> @as(u5, @intCast(@as(u6, 32) - n)));
+}
+
+// Compile-time T-table initialization
+// T0[v] = L(S(v) || 0 || 0 || 0)
+// T1[v] = L(0 || S(v) || 0 || 0)
+// T2[v] = L(0 || 0 || S(v) || 0)
+// T3[v] = L(0 || 0 || 0 || S(v))
+fn computeTTable(comptime byte_position: u2) [256]u32 {
+    @setEvalBranchQuota(10000);
+    var table: [256]u32 = undefined;
+    
+    const shift_amount: u5 = comptime switch (byte_position) {
+        0 => 24,
+        1 => 16,
+        2 => 8,
+        3 => 0,
+    };
+    
+    for (0..256) |i| {
+        const sbox_val = @as(u32, SBOX[i]);
+        
+        // Place S-box value in the correct byte position
+        const b: u32 = sbox_val << shift_amount;
+        
+        // Apply linear transformation L
+        table[i] = b ^ rotl(b, 2) ^ rotl(b, 10) ^ rotl(b, 18) ^ rotl(b, 24);
+    }
+    
+    return table;
+}
+
+// Precomputed T-tables at compile time for optimal performance
+const T0: [256]u32 = computeTTable(0); // Byte 0 (most significant)
+const T1: [256]u32 = computeTTable(1); // Byte 1
+const T2: [256]u32 = computeTTable(2); // Byte 2
+const T3: [256]u32 = computeTTable(3); // Byte 3 (least significant)
+
 // SM4 context structure
 pub const SM4 = struct {
     rk: [ROUNDS]u32, // Round keys
@@ -126,16 +166,18 @@ pub const SM4 = struct {
         return b ^ rotl(b, 13) ^ rotl(b, 23);
     }
 
+    // Optimized round function using T-tables
     fn round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
-        // tau + l_transform 合并
         const t = x1 ^ x2 ^ x3 ^ rk;
-        const sbox_out = tau(t);
-        const l = sbox_out ^
-            rotl(sbox_out, 2) ^
-            rotl(sbox_out, 10) ^
-            rotl(sbox_out, 18) ^
-            rotl(sbox_out, 24);
-        return x0 ^ l;
+        
+        // Extract bytes and use T-table lookup
+        const b0 = @as(u8, @truncate(t >> 24));
+        const b1 = @as(u8, @truncate(t >> 16));
+        const b2 = @as(u8, @truncate(t >> 8));
+        const b3 = @as(u8, @truncate(t));
+        
+        // L(τ(t)) = T0[b0] ⊕ T1[b1] ⊕ T2[b2] ⊕ T3[b3]
+        return x0 ^ (T0[b0] ^ T1[b1] ^ T2[b2] ^ T3[b3]);
     }
 
     // Nonlinear transformation τ (S-box substitution)
@@ -153,11 +195,6 @@ pub const SM4 = struct {
             rotl(b, 10) ^
             rotl(b, 18) ^
             rotl(b, 24);
-    }
-
-    // Rotate left helper
-    fn rotl(x: u32, n: u5) u32 {
-        return (x << n) | (x >> @as(u5, @intCast(@as(u6, 32) - n)));
     }
 };
 
@@ -223,6 +260,416 @@ pub const SM4_CBC = struct {
 
         // 更新IV为最后一个密文块
         @memcpy(&self.iv, &next_iv);
+    }
+};
+
+// ECB模式 (Electronic Codebook Mode)
+pub const SM4_ECB = struct {
+    sm4: SM4,
+
+    pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4_ECB {
+        return .{
+            .sm4 = SM4.init(key),
+        };
+    }
+
+    pub fn encrypt(self: *const SM4_ECB, input: []const u8, output: []u8) void {
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+        assert(output.len >= input.len);
+
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const block = input[i .. i + SM4_BLOCK_SIZE];
+            self.sm4.encryptBlock(
+                @as(*const [16]u8, @ptrCast(block.ptr)),
+                @as(*[16]u8, @ptrCast(output[i..].ptr))
+            );
+        }
+    }
+
+    pub fn decrypt(self: *const SM4_ECB, input: []const u8, output: []u8) void {
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+        assert(output.len >= input.len);
+
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            const block = input[i .. i + SM4_BLOCK_SIZE];
+            self.sm4.decryptBlock(
+                @as(*const [16]u8, @ptrCast(block.ptr)),
+                @as(*[16]u8, @ptrCast(output[i..].ptr))
+            );
+        }
+    }
+};
+
+// CTR模式 (Counter Mode)
+pub const SM4_CTR = struct {
+    sm4: SM4,
+    counter: [SM4_BLOCK_SIZE]u8,
+
+    pub fn init(key: *const [SM4_KEY_SIZE]u8, nonce: *const [SM4_BLOCK_SIZE]u8) SM4_CTR {
+        return .{
+            .sm4 = SM4.init(key),
+            .counter = nonce.*,
+        };
+    }
+
+    pub fn incrementCounter(counter: *[SM4_BLOCK_SIZE]u8) void {
+        var i: usize = SM4_BLOCK_SIZE;
+        while (i > 0) {
+            i -= 1;
+            counter[i] +%= 1;
+            if (counter[i] != 0) break;
+        }
+    }
+
+    pub fn encrypt(self: *SM4_CTR, input: []const u8, output: []u8) void {
+        assert(output.len >= input.len);
+
+        var i: usize = 0;
+        while (i < input.len) {
+            var keystream: [SM4_BLOCK_SIZE]u8 = undefined;
+            self.sm4.encryptBlock(&self.counter, &keystream);
+            incrementCounter(&self.counter);
+
+            const remaining = @min(SM4_BLOCK_SIZE, input.len - i);
+            for (0..remaining) |j| {
+                output[i + j] = input[i + j] ^ keystream[j];
+            }
+            i += remaining;
+        }
+    }
+
+    pub fn decrypt(self: *SM4_CTR, input: []const u8, output: []u8) void {
+        // CTR mode encryption and decryption are the same
+        self.encrypt(input, output);
+    }
+};
+
+// GCM模式 (Galois/Counter Mode)
+pub const SM4_GCM = struct {
+    sm4: SM4,
+    h: [SM4_BLOCK_SIZE]u8, // Hash subkey
+
+    pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4_GCM {
+        const sm4_ctx = SM4.init(key);
+        var h: [SM4_BLOCK_SIZE]u8 = [_]u8{0} ** SM4_BLOCK_SIZE;
+        sm4_ctx.encryptBlock(&h, &h);
+        
+        return .{
+            .sm4 = sm4_ctx,
+            .h = h,
+        };
+    }
+
+    // GF(2^128) multiplication
+    fn gfMul(x: *const [16]u8, y: *const [16]u8) [16]u8 {
+        var z = [_]u8{0} ** 16;
+        var v = y.*;
+
+        for (0..16) |i| {
+            for (0..8) |j| {
+                const bit = 7 - j;
+                if ((x[i] & (@as(u8, 1) << @as(u3, @intCast(bit)))) != 0) {
+                    for (0..16) |k| {
+                        z[k] ^= v[k];
+                    }
+                }
+
+                // Check if LSB of v is 1
+                const lsb = v[15] & 1;
+                
+                // Right shift v
+                var k: usize = 15;
+                while (k > 0) {
+                    v[k] = (v[k] >> 1) | (v[k - 1] << 7);
+                    k -= 1;
+                }
+                v[0] >>= 1;
+
+                // If LSB was 1, XOR with reduction polynomial
+                if (lsb != 0) {
+                    v[0] ^= 0xE1;
+                }
+            }
+        }
+
+        return z;
+    }
+
+    fn ghash(h: *const [16]u8, data: []const u8) [16]u8 {
+        var y = [_]u8{0} ** 16;
+
+        var i: usize = 0;
+        while (i < data.len) {
+            const remaining = @min(16, data.len - i);
+            for (0..remaining) |j| {
+                y[j] ^= data[i + j];
+            }
+            y = gfMul(&y, h);
+            i += 16;
+        }
+
+        return y;
+    }
+
+    pub fn encrypt(
+        self: *const SM4_GCM,
+        nonce: *const [12]u8,
+        plaintext: []const u8,
+        additional_data: []const u8,
+        ciphertext: []u8,
+        tag: *[16]u8
+    ) void {
+        assert(ciphertext.len >= plaintext.len);
+
+        // Construct initial counter block
+        var counter: [16]u8 = [_]u8{0} ** 16;
+        @memcpy(counter[0..12], nonce);
+        counter[15] = 1;
+
+        // Encrypt plaintext using CTR mode
+        var ctr_counter = counter;
+        var i: usize = 0;
+        while (i < plaintext.len) {
+            var keystream: [16]u8 = undefined;
+            self.sm4.encryptBlock(&ctr_counter, &keystream);
+            SM4_CTR.incrementCounter(&ctr_counter);
+
+            const remaining = @min(16, plaintext.len - i);
+            for (0..remaining) |j| {
+                ciphertext[i + j] = plaintext[i + j] ^ keystream[j];
+            }
+            i += remaining;
+        }
+
+        // Compute GHASH incrementally
+        var y = [_]u8{0} ** 16;
+        
+        // Process additional data
+        i = 0;
+        while (i < additional_data.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, additional_data.len - i);
+            @memcpy(block[0..remaining], additional_data[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process ciphertext
+        i = 0;
+        while (i < plaintext.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, plaintext.len - i);
+            @memcpy(block[0..remaining], ciphertext[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process length block
+        var len_block: [16]u8 = undefined;
+        std.mem.writeInt(u64, len_block[0..8], @as(u64, additional_data.len) * 8, .big);
+        std.mem.writeInt(u64, len_block[8..16], @as(u64, plaintext.len) * 8, .big);
+        for (0..16) |j| {
+            y[j] ^= len_block[j];
+        }
+        y = gfMul(&y, &self.h);
+
+        // Compute tag: GHASH(H, A, C) XOR E(K, Y0)
+        counter[15] = 1; // Reset to initial counter
+        var y0_encrypted: [16]u8 = undefined;
+        self.sm4.encryptBlock(&counter, &y0_encrypted);
+
+        for (0..16) |j| {
+            tag[j] = y[j] ^ y0_encrypted[j];
+        }
+    }
+
+    pub fn decrypt(
+        self: *const SM4_GCM,
+        nonce: *const [12]u8,
+        ciphertext: []const u8,
+        additional_data: []const u8,
+        tag: *const [16]u8,
+        plaintext: []u8
+    ) bool {
+        assert(plaintext.len >= ciphertext.len);
+
+        // Verify tag first by computing GHASH incrementally
+        var counter: [16]u8 = [_]u8{0} ** 16;
+        @memcpy(counter[0..12], nonce);
+        counter[15] = 1;
+
+        // Compute GHASH incrementally
+        var y = [_]u8{0} ** 16;
+        
+        // Process additional data
+        var i: usize = 0;
+        while (i < additional_data.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, additional_data.len - i);
+            @memcpy(block[0..remaining], additional_data[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process ciphertext
+        i = 0;
+        while (i < ciphertext.len) : (i += 16) {
+            var block = [_]u8{0} ** 16;
+            const remaining = @min(16, ciphertext.len - i);
+            @memcpy(block[0..remaining], ciphertext[i..i + remaining]);
+            for (0..16) |j| {
+                y[j] ^= block[j];
+            }
+            y = gfMul(&y, &self.h);
+        }
+        
+        // Process length block
+        var len_block: [16]u8 = undefined;
+        std.mem.writeInt(u64, len_block[0..8], @as(u64, additional_data.len) * 8, .big);
+        std.mem.writeInt(u64, len_block[8..16], @as(u64, ciphertext.len) * 8, .big);
+        for (0..16) |j| {
+            y[j] ^= len_block[j];
+        }
+        y = gfMul(&y, &self.h);
+
+        // Compute tag
+        var y0_encrypted: [16]u8 = undefined;
+        self.sm4.encryptBlock(&counter, &y0_encrypted);
+
+        var computed_tag: [16]u8 = undefined;
+        for (0..16) |j| {
+            computed_tag[j] = y[j] ^ y0_encrypted[j];
+        }
+
+        // Constant-time comparison
+        var diff: u8 = 0;
+        for (0..16) |j| {
+            diff |= computed_tag[j] ^ tag[j];
+        }
+
+        if (diff != 0) return false;
+
+        // Decrypt if tag is valid using CTR mode
+        var ctr_counter = counter;
+        i = 0;
+        while (i < ciphertext.len) {
+            var keystream: [16]u8 = undefined;
+            self.sm4.encryptBlock(&ctr_counter, &keystream);
+            SM4_CTR.incrementCounter(&ctr_counter);
+
+            const remaining = @min(16, ciphertext.len - i);
+            for (0..remaining) |j| {
+                plaintext[i + j] = ciphertext[i + j] ^ keystream[j];
+            }
+            i += remaining;
+        }
+
+        return true;
+    }
+};
+
+// XTS模式 (XEX-based tweaked-codebook mode with ciphertext stealing)
+pub const SM4_XTS = struct {
+    sm4_1: SM4, // For tweak encryption
+    sm4_2: SM4, // For data encryption
+
+    pub fn init(key: *const [32]u8) SM4_XTS {
+        var key1: [16]u8 = undefined;
+        var key2: [16]u8 = undefined;
+        @memcpy(&key1, key[0..16]);
+        @memcpy(&key2, key[16..32]);
+
+        return .{
+            .sm4_1 = SM4.init(&key1),
+            .sm4_2 = SM4.init(&key2),
+        };
+    }
+
+    fn multiplyAlpha(tweak: *[16]u8) void {
+        var carry: u8 = 0;
+        var i: usize = 0;
+        while (i < 16) : (i += 1) {
+            const new_carry = tweak[i] >> 7;
+            tweak[i] = (tweak[i] << 1) | carry;
+            carry = new_carry;
+        }
+        if (carry != 0) {
+            tweak[0] ^= 0x87;
+        }
+    }
+
+    pub fn encrypt(self: *const SM4_XTS, tweak_value: u64, input: []const u8, output: []u8) void {
+        assert(input.len >= SM4_BLOCK_SIZE);
+        assert(output.len >= input.len);
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+
+        // Initialize tweak
+        var tweak: [16]u8 = [_]u8{0} ** 16;
+        std.mem.writeInt(u64, tweak[0..8], tweak_value, .little);
+        self.sm4_1.encryptBlock(&tweak, &tweak);
+
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            var block: [16]u8 = undefined;
+            @memcpy(&block, input[i..i + 16]);
+
+            // XOR with tweak
+            for (0..16) |j| {
+                block[j] ^= tweak[j];
+            }
+
+            // Encrypt
+            self.sm4_2.encryptBlock(&block, &block);
+
+            // XOR with tweak again
+            for (0..16) |j| {
+                output[i + j] = block[j] ^ tweak[j];
+            }
+
+            // Multiply tweak by alpha for next block
+            multiplyAlpha(&tweak);
+        }
+    }
+
+    pub fn decrypt(self: *const SM4_XTS, tweak_value: u64, input: []const u8, output: []u8) void {
+        assert(input.len >= SM4_BLOCK_SIZE);
+        assert(output.len >= input.len);
+        assert(input.len % SM4_BLOCK_SIZE == 0);
+
+        // Initialize tweak
+        var tweak: [16]u8 = [_]u8{0} ** 16;
+        std.mem.writeInt(u64, tweak[0..8], tweak_value, .little);
+        self.sm4_1.encryptBlock(&tweak, &tweak);
+
+        var i: usize = 0;
+        while (i < input.len) : (i += SM4_BLOCK_SIZE) {
+            var block: [16]u8 = undefined;
+            @memcpy(&block, input[i..i + 16]);
+
+            // XOR with tweak
+            for (0..16) |j| {
+                block[j] ^= tweak[j];
+            }
+
+            // Decrypt
+            self.sm4_2.decryptBlock(&block, &block);
+
+            // XOR with tweak again
+            for (0..16) |j| {
+                output[i + j] = block[j] ^ tweak[j];
+            }
+
+            // Multiply tweak by alpha for next block
+            multiplyAlpha(&tweak);
+        }
     }
 };
 
