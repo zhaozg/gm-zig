@@ -14,6 +14,7 @@ const isZig015OrNewer = blk: {
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
 const SM4_KEY_SIZE = 16; // 128-bit keys
 const ROUNDS = 32; // 32 rounds
+const SIMD_MIN_BLOCKS = 4; // Minimum blocks needed to activate SIMD (4 blocks = 64 bytes)
 
 // SM4 S-Box (256-byte substitution table)
 const SBOX = [256]u8{
@@ -242,7 +243,7 @@ pub const SM4_CBC = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
-        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * 4) {
+        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * SIMD_MIN_BLOCKS) {
             // Use SIMD-optimized parallel decryption
             self.decryptSIMD(input, output);
         } else {
@@ -293,7 +294,7 @@ pub const SM4_CBC = struct {
             var cipher_blocks: [simd.MAX_VECTOR_SIZE][SM4_BLOCK_SIZE]u8 = undefined;
             
             var j: usize = 0;
-            while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
+            while (j < vector_size) : (j += 1) {
                 const block_offset = i + (j * SM4_BLOCK_SIZE);
                 const cipher_in = input[block_offset..][0..SM4_BLOCK_SIZE];
                 @memcpy(&cipher_blocks[j], cipher_in);
@@ -306,7 +307,7 @@ pub const SM4_CBC = struct {
             
             // XOR with previous cipher blocks
             j = 0;
-            while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
+            while (j < vector_size) : (j += 1) {
                 const block_offset = i + (j * SM4_BLOCK_SIZE);
                 const plain_out = output[block_offset..][0..SM4_BLOCK_SIZE];
                 
@@ -358,7 +359,7 @@ pub const SM4_ECB = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
-        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * 4) {
+        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * SIMD_MIN_BLOCKS) {
             // Use SIMD-optimized parallel processing for larger inputs
             self.encryptSIMD(input, output);
         } else {
@@ -378,7 +379,7 @@ pub const SM4_ECB = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
         assert(output.len >= input.len);
 
-        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * 4) {
+        if (self.use_simd and input.len >= SM4_BLOCK_SIZE * SIMD_MIN_BLOCKS) {
             // Use SIMD-optimized parallel processing for larger inputs
             self.decryptSIMD(input, output);
         } else {

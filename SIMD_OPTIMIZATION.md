@@ -11,20 +11,26 @@ This document describes the SIMD (Single Instruction Multiple Data) optimization
 #### ECB Mode (Electronic Codebook)
 - **Optimization**: Parallel block encryption/decryption
 - **Benefit**: Independent blocks can be processed simultaneously
-- **Performance**: Maintains ~35 MB/s throughput with SIMD parallelization
+- **Performance**: 
+  - Debug build: ~35 MB/s throughput with SIMD parallelization
+  - ReleaseFast build: ~140 MB/s throughput (4x improvement)
 - **Vector Size**: Processes 4 blocks (64 bytes) in parallel on AVX2-capable systems
 
 #### CBC Mode (Cipher Block Chaining)
 - **Encryption**: Not SIMD-optimized (sequential dependency)
 - **Decryption**: SIMD-optimized parallel decryption
 - **Benefit**: Decryption blocks can be processed in parallel
-- **Performance**: ~28 MB/s throughput for decryption with SIMD
+- **Performance**: 
+  - Debug build: ~28 MB/s throughput for decryption with SIMD
+  - ReleaseFast build: ~121 MB/s throughput (4x improvement)
 
 ### SM3 Hash Function
 
 - **Optimization**: SIMD-optimized message expansion
 - **Benefit**: Parallel computation of message schedule words
-- **Performance**: ~19 MB/s throughput with SIMD
+- **Performance**: 
+  - Debug build: ~19 MB/s throughput with SIMD
+  - ReleaseFast build: ~235 MB/s throughput (12x improvement)
 - **Details**: Message expansion processes multiple W values simultaneously
 
 ## SIMD Capability Detection

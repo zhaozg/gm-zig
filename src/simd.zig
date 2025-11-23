@@ -127,7 +127,7 @@ pub const SM4_SIMD = struct {
             var cipher_blocks: [MAX_VECTOR_SIZE][SM4_BLOCK_SIZE]u8 = undefined;
             
             var j: usize = 0;
-            while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
+            while (j < vector_size) : (j += 1) {
                 const block_offset = i + (j * SM4_BLOCK_SIZE);
                 const cipher_in = input[block_offset..][0..SM4_BLOCK_SIZE];
                 @memcpy(&cipher_blocks[j], cipher_in);
@@ -140,7 +140,7 @@ pub const SM4_SIMD = struct {
             
             // XOR with previous cipher blocks
             j = 0;
-            while (j < vector_size and i + (j * SM4_BLOCK_SIZE) < input.len) : (j += 1) {
+            while (j < vector_size) : (j += 1) {
                 const block_offset = i + (j * SM4_BLOCK_SIZE);
                 const plain_out = output[block_offset..][0..SM4_BLOCK_SIZE];
                 
