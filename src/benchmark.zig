@@ -20,7 +20,7 @@ const CpuCycleCounter = struct {
         if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
             return asm volatile ("rdtsc"
                 : [ret] "={eax}" (-> u64),
-                : [_] "{edx}" (0)
+                : [_] "{edx}" (0),
             );
         }
         // Fallback to 0 for unsupported architectures
@@ -37,8 +37,8 @@ const CpuCycleCounter = struct {
         if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
             asm volatile ("cpuid"
                 :
-                : [_] "{eax}" (0)
-                : "eax", "ebx", "ecx", "edx"
+                : [_] "{eax}" (0),
+                : .{ .eax = true, .ebx = true, .ecx = true, .edx = true }
             );
         }
         return readTSC();
@@ -51,8 +51,8 @@ const CpuCycleCounter = struct {
         if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
             asm volatile ("cpuid"
                 :
-                : [_] "{eax}" (0)
-                : "eax", "ebx", "ecx", "edx"
+                : [_] "{eax}" (0),
+                : .{ .eax = true, .ebx = true, .ecx = true, .edx = true }
             );
         }
         return cycles;
@@ -278,7 +278,7 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Calculate bits and enhanced metrics
         const total_bits = @as(f64, @floatFromInt(size * 8));
         const ns_per_bit = duration_ns / total_bits;
-        
+
         const cycles_per_bit = if (CpuCycleCounter.isSupported() and end_cycles > start_cycles)
             @as(f64, @floatFromInt(end_cycles - start_cycles)) / total_bits
         else
@@ -426,7 +426,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     };
-    
+
     const test_sizes = [_]usize{
         1024, // 1KB
         64 * 1024, // 64KB
@@ -439,7 +439,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     for (test_sizes) |size| {
         const plaintext = try allocator.alloc(u8, size);
         defer allocator.free(plaintext);
-        
+
         // Fill with test data
         var prng = std.Random.DefaultPrng.init(0);
         prng.random().bytes(plaintext);
