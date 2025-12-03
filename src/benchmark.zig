@@ -41,6 +41,9 @@ pub const BenchmarkResult = struct {
     timestamp: i64,
     build_mode: []const u8,
     platform: []const u8,
+    // Enhanced metrics
+    ns_per_bit: ?f64 = null,
+    cycles_per_bit: ?f64 = null,
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
         var output = if (isZig015OrNewer)
@@ -65,6 +68,12 @@ pub const BenchmarkResult = struct {
         try writer.print("\"performance_value\":{d},", .{self.performance_value});
         try writer.print("\"performance_unit\":\"{s}\",", .{self.performance_unit});
         try writer.print("\"data_size_kb\":{d},", .{self.data_size_kb});
+        if (self.ns_per_bit) |ns| {
+            try writer.print("\"ns_per_bit\":{d:.2},", .{ns});
+        }
+        if (self.cycles_per_bit) |cycles| {
+            try writer.print("\"cycles_per_bit\":{d:.2},", .{cycles});
+        }
         try writer.print("\"timestamp\":{},", .{self.timestamp});
         try writer.print("\"build_mode\":\"{s}\",", .{self.build_mode});
         try writer.print("\"platform\":\"{s}\"", .{self.platform});
@@ -144,13 +153,20 @@ pub const BenchmarkSuite = struct {
     pub fn printSummary(self: *BenchmarkSuite) void {
         std.debug.print("\n=== Performance Benchmark Summary ===\n", .{});
         for (self.results.items) |result| {
-            std.debug.print("{s} {s}: {d:.2} KB -> {d:.2} {s}\n", .{
+            std.debug.print("{s} {s}: {d:.2} KB -> {d:.2} {s}", .{
                 result.algorithm,
                 result.operation,
                 result.data_size_kb,
                 result.performance_value,
                 result.performance_unit,
             });
+            if (result.ns_per_bit) |ns| {
+                std.debug.print(" ({d:.4} ns/bit)", .{ns});
+            }
+            if (result.cycles_per_bit) |cycles| {
+                std.debug.print(" ({d:.2} cycles/bit)", .{cycles});
+            }
+            std.debug.print("\n", .{});
         }
     }
 };
@@ -209,12 +225,18 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         const ns_per_s = 1_000_000_000.0;
         const throughput = (@as(f64, @floatFromInt(size)) / duration_ns) * ns_per_s / bytes_per_mb;
 
+        // Calculate bits and enhanced metrics
+        const total_bits = @as(f64, @floatFromInt(size * 8));
+        const ns_per_bit = duration_ns / total_bits;
+
         const result = BenchmarkResult{
             .algorithm = "SM3",
             .operation = "hash",
             .data_size_kb = @as(f64, @floatFromInt(size)) / 1024.0,
             .performance_value = throughput,
             .performance_unit = "MB/s",
+            .ns_per_bit = ns_per_bit,
+            .cycles_per_bit = null, // CPU cycle counting not readily available cross-platform
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
@@ -275,12 +297,16 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         const ns_per_s = 1_000_000_000.0;
         const encrypt_throughput = (@as(f64, @floatFromInt(size)) / encrypt_duration) * ns_per_s / bytes_per_mb;
 
+        const encrypt_bits = @as(f64, @floatFromInt(size * 8));
+        const encrypt_ns_per_bit = encrypt_duration / encrypt_bits;
+
         const encrypt_result = BenchmarkResult{
             .algorithm = "SM4",
             .operation = "encrypt",
             .data_size_kb = @as(f64, @floatFromInt(size)) / 1024.0,
             .performance_value = encrypt_throughput,
             .performance_unit = "MB/s",
+            .ns_per_bit = encrypt_ns_per_bit,
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
@@ -302,12 +328,16 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
         const decrypt_throughput = (@as(f64, @floatFromInt(size)) / decrypt_duration) * ns_per_s / bytes_per_mb;
 
+        const decrypt_bits = @as(f64, @floatFromInt(size * 8));
+        const decrypt_ns_per_bit = decrypt_duration / decrypt_bits;
+
         const decrypt_result = BenchmarkResult{
             .algorithm = "SM4",
             .operation = "decrypt",
             .data_size_kb = @as(f64, @floatFromInt(size)) / 1024.0,
             .performance_value = decrypt_throughput,
             .performance_unit = "MB/s",
+            .ns_per_bit = decrypt_ns_per_bit,
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
