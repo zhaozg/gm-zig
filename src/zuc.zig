@@ -982,7 +982,7 @@ test "ZUC MAC with null pointers" {
     try testing.expect(mac2 != 0);
 }
 
-// 添加性能基准测试
+// MAC性能基准测试（已移至benchmark.zig）
 test "ZUC MAC benchmark" {
     const key = [_]u8{0x55} ** 16;
     const iv = [_]u8{0x66} ** 16;
@@ -1007,10 +1007,12 @@ test "ZUC MAC benchmark" {
 
         const end_time = std.time.nanoTimestamp();
         const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
-        const ns_per_mac = elapsed_ns / @as(f64, @floatFromInt(iterations));
-        const mbps = (@as(f64, @floatFromInt(size)) / (1024 * 1024)) / (ns_per_mac / 1e9);
+        const ns_per_operation = elapsed_ns / @as(f64, @floatFromInt(iterations));
+        const mbps = (@as(f64, @floatFromInt(size)) / (1024 * 1024)) / (ns_per_operation / 1e9);
+        const total_bits = @as(f64, @floatFromInt(size * 8));
+        const ns_per_bit = ns_per_operation / total_bits;
 
-        std.debug.print("ZUC MAC {d} bytes: {d:.2} ns/MAC, {d:.2} MB/s\n", .{ size, ns_per_mac, mbps });
+        std.debug.print("ZUC MAC {d} bytes: {d:.2} MB/s ({d:.4} ns/bit)\n", .{ size, mbps, ns_per_bit });
     }
 
     try testing.expect(true);

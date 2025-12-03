@@ -4,12 +4,59 @@ const sm3 = root.sm3;
 const sm4 = root.sm4;
 const sm2 = root.sm2;
 const sm9 = root.sm9;
+const zuc = root.zuc;
 const builtin = @import("builtin");
 
 /// Conditional compilation for Zig version compatibility
 const isZig015OrNewer = blk: {
     const version = builtin.zig_version;
     break :blk (version.major == 0 and version.minor >= 15);
+};
+
+// CPU cycle counting support for performance measurement
+const CpuCycleCounter = struct {
+    // Read CPU timestamp counter (x86/x86_64 RDTSC instruction)
+    fn readTSC() u64 {
+        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
+            return asm volatile ("rdtsc"
+                : [ret] "={eax}" (-> u64),
+                : [_] "{edx}" (0)
+            );
+        }
+        // Fallback to 0 for unsupported architectures
+        return 0;
+    }
+
+    pub fn isSupported() bool {
+        return builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86;
+    }
+
+    pub fn start() u64 {
+        if (!isSupported()) return 0;
+        // Serialize to prevent out-of-order execution
+        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
+            asm volatile ("cpuid"
+                :
+                : [_] "{eax}" (0)
+                : "eax", "ebx", "ecx", "edx"
+            );
+        }
+        return readTSC();
+    }
+
+    pub fn end() u64 {
+        if (!isSupported()) return 0;
+        const cycles = readTSC();
+        // Serialize to prevent out-of-order execution
+        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
+            asm volatile ("cpuid"
+                :
+                : [_] "{eax}" (0)
+                : "eax", "ebx", "ecx", "edx"
+            );
+        }
+        return cycles;
+    }
 };
 
 // Flag to control logging output in JSON mode
@@ -43,7 +90,7 @@ pub const BenchmarkResult = struct {
     platform: []const u8,
     // Enhanced metrics
     ns_per_bit: ?f64 = null,
-    // TODO: CPU cycle counting requires platform-specific implementation (RDTSC on x86, PMCCNTR on ARM)
+    // CPU cycles per bit (x86/x86_64 only, using RDTSC)
     cycles_per_bit: ?f64 = null,
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
@@ -216,10 +263,12 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Warm up
         sm3.SM3.hash(buffer[0..1024], &out, .{});
 
-        // Benchmark
+        // Benchmark with time and cycles
+        const start_cycles = CpuCycleCounter.start();
         const start_time = std.time.nanoTimestamp();
         sm3.SM3.hash(buffer, &out, .{});
         const end_time = std.time.nanoTimestamp();
+        const end_cycles = CpuCycleCounter.end();
 
         const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
         const bytes_per_mb = 1024.0 * 1024.0;
@@ -229,6 +278,11 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Calculate bits and enhanced metrics
         const total_bits = @as(f64, @floatFromInt(size * 8));
         const ns_per_bit = duration_ns / total_bits;
+        
+        const cycles_per_bit = if (CpuCycleCounter.isSupported() and end_cycles > start_cycles)
+            @as(f64, @floatFromInt(end_cycles - start_cycles)) / total_bits
+        else
+            null;
 
         const result = BenchmarkResult{
             .algorithm = "SM3",
@@ -237,6 +291,7 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_value = throughput,
             .performance_unit = "MB/s",
             .ns_per_bit = ns_per_bit,
+            .cycles_per_bit = cycles_per_bit,
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
@@ -280,7 +335,8 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Warm up
         ctx.encryptBlock(buffer[0..16], out[0..16]);
 
-        // Benchmark encryption
+        // Benchmark encryption with cycles
+        const encrypt_start_cycles = CpuCycleCounter.start();
         const encrypt_start = std.time.nanoTimestamp();
         const blocks = size / 16; // SM4 block size
         for (0..blocks) |i| {
@@ -291,6 +347,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             );
         }
         const encrypt_end = std.time.nanoTimestamp();
+        const encrypt_end_cycles = CpuCycleCounter.end();
 
         const encrypt_duration = @as(f64, @floatFromInt(encrypt_end - encrypt_start));
         const bytes_per_mb = 1024.0 * 1024.0;
@@ -299,6 +356,10 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         const encrypt_bits = @as(f64, @floatFromInt(size * 8));
         const encrypt_ns_per_bit = encrypt_duration / encrypt_bits;
+        const encrypt_cycles_per_bit = if (CpuCycleCounter.isSupported() and encrypt_end_cycles > encrypt_start_cycles)
+            @as(f64, @floatFromInt(encrypt_end_cycles - encrypt_start_cycles)) / encrypt_bits
+        else
+            null;
 
         const encrypt_result = BenchmarkResult{
             .algorithm = "SM4",
@@ -307,6 +368,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_value = encrypt_throughput,
             .performance_unit = "MB/s",
             .ns_per_bit = encrypt_ns_per_bit,
+            .cycles_per_bit = encrypt_cycles_per_bit,
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
@@ -314,7 +376,8 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         try suite.addResult(encrypt_result);
 
-        // Benchmark decryption
+        // Benchmark decryption with cycles
+        const decrypt_start_cycles = CpuCycleCounter.start();
         const decrypt_start = std.time.nanoTimestamp();
         for (0..blocks) |i| {
             const start = i * 16;
@@ -324,12 +387,17 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             );
         }
         const decrypt_end = std.time.nanoTimestamp();
+        const decrypt_end_cycles = CpuCycleCounter.end();
 
         const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
         const decrypt_throughput = (@as(f64, @floatFromInt(size)) / decrypt_duration) * ns_per_s / bytes_per_mb;
 
         const decrypt_bits = @as(f64, @floatFromInt(size * 8));
         const decrypt_ns_per_bit = decrypt_duration / decrypt_bits;
+        const decrypt_cycles_per_bit = if (CpuCycleCounter.isSupported() and decrypt_end_cycles > decrypt_start_cycles)
+            @as(f64, @floatFromInt(decrypt_end_cycles - decrypt_start_cycles)) / decrypt_bits
+        else
+            null;
 
         const decrypt_result = BenchmarkResult{
             .algorithm = "SM4",
@@ -338,12 +406,136 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_value = decrypt_throughput,
             .performance_unit = "MB/s",
             .ns_per_bit = decrypt_ns_per_bit,
+            .cycles_per_bit = decrypt_cycles_per_bit,
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
 
         try suite.addResult(decrypt_result);
+    }
+}
+
+// Benchmark ZUC stream cipher performance
+pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
+    const key = [16]u8{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    };
+    const iv = [16]u8{
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    };
+    
+    const test_sizes = [_]usize{
+        1024, // 1KB
+        64 * 1024, // 64KB
+        1024 * 1024, // 1MB
+    };
+
+    const timestamp = std.time.timestamp();
+
+    // Benchmark encryption
+    for (test_sizes) |size| {
+        const plaintext = try allocator.alloc(u8, size);
+        defer allocator.free(plaintext);
+        
+        // Fill with test data
+        var prng = std.Random.DefaultPrng.init(0);
+        prng.random().bytes(plaintext);
+
+        const ciphertext = try allocator.alloc(u8, size);
+        defer allocator.free(ciphertext);
+
+        // Warm up
+        var ctx_warmup = zuc.ZUC.init(&key, &iv);
+        ctx_warmup.crypt(plaintext[0..@min(256, size)], ciphertext[0..@min(256, size)]);
+
+        // Benchmark encryption with cycles
+        const start_cycles = CpuCycleCounter.start();
+        const start_time = std.time.nanoTimestamp();
+        var ctx = zuc.ZUC.init(&key, &iv);
+        ctx.crypt(plaintext, ciphertext);
+        const end_time = std.time.nanoTimestamp();
+        const end_cycles = CpuCycleCounter.end();
+
+        const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
+        const bytes_per_mb = 1024.0 * 1024.0;
+        const ns_per_s = 1_000_000_000.0;
+        const throughput = (@as(f64, @floatFromInt(size)) / duration_ns) * ns_per_s / bytes_per_mb;
+
+        const total_bits = @as(f64, @floatFromInt(size * 8));
+        const ns_per_bit = duration_ns / total_bits;
+        const cycles_per_bit = if (CpuCycleCounter.isSupported() and end_cycles > start_cycles)
+            @as(f64, @floatFromInt(end_cycles - start_cycles)) / total_bits
+        else
+            null;
+
+        const result = BenchmarkResult{
+            .algorithm = "ZUC",
+            .operation = "encrypt",
+            .data_size_kb = @as(f64, @floatFromInt(size)) / 1024.0,
+            .performance_value = throughput,
+            .performance_unit = "MB/s",
+            .ns_per_bit = ns_per_bit,
+            .cycles_per_bit = cycles_per_bit,
+            .timestamp = timestamp,
+            .build_mode = getBuildMode(),
+            .platform = getPlatform(),
+        };
+
+        try suite.addResult(result);
+    }
+
+    // Benchmark MAC generation
+    const mac_test_sizes = [_]usize{ 16, 256, 4096 };
+    for (mac_test_sizes) |size| {
+        const message = try allocator.alloc(u8, size);
+        defer allocator.free(message);
+
+        var prng = std.Random.DefaultPrng.init(0);
+        prng.random().bytes(message);
+
+        // Warm up
+        _ = zuc.ZUC.generateMACWithKey(&key, &iv, message[0..@min(16, size)]);
+
+        // Benchmark MAC generation with cycles
+        const iterations: usize = if (size < 1024) 100 else 10;
+        const start_cycles = CpuCycleCounter.start();
+        const start_time = std.time.nanoTimestamp();
+        for (0..iterations) |_| {
+            _ = zuc.ZUC.generateMACWithKey(&key, &iv, message);
+        }
+        const end_time = std.time.nanoTimestamp();
+        const end_cycles = CpuCycleCounter.end();
+
+        const duration_ns = @as(f64, @floatFromInt(end_time - start_time)) / @as(f64, @floatFromInt(iterations));
+        const bytes_per_mb = 1024.0 * 1024.0;
+        const ns_per_s = 1_000_000_000.0;
+        const throughput = (@as(f64, @floatFromInt(size)) / duration_ns) * ns_per_s / bytes_per_mb;
+
+        const total_bits = @as(f64, @floatFromInt(size * 8));
+        const ns_per_bit = duration_ns / total_bits;
+        const total_cycles = if (CpuCycleCounter.isSupported() and end_cycles > start_cycles)
+            @as(f64, @floatFromInt(end_cycles - start_cycles)) / @as(f64, @floatFromInt(iterations))
+        else
+            null;
+        const cycles_per_bit = if (total_cycles) |cycles| cycles / total_bits else null;
+
+        const result = BenchmarkResult{
+            .algorithm = "ZUC",
+            .operation = "MAC",
+            .data_size_kb = @as(f64, @floatFromInt(size)) / 1024.0,
+            .performance_value = throughput,
+            .performance_unit = "MB/s",
+            .ns_per_bit = ns_per_bit,
+            .cycles_per_bit = cycles_per_bit,
+            .timestamp = timestamp,
+            .build_mode = getBuildMode(),
+            .platform = getPlatform(),
+        };
+
+        try suite.addResult(result);
     }
 }
 
@@ -706,6 +898,7 @@ pub fn runBenchmarks(allocator: std.mem.Allocator, output_json: bool) !void {
 
     try benchmarkSM3(allocator, &suite);
     try benchmarkSM4(allocator, &suite);
+    try benchmarkZUC(allocator, &suite);
     try benchmarkSM2(allocator, &suite);
     try benchmarkSM9(allocator, &suite);
 
