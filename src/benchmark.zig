@@ -33,28 +33,16 @@ const CpuCycleCounter = struct {
 
     pub fn start() u64 {
         if (!isSupported()) return 0;
-        // Serialize to prevent out-of-order execution
-        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-            asm volatile ("cpuid"
-                :
-                : [_] "{eax}" (0),
-                : .{ .eax = true, .ebx = true, .ecx = true, .edx = true }
-            );
-        }
+        // Note: CPUID serialization removed for Zig 0.14/0.15 compatibility
+        // RDTSC provides reasonable accuracy for benchmarking purposes
         return readTSC();
     }
 
     pub fn end() u64 {
         if (!isSupported()) return 0;
         const cycles = readTSC();
-        // Serialize to prevent out-of-order execution
-        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-            asm volatile ("cpuid"
-                :
-                : [_] "{eax}" (0),
-                : .{ .eax = true, .ebx = true, .ecx = true, .edx = true }
-            );
-        }
+        // Note: CPUID serialization removed for Zig 0.14/0.15 compatibility
+        // RDTSC provides reasonable accuracy for benchmarking purposes
         return cycles;
     }
 };
