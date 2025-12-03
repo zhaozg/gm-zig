@@ -18,10 +18,13 @@ const CpuCycleCounter = struct {
     // Read CPU timestamp counter (x86/x86_64 RDTSC instruction)
     fn readTSC() u64 {
         if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-            return asm volatile ("rdtsc"
-                : [ret] "={eax}" (-> u64),
-                : [_] "{edx}" (0)
+            var low: u32 = 0;
+            var high: u32 = 0;
+            asm volatile ("rdtsc"
+                : [low] "={eax}" (low),
+                  [high] "={edx}" (high),
             );
+            return (@as(u64, high) << 32) | @as(u64, low);
         }
         // Fallback to 0 for unsupported architectures
         return 0;
@@ -33,28 +36,16 @@ const CpuCycleCounter = struct {
 
     pub fn start() u64 {
         if (!isSupported()) return 0;
-        // Serialize to prevent out-of-order execution
-        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-            asm volatile ("cpuid"
-                :
-                : [_] "{eax}" (0)
-                : "eax", "ebx", "ecx", "edx"
-            );
-        }
+        // Note: CPUID serialization removed for Zig 0.14/0.15 compatibility
+        // RDTSC provides reasonable accuracy for benchmarking purposes
         return readTSC();
     }
 
     pub fn end() u64 {
         if (!isSupported()) return 0;
         const cycles = readTSC();
-        // Serialize to prevent out-of-order execution
-        if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-            asm volatile ("cpuid"
-                :
-                : [_] "{eax}" (0)
-                : "eax", "ebx", "ecx", "edx"
-            );
-        }
+        // Note: CPUID serialization removed for Zig 0.14/0.15 compatibility
+        // RDTSC provides reasonable accuracy for benchmarking purposes
         return cycles;
     }
 };
@@ -278,7 +269,7 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Calculate bits and enhanced metrics
         const total_bits = @as(f64, @floatFromInt(size * 8));
         const ns_per_bit = duration_ns / total_bits;
-        
+
         const cycles_per_bit = if (CpuCycleCounter.isSupported() and end_cycles > start_cycles)
             @as(f64, @floatFromInt(end_cycles - start_cycles)) / total_bits
         else
@@ -426,7 +417,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     };
-    
+
     const test_sizes = [_]usize{
         1024, // 1KB
         64 * 1024, // 64KB
@@ -439,7 +430,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     for (test_sizes) |size| {
         const plaintext = try allocator.alloc(u8, size);
         defer allocator.free(plaintext);
-        
+
         // Fill with test data
         var prng = std.Random.DefaultPrng.init(0);
         prng.random().bytes(plaintext);
