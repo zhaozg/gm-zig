@@ -43,6 +43,7 @@ pub const BenchmarkResult = struct {
     platform: []const u8,
     // Enhanced metrics
     ns_per_bit: ?f64 = null,
+    // TODO: CPU cycle counting requires platform-specific implementation (RDTSC on x86, PMCCNTR on ARM)
     cycles_per_bit: ?f64 = null,
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
@@ -236,7 +237,6 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_value = throughput,
             .performance_unit = "MB/s",
             .ns_per_bit = ns_per_bit,
-            .cycles_per_bit = null, // CPU cycle counting not readily available cross-platform
             .timestamp = timestamp,
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
