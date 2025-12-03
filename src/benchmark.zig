@@ -18,10 +18,13 @@ const CpuCycleCounter = struct {
     // Read CPU timestamp counter (x86/x86_64 RDTSC instruction)
     fn readTSC() u64 {
         if (comptime builtin.cpu.arch == .x86_64 or builtin.cpu.arch == .x86) {
-            return asm volatile ("rdtsc"
-                : [ret] "={eax}" (-> u64),
-                : [_] "{edx}" (0),
+            var low: u32 = undefined;
+            var high: u32 = undefined;
+            asm volatile ("rdtsc"
+                : [low] "={eax}" (low),
+                  [high] "={edx}" (high),
             );
+            return (@as(u64, high) << 32) | @as(u64, low);
         }
         // Fallback to 0 for unsupported architectures
         return 0;
