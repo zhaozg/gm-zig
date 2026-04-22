@@ -3,7 +3,7 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 context initialization" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -14,7 +14,7 @@ test "SM9 context initialization" {
 }
 
 test "SM9 context with custom parameters" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -25,7 +25,7 @@ test "SM9 context with custom parameters" {
 }
 
 test "SM9 complete workflow" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -82,7 +82,7 @@ test "SM9 complete workflow" {
 }
 
 test "SM9 utility functions" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -97,8 +97,8 @@ test "SM9 utility functions" {
     try testing.expectEqualSlices(u8, &original_bytes, restored_bytes);
 
     // Test random generation
-    const random_bytes = try sm9.Utils.generateRandomBytes(32, allocator);
-    defer allocator.free(random_bytes);
+    var random_bytes: [32]u8 = undefined;
+    try std.Io.randomSecure(testing.io, &random_bytes);
     try testing.expect(random_bytes.len == 32);
 
     // Test constant-time comparison
@@ -116,7 +116,7 @@ test "SM9 utility functions" {
 }
 
 test "SM9 test vectors validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -126,7 +126,7 @@ test "SM9 test vectors validation" {
 }
 
 test "SM9 version and info" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -144,7 +144,7 @@ test "SM9 version and info" {
 }
 
 test "SM9 error handling" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -164,7 +164,7 @@ test "SM9 error handling" {
 }
 
 test "SM9 cross-module integration" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

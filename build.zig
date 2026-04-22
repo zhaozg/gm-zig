@@ -5,8 +5,8 @@ comptime {
     if (builtin.zig_version.major == 0 and builtin.zig_version.minor < 14) {
         @compileError("Zig version 0.14 or newer is required");
     }
-    if (builtin.zig_version.major == 0 and builtin.zig_version.minor > 15) {
-        @compileError("Zig version 0.16 or newer is not supported yet - use Zig 0.14.x or 0.15.x");
+    if (builtin.zig_version.major == 0 and builtin.zig_version.minor > 16) {
+        @compileError("Zig version 0.16 is latest supported version - use Zig 0.14.x, 0.15.x or 0.16.x");
     }
 }
 
@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) void {
         .root_module = test_mod,
     });
     tests.root_module.addImport("gmlib", lib_mod);
-    tests.addIncludePath(.{ .cwd_relative = "src" });
+    tests.root_module.addIncludePath(.{ .cwd_relative = "src" });
 
     const run_tests = b.addRunArtifact(tests); // 创建运行步骤
 

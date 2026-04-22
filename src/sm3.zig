@@ -3,18 +3,8 @@ const testing = std.testing;
 const mem = std.mem;
 const math = std.math;
 const fmt = std.fmt;
-const compat = @import("compat.zig");
 
 const builtin = @import("builtin");
-
-/// 编译时检测是否为 Zig 0.15 或更新版本
-pub const isZig015OrNewer = blk: {
-    // Zig 版本号结构: major.minor.patch
-    const version = builtin.zig_version;
-
-    // 0.15.0 或更新版本
-    break :blk (version.major == 0 and version.minor >= 15);
-};
 
 /// SM3哈希算法实现 - 严格按照GM/T 0004-2012标准
 pub const SM3 = struct {
@@ -181,16 +171,9 @@ pub const SM3 = struct {
         return x ^ math.rotl(u32, x, 15) ^ math.rotl(u32, x, 23);
     }
 
-    pub const Error = error{};
-    pub const Writer = compat.Writer(*Self, Error, write);
-
-    fn write(self: *Self, bytes: []const u8) Error!usize {
+    fn write(self: *Self, bytes: []const u8) !usize {
         self.update(bytes);
         return bytes.len;
-    }
-
-    pub fn writer(self: *Self) Writer {
-        return .{ .context = self };
     }
 };
 
@@ -235,8 +218,9 @@ pub fn hmac(key: []const u8, message: []const u8) [SM3.digest_length]u8 {
 }
 
 // 优化的性能测试函数
-pub fn testPerformance(allocator: std.mem.Allocator) !void {
+pub fn testPerformance(io: std.Io, allocator: std.mem.Allocator) !void {
     const print = std.debug.print;
+
     const test_sizes = [_]usize{
         64 * 1024, // 64KB
         1024 * 1024, // 1MB
@@ -249,14 +233,8 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
 
     for (test_sizes) |size| {
         // 分配对齐的内存
-        var buffer: []u8 = undefined;
-        if (isZig015OrNewer) {
-            const alignment = mem.Alignment.@"64";
-            buffer = try allocator.alignedAlloc(u8, alignment, size);
-        } else {
-            const alignment = 16;
-            buffer = try allocator.alignedAlloc(u8, alignment, size);
-        }
+        const alignment = mem.Alignment.@"64";
+        const buffer: []u8 = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
         // 填充随机数据
@@ -267,14 +245,14 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         var out: [32]u8 = undefined;
 
         // 加密性能测试
-        const hash_start = std.time.nanoTimestamp();
+        const clock = std.Io.Clock.awake;
+        const hash_start = std.Io.Clock.now(clock, io).toNanoseconds();
         SM3.hash(buffer, &out, .{});
-        const hash_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - hash_start));
+        const hash_time = std.Io.Clock.now(clock, io).toNanoseconds() - hash_start;
 
         // 计算速度 (MB/s)
         const bytes_per_mb = 1024.0 * 1024.0;
-        const ns_per_s = 1_000_000_000.0;
-        const hash_speed = (@as(f64, @floatFromInt(size)) / hash_time) * ns_per_s / bytes_per_mb;
+        const hash_speed = (@as(f128, @floatFromInt(size)) / hash_time) * std.time.ns_per_s / bytes_per_mb;
 
         print("Data: {d:>6.2} KB | Digest: {d:>6.2} MB/s\n", .{
             size / 1024,

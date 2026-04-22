@@ -174,6 +174,7 @@ pub const Scalar = struct {
     /// Return a random scalar < L.
     pub fn random() Scalar {
         var s: [48]u8 = undefined;
+
         if (builtin.os.tag == .freestanding) {
             // In WASI, we use the global random generator.
             const wasmRng = @import("../wasmRng.zig");
@@ -182,8 +183,14 @@ pub const Scalar = struct {
             return Scalar.fromBytes48(s, .little);
         }
 
+        const io = std.Io.Threaded.global_single_threaded.io();
+        const clock = std.Io.Clock.awake;
+        const seed: u64 = @intCast(std.Io.Clock.now(clock, io).toMicroseconds());
+        var prng = std.Random.DefaultPrng.init(seed);
+        const rand = prng.random();
+
         while (true) {
-            crypto.random.bytes(&s);
+            s = rand.array(u8, 48);
             const n = Scalar.fromBytes48(s, .little);
             if (!n.isZero()) {
                 return n;

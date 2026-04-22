@@ -3,12 +3,6 @@ const assert = std.debug.assert;
 const print = std.debug.print;
 const builtin = @import("builtin");
 
-/// Conditional compilation for Zig version compatibility
-const isZig015OrNewer = blk: {
-    const version = builtin.zig_version;
-    break :blk (version.major == 0 and version.minor >= 15);
-};
-
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
 const SM4_KEY_SIZE = 16; // 128-bit keys
@@ -67,24 +61,24 @@ fn rotl(x: u32, n: u5) u32 {
 fn computeTTable(comptime byte_position: u2) [256]u32 {
     @setEvalBranchQuota(10000);
     var table: [256]u32 = undefined;
-    
+
     const shift_amount: u5 = comptime switch (byte_position) {
         0 => 24,
         1 => 16,
         2 => 8,
         3 => 0,
     };
-    
+
     for (0..256) |i| {
         const sbox_val = @as(u32, SBOX[i]);
-        
+
         // Place S-box value in the correct byte position
         const b: u32 = sbox_val << shift_amount;
-        
+
         // Apply linear transformation L
         table[i] = b ^ rotl(b, 2) ^ rotl(b, 10) ^ rotl(b, 18) ^ rotl(b, 24);
     }
-    
+
     return table;
 }
 
@@ -169,13 +163,13 @@ pub const SM4 = struct {
     // Optimized round function using T-tables
     fn round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
         const t = x1 ^ x2 ^ x3 ^ rk;
-        
+
         // Extract bytes and use T-table lookup
         const b0 = @as(u8, @truncate(t >> 24));
         const b1 = @as(u8, @truncate(t >> 16));
         const b2 = @as(u8, @truncate(t >> 8));
         const b3 = @as(u8, @truncate(t));
-        
+
         // L(τ(t)) = T0[b0] ⊕ T1[b1] ⊕ T2[b2] ⊕ T3[b3]
         return x0 ^ (T0[b0] ^ T1[b1] ^ T2[b2] ^ T3[b3]);
     }
@@ -355,7 +349,7 @@ pub const SM4_GCM = struct {
         const sm4_ctx = SM4.init(key);
         var h: [SM4_BLOCK_SIZE]u8 = [_]u8{0} ** SM4_BLOCK_SIZE;
         sm4_ctx.encryptBlock(&h, &h);
-        
+
         return .{
             .sm4 = sm4_ctx,
             .h = h,
@@ -378,7 +372,7 @@ pub const SM4_GCM = struct {
 
                 // Check if LSB of v is 1
                 const lsb = v[15] & 1;
-                
+
                 // Right shift v
                 var k: usize = 15;
                 while (k > 0) {
@@ -445,7 +439,7 @@ pub const SM4_GCM = struct {
 
         // Compute GHASH incrementally
         var y = [_]u8{0} ** 16;
-        
+
         // Process additional data
         i = 0;
         while (i < additional_data.len) : (i += 16) {
@@ -457,7 +451,7 @@ pub const SM4_GCM = struct {
             }
             y = gfMul(&y, &self.h);
         }
-        
+
         // Process ciphertext
         i = 0;
         while (i < plaintext.len) : (i += 16) {
@@ -469,7 +463,7 @@ pub const SM4_GCM = struct {
             }
             y = gfMul(&y, &self.h);
         }
-        
+
         // Process length block
         var len_block: [16]u8 = undefined;
         std.mem.writeInt(u64, len_block[0..8], @as(u64, additional_data.len) * 8, .big);
@@ -506,7 +500,7 @@ pub const SM4_GCM = struct {
 
         // Compute GHASH incrementally
         var y = [_]u8{0} ** 16;
-        
+
         // Process additional data
         var i: usize = 0;
         while (i < additional_data.len) : (i += 16) {
@@ -518,7 +512,7 @@ pub const SM4_GCM = struct {
             }
             y = gfMul(&y, &self.h);
         }
-        
+
         // Process ciphertext
         i = 0;
         while (i < ciphertext.len) : (i += 16) {
@@ -530,7 +524,7 @@ pub const SM4_GCM = struct {
             }
             y = gfMul(&y, &self.h);
         }
-        
+
         // Process length block
         var len_block: [16]u8 = undefined;
         std.mem.writeInt(u64, len_block[0..8], @as(u64, additional_data.len) * 8, .big);
@@ -704,11 +698,13 @@ test "SM4 Known Answer Test" {
 }
 
 // 性能测试函数
-pub fn testPerformance(allocator: std.mem.Allocator) !void {
+pub fn testPerformance(io: std.Io, allocator: std.mem.Allocator) !void {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
     };
+    const clock = std.Io.Clock.awake;
+
     const ctx = SM4.init(&key);
 
     const test_sizes = [_]usize{
@@ -723,10 +719,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
 
     for (test_sizes) |size| {
         // 分配对齐的内存以提高性能
-        const alignment = if (isZig015OrNewer)
-            @as(std.mem.Alignment, @enumFromInt(16))
-        else
-            @as(u29, 16);
+        const alignment = @as(std.mem.Alignment, @enumFromInt(16));
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
@@ -742,7 +735,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
         ctx.encryptBlock(buffer[0..16], out[0..16]);
 
         // 加密性能测试
-        const encrypt_start = std.time.nanoTimestamp();
+        const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         const blocks = size / SM4_BLOCK_SIZE;
         for (0..blocks) |i| {
             const start = i * SM4_BLOCK_SIZE;
@@ -752,10 +745,10 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
                 std.mem.bytesAsValue([SM4_BLOCK_SIZE]u8, out[start..end]),
             );
         }
-        const encrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - encrypt_start));
+        const encrypt_time = @as(f64, @floatFromInt(std.Io.Clock.now(clock, io).toNanoseconds() - encrypt_start));
 
         // 解密性能测试
-        const decrypt_start = std.time.nanoTimestamp();
+        const decrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         for (0..blocks) |i| {
             const start = i * SM4_BLOCK_SIZE;
             const end = start + SM4_BLOCK_SIZE;
@@ -764,7 +757,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
                 std.mem.bytesAsValue([SM4_BLOCK_SIZE]u8, buffer[start..end]),
             );
         }
-        const decrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - decrypt_start));
+        const decrypt_time = @as(f64, @floatFromInt(std.Io.Clock.now(clock, io).toNanoseconds() - decrypt_start));
 
         // 计算速度 (MB/s)
         const bytes_per_mb = 1024.0 * 1024.0;
@@ -780,7 +773,7 @@ pub fn testPerformance(allocator: std.mem.Allocator) !void {
     }
 }
 
-pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
+pub fn testPerformance_cbc(io: std.Io, allocator: std.mem.Allocator) !void {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
@@ -794,6 +787,7 @@ pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
         10 * 1024 * 1024, // 10MB
         100 * 1024 * 1024, // 100MB
     };
+    const clock = std.Io.Clock.awake;
 
     std.debug.print("\nSM4_CBC 性能测试 (推荐使用ReleaseSafe构建)\n", .{});
     std.debug.print("------------------------------------------------\n", .{});
@@ -813,7 +807,7 @@ pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
         ctx.encrypt(buffer[0..16], out[0..16]);
 
         // 加密性能测试
-        const encrypt_start = std.time.nanoTimestamp();
+        const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         const blocks = size / SM4_BLOCK_SIZE;
         for (0..blocks) |i| {
             const start = i * SM4_BLOCK_SIZE;
@@ -822,10 +816,10 @@ pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
                 out[start..][0..SM4_BLOCK_SIZE],
             );
         }
-        const encrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - encrypt_start));
+        const encrypt_time = @as(f64, @floatFromInt(std.Io.Clock.now(clock, io).toNanoseconds() - encrypt_start));
 
         // 解密性能测试
-        const decrypt_start = std.time.nanoTimestamp();
+        const decrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         for (0..blocks) |i| {
             const start = i * SM4_BLOCK_SIZE;
             ctx.decrypt(
@@ -833,7 +827,7 @@ pub fn testPerformance_cbc(allocator: std.mem.Allocator) !void {
                 buffer[start..][0..SM4_BLOCK_SIZE],
             );
         }
-        const decrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - decrypt_start));
+        const decrypt_time = @as(f64, @floatFromInt(std.Io.Clock.now(clock, io).toNanoseconds() - decrypt_start));
 
         // 计算速度 (MB/s)
         const bytes_per_mb = 1024.0 * 1024.0;

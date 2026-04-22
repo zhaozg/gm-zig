@@ -7,12 +7,6 @@ const sm9 = root.sm9;
 const zuc = root.zuc;
 const builtin = @import("builtin");
 
-/// Conditional compilation for Zig version compatibility
-const isZig015OrNewer = blk: {
-    const version = builtin.zig_version;
-    break :blk (version.major == 0 and version.minor >= 15);
-};
-
 // CPU cycle counting support for performance measurement
 const CpuCycleCounter = struct {
     // Read CPU timestamp counter (x86/x86_64 RDTSC instruction)
@@ -56,7 +50,7 @@ var json_mode: bool = false;
 // Custom log function that suppresses output in JSON mode
 pub fn log(
     comptime message_level: std.log.Level,
-    comptime scope: @Type(.EnumLiteral),
+    comptime scope: @EnumLiteral(),
     comptime format: []const u8,
     args: anytype,
 ) void {
@@ -85,21 +79,10 @@ pub const BenchmarkResult = struct {
     cycles_per_bit: ?f64 = null,
 
     pub fn toJson(self: BenchmarkResult, allocator: std.mem.Allocator) ![]u8 {
-        var output = if (isZig015OrNewer)
-            std.ArrayList(u8){}
-        else
-            std.ArrayList(u8).init(allocator);
+        var output = std.ArrayList(u8).empty;
+        defer output.deinit(allocator);
 
-        if (isZig015OrNewer) {
-            defer output.deinit(allocator);
-        } else {
-            defer output.deinit();
-        }
-
-        const writer = if (isZig015OrNewer)
-            output.writer(allocator)
-        else
-            output.writer();
+        var writer: std.Io.Writer = .fromArrayList(&output);
 
         try writer.print("{{", .{});
         try writer.print("\"algorithm\":\"{s}\",", .{self.algorithm});
@@ -118,10 +101,7 @@ pub const BenchmarkResult = struct {
         try writer.print("\"platform\":\"{s}\"", .{self.platform});
         try writer.print("}}", .{});
 
-        return if (isZig015OrNewer)
-            try output.toOwnedSlice(allocator)
-        else
-            try output.toOwnedSlice();
+        return try output.toOwnedSlice(allocator);
     }
 };
 
@@ -131,46 +111,24 @@ pub const BenchmarkSuite = struct {
 
     pub fn init(allocator: std.mem.Allocator) BenchmarkSuite {
         return BenchmarkSuite{
-            .results = if (isZig015OrNewer)
-                std.ArrayList(BenchmarkResult){}
-            else
-                std.ArrayList(BenchmarkResult).init(allocator),
+            .results = std.ArrayList(BenchmarkResult).empty,
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *BenchmarkSuite) void {
-        if (isZig015OrNewer) {
-            self.results.deinit(self.allocator);
-        } else {
-            self.results.deinit();
-        }
+        self.results.deinit(self.allocator);
     }
 
     pub fn addResult(self: *BenchmarkSuite, result: BenchmarkResult) !void {
-        if (isZig015OrNewer) {
-            try self.results.append(self.allocator, result);
-        } else {
-            try self.results.append(result);
-        }
+        try self.results.append(self.allocator, result);
     }
 
     pub fn toJsonArray(self: *BenchmarkSuite) ![]u8 {
-        var output = if (isZig015OrNewer)
-            std.ArrayList(u8){}
-        else
-            std.ArrayList(u8).init(self.allocator);
+        var output = std.ArrayList(u8).empty;
+        defer output.deinit(self.allocator);
 
-        if (isZig015OrNewer) {
-            defer output.deinit(self.allocator);
-        } else {
-            defer output.deinit();
-        }
-
-        const writer = if (isZig015OrNewer)
-            output.writer(self.allocator)
-        else
-            output.writer();
+        var writer: std.Io.Writer = .fromArrayList(&output);
 
         try writer.print("[", .{});
 
@@ -182,10 +140,7 @@ pub const BenchmarkSuite = struct {
         }
 
         try writer.print("]", .{});
-        return if (isZig015OrNewer)
-            try output.toOwnedSlice(self.allocator)
-        else
-            try output.toOwnedSlice();
+        return try output.toOwnedSlice(self.allocator);
     }
 
     // Print human-readable summary
@@ -233,15 +188,13 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         1024 * 1024, // 1MB
         10 * 1024 * 1024, // 10MB
     };
-
-    const timestamp = std.time.timestamp();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const clock = std.Io.Clock.awake;
+    const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
     for (test_sizes) |size| {
         // Allocate aligned memory
-        const alignment = if (isZig015OrNewer)
-            @as(std.mem.Alignment, @enumFromInt(16))
-        else
-            @as(u29, 16);
+        const alignment = @as(std.mem.Alignment, @enumFromInt(16));
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
@@ -256,9 +209,9 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Benchmark with time and cycles
         const start_cycles = CpuCycleCounter.start();
-        const start_time = std.time.nanoTimestamp();
+        const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
         sm3.SM3.hash(buffer, &out, .{});
-        const end_time = std.time.nanoTimestamp();
+        const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
         const end_cycles = CpuCycleCounter.end();
 
         const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
@@ -283,7 +236,7 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_unit = "MB/s",
             .ns_per_bit = ns_per_bit,
             .cycles_per_bit = cycles_per_bit,
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -306,13 +259,12 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         10 * 1024 * 1024, // 10MB
     };
 
-    const timestamp = std.time.timestamp();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const clock = std.Io.Clock.awake;
+    const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
     for (test_sizes) |size| {
-        const alignment = if (isZig015OrNewer)
-            @as(std.mem.Alignment, @enumFromInt(16))
-        else
-            @as(u29, 16);
+        const alignment = @as(std.mem.Alignment, @enumFromInt(16));
         const buffer = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(buffer);
 
@@ -328,7 +280,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Benchmark encryption with cycles
         const encrypt_start_cycles = CpuCycleCounter.start();
-        const encrypt_start = std.time.nanoTimestamp();
+        const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         const blocks = size / 16; // SM4 block size
         for (0..blocks) |i| {
             const start = i * 16;
@@ -337,7 +289,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 out[start..][0..16],
             );
         }
-        const encrypt_end = std.time.nanoTimestamp();
+        const encrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
         const encrypt_end_cycles = CpuCycleCounter.end();
 
         const encrypt_duration = @as(f64, @floatFromInt(encrypt_end - encrypt_start));
@@ -360,7 +312,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_unit = "MB/s",
             .ns_per_bit = encrypt_ns_per_bit,
             .cycles_per_bit = encrypt_cycles_per_bit,
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -369,7 +321,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Benchmark decryption with cycles
         const decrypt_start_cycles = CpuCycleCounter.start();
-        const decrypt_start = std.time.nanoTimestamp();
+        const decrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         for (0..blocks) |i| {
             const start = i * 16;
             ctx.decryptBlock(
@@ -377,7 +329,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 buffer[start..][0..16],
             );
         }
-        const decrypt_end = std.time.nanoTimestamp();
+        const decrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
         const decrypt_end_cycles = CpuCycleCounter.end();
 
         const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
@@ -398,7 +350,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_unit = "MB/s",
             .ns_per_bit = decrypt_ns_per_bit,
             .cycles_per_bit = decrypt_cycles_per_bit,
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -424,7 +376,9 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         1024 * 1024, // 1MB
     };
 
-    const timestamp = std.time.timestamp();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const clock = std.Io.Clock.awake;
+    const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
     // Benchmark encryption
     for (test_sizes) |size| {
@@ -444,10 +398,10 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Benchmark encryption with cycles
         const start_cycles = CpuCycleCounter.start();
-        const start_time = std.time.nanoTimestamp();
+        const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
         var ctx = zuc.ZUC.init(&key, &iv);
         ctx.crypt(plaintext, ciphertext);
-        const end_time = std.time.nanoTimestamp();
+        const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
         const end_cycles = CpuCycleCounter.end();
 
         const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
@@ -470,7 +424,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_unit = "MB/s",
             .ns_per_bit = ns_per_bit,
             .cycles_per_bit = cycles_per_bit,
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -493,11 +447,11 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Benchmark MAC generation with cycles
         const iterations: usize = if (size < 1024) 100 else 10;
         const start_cycles = CpuCycleCounter.start();
-        const start_time = std.time.nanoTimestamp();
+        const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
         for (0..iterations) |_| {
             _ = zuc.ZUC.generateMACWithKey(&key, &iv, message);
         }
-        const end_time = std.time.nanoTimestamp();
+        const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
         const end_cycles = CpuCycleCounter.end();
 
         const duration_ns = @as(f64, @floatFromInt(end_time - start_time)) / @as(f64, @floatFromInt(iterations));
@@ -521,7 +475,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .performance_unit = "MB/s",
             .ns_per_bit = ns_per_bit,
             .cycles_per_bit = cycles_per_bit,
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -532,7 +486,9 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
 // Benchmark SM2 elliptic curve cryptography performance
 pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
-    const timestamp = std.time.timestamp();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const clock = std.Io.Clock.awake;
+    const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
     // Test message sizes for encryption/signature operations
     const test_messages = [_][]const u8{
@@ -545,13 +501,13 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     // 1. Benchmark key pair generation
     {
         const iterations = 100;
-        const start_time = std.time.nanoTimestamp();
+        const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
         for (0..iterations) |_| {
             _ = sm2.kp.generateKeyPair();
         }
 
-        const end_time = std.time.nanoTimestamp();
+        const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
         const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
         const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
 
@@ -561,7 +517,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .data_size_kb = 0, // Not applicable for key generation
             .performance_value = ops_per_second,
             .performance_unit = "ops/s",
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -583,13 +539,13 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         // Signature creation
         {
             const iterations: u32 = if (i == 2) 10 else 50; // Fewer iterations for large messages
-            const start_time = std.time.nanoTimestamp();
+            const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
             for (0..iterations) |_| {
                 _ = sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
             }
 
-            const end_time = std.time.nanoTimestamp();
+            const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
             const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
             const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
 
@@ -599,7 +555,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -611,13 +567,13 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         {
             const signature = sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
             const iterations: u32 = if (i == 2) 10 else 50;
-            const start_time = std.time.nanoTimestamp();
+            const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
             for (0..iterations) |_| {
                 _ = sm2.signature.verify(message, signature, key_pair.public_key, sign_options) catch continue;
             }
 
-            const end_time = std.time.nanoTimestamp();
+            const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
             const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
             const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
 
@@ -627,7 +583,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -640,12 +596,12 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             const iterations: u32 = if (i == 2) 5 else 20;
 
             // Encryption
-            const encrypt_start = std.time.nanoTimestamp();
+            const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
             for (0..iterations) |_| {
                 const ciphertext = sm2.encryption.encrypt(allocator, message, key_pair.public_key, .c1c3c2) catch continue;
                 ciphertext.deinit(allocator);
             }
-            const encrypt_end = std.time.nanoTimestamp();
+            const encrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
 
             const encrypt_duration = @as(f64, @floatFromInt(encrypt_end - encrypt_start));
             const encrypt_ops_per_second = (@as(f64, @floatFromInt(iterations)) / encrypt_duration) * 1_000_000_000.0;
@@ -656,7 +612,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = encrypt_ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -667,12 +623,12 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             const ciphertext = sm2.encryption.encrypt(allocator, message, key_pair.public_key, .c1c3c2) catch return;
             defer ciphertext.deinit(allocator);
 
-            const decrypt_start = std.time.nanoTimestamp();
+            const decrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
             for (0..iterations) |_| {
                 const plaintext = sm2.encryption.decrypt(allocator, ciphertext, key_pair.private_key) catch continue;
                 allocator.free(plaintext);
             }
-            const decrypt_end = std.time.nanoTimestamp();
+            const decrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
 
             const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
             const decrypt_ops_per_second = (@as(f64, @floatFromInt(iterations)) / decrypt_duration) * 1_000_000_000.0;
@@ -683,7 +639,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = decrypt_ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -695,7 +651,9 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
 // Benchmark SM9 identity-based cryptography performance
 pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
-    const timestamp = std.time.timestamp();
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const clock = std.Io.Clock.awake;
+    const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
     // Initialize SM9 system
     const system = sm9.params.SM9System.init();
@@ -715,11 +673,11 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         const iterations = 10; // Reduced for faster CI
 
         // Signing key extraction
-        const sign_extract_start = std.time.nanoTimestamp();
+        const sign_extract_start = std.Io.Clock.now(clock, io).toNanoseconds();
         for (0..iterations) |_| {
             _ = key_context.extractSignKey(test_user_id) catch continue;
         }
-        const sign_extract_end = std.time.nanoTimestamp();
+        const sign_extract_end = std.Io.Clock.now(clock, io).toNanoseconds();
 
         const sign_extract_duration = @as(f64, @floatFromInt(sign_extract_end - sign_extract_start));
         const sign_extract_ops = (@as(f64, @floatFromInt(iterations)) / sign_extract_duration) * 1_000_000_000.0;
@@ -730,7 +688,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .data_size_kb = 0,
             .performance_value = sign_extract_ops,
             .performance_unit = "ops/s",
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -738,11 +696,11 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         try suite.addResult(sign_extract_result);
 
         // Encryption key extraction
-        const encrypt_extract_start = std.time.nanoTimestamp();
+        const encrypt_extract_start = std.Io.Clock.now(clock, io).toNanoseconds();
         for (0..iterations) |_| {
             _ = key_context.extractEncryptKey(test_user_id) catch continue;
         }
-        const encrypt_extract_end = std.time.nanoTimestamp();
+        const encrypt_extract_end = std.Io.Clock.now(clock, io).toNanoseconds();
 
         const encrypt_extract_duration = @as(f64, @floatFromInt(encrypt_extract_end - encrypt_extract_start));
         const encrypt_extract_ops = (@as(f64, @floatFromInt(iterations)) / encrypt_extract_duration) * 1_000_000_000.0;
@@ -753,7 +711,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             .data_size_kb = 0,
             .performance_value = encrypt_extract_ops,
             .performance_unit = "ops/s",
-            .timestamp = timestamp,
+            .timestamp = @intCast(timestamp),
             .build_mode = getBuildMode(),
             .platform = getPlatform(),
         };
@@ -772,13 +730,13 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Signature creation
         {
-            const start_time = std.time.nanoTimestamp();
+            const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
             for (0..iterations) |_| {
                 _ = sign_context.sign(message, sign_key, .{}) catch continue;
             }
 
-            const end_time = std.time.nanoTimestamp();
+            const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
             const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
             const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
 
@@ -788,7 +746,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -800,13 +758,13 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         {
             const signature = sign_context.sign(message, sign_key, .{}) catch continue;
 
-            const start_time = std.time.nanoTimestamp();
+            const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
             for (0..iterations) |_| {
                 _ = sign_context.verify(message, signature, test_user_id, .{}) catch continue;
             }
 
-            const end_time = std.time.nanoTimestamp();
+            const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
             const duration_ns = @as(f64, @floatFromInt(end_time - start_time));
             const ops_per_second = (@as(f64, @floatFromInt(iterations)) / duration_ns) * 1_000_000_000.0;
 
@@ -816,7 +774,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -829,12 +787,12 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             const enc_iterations: u32 = if (i == 2) 1 else 3; // Reduced for faster CI
 
             // Encryption
-            const encrypt_start = std.time.nanoTimestamp();
+            const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
             for (0..enc_iterations) |_| {
                 const ciphertext = encrypt_context.encrypt(message, test_user_id, .{}) catch continue;
                 ciphertext.deinit();
             }
-            const encrypt_end = std.time.nanoTimestamp();
+            const encrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
 
             const encrypt_duration = @as(f64, @floatFromInt(encrypt_end - encrypt_start));
             const encrypt_ops_per_second = (@as(f64, @floatFromInt(enc_iterations)) / encrypt_duration) * 1_000_000_000.0;
@@ -845,7 +803,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = encrypt_ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -856,12 +814,12 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             const ciphertext = encrypt_context.encrypt(message, test_user_id, .{}) catch return;
             defer ciphertext.deinit();
 
-            const decrypt_start = std.time.nanoTimestamp();
+            const decrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
             for (0..enc_iterations) |_| {
                 const plaintext = encrypt_context.decrypt(ciphertext, encrypt_key, .{}) catch continue;
                 allocator.free(plaintext);
             }
-            const decrypt_end = std.time.nanoTimestamp();
+            const decrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
 
             const decrypt_duration = @as(f64, @floatFromInt(decrypt_end - decrypt_start));
             const decrypt_ops_per_second = (@as(f64, @floatFromInt(enc_iterations)) / decrypt_duration) * 1_000_000_000.0;
@@ -872,7 +830,7 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
                 .data_size_kb = data_size_kb,
                 .performance_value = decrypt_ops_per_second,
                 .performance_unit = "ops/s",
-                .timestamp = timestamp,
+                .timestamp = @intCast(timestamp),
                 .build_mode = getBuildMode(),
                 .platform = getPlatform(),
             };
@@ -905,14 +863,13 @@ pub fn runBenchmarks(allocator: std.mem.Allocator, output_json: bool) !void {
 }
 
 // Command-line benchmark runner
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+pub fn main(init: std.process.Init) !void {
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // Check command line arguments
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
     const output_json = args.len > 1 and std.mem.eql(u8, args[1], "--json");
 

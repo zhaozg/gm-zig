@@ -4,7 +4,7 @@ const sm9 = @import("../sm9.zig");
 
 // Test key extraction robustness under edge conditions
 test "SM9 key extraction mathematical robustness" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -58,7 +58,7 @@ test "SM9 key extraction mathematical robustness" {
 
 // Test public key derivation robustness
 test "SM9 public key derivation robustness" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -158,7 +158,7 @@ test "SM9 bigint mathematical boundary conditions" {
 
 // Test signature and verification robustness
 test "SM9 signature robustness with edge cases" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -217,7 +217,7 @@ test "SM9 signature robustness with edge cases" {
 
 // Test encryption and decryption robustness
 test "SM9 encryption robustness with edge cases" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

@@ -8,36 +8,35 @@ const sm2 = root.sm2;
 const zuc = root.zuc;
 const sm9 = root.sm9;
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const allocator = init.gpa;
 
     print("=== GM-Zig Cryptography Library Demo ===\n\n", .{});
 
     print("=== ZUC Performance ===\n", .{});
-    try zuc.testZUCPerformance(allocator);
+    try zuc.testZUCPerformance(io, allocator);
 
     print("\n=== SM4 ECB Performance ===\n", .{});
-    try sm4.testPerformance(allocator);
+    try sm4.testPerformance(io, allocator);
 
     print("\n=== SM4 CBC Performance ===\n", .{});
-    try sm4.testPerformance_cbc(allocator);
+    try sm4.testPerformance_cbc(io, allocator);
 
     print("\n=== SM3 Hash Performance ===\n", .{});
-    try sm3.testPerformance(allocator);
+    try sm3.testPerformance(io, allocator);
 
     print("\n=== SM2 Digital Signature Demo ===\n", .{});
-    try demonstrateSignature(allocator);
+    try demonstrateSignature(io, allocator);
 
     print("\n=== SM2 Key Exchange Demo ===\n", .{});
-    try demonstrateKeyExchange(allocator);
+    try demonstrateKeyExchange(io, allocator);
 
     print("\n=== SM2 Encryption Demo ===\n", .{});
-    try demonstrateEncryption(allocator);
+    try demonstrateEncryption(io, allocator);
 
     print("\n=== SM2 Utilities Demo ===\n", .{});
-    try demonstrateUtils(allocator);
+    try demonstrateUtils(io, allocator);
 
     print("\n=== SM2 WasmRng Demo ===\n", .{});
     if (builtin.target.cpu.arch == .wasm32) {
@@ -45,11 +44,11 @@ pub fn main() !void {
     }
 
     print("\n=== SM9 Identity-Based Cryptography Demo ===\n", .{});
-    try demonstrateSM9(allocator);
+    try demonstrateSM9(io, allocator);
 }
 
-fn demonstrateSignature(allocator: std.mem.Allocator) !void {
-
+fn demonstrateSignature(io: std.Io, allocator: std.mem.Allocator) !void {
+    _ = io;
     // Generate key pair
     print("1. Generating SM2 key pair...\n", .{});
     const key_pair = sm2.kp.generateKeyPair();
@@ -101,7 +100,8 @@ fn demonstrateSignature(allocator: std.mem.Allocator) !void {
     print("   DER roundtrip success: {}\n", .{der_valid});
 }
 
-fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
+fn demonstrateKeyExchange(io: std.Io, allocator: std.mem.Allocator) !void {
+    _ = io;
     print("1. Setting up key exchange participants...\n", .{});
 
     // Alice's setup
@@ -183,7 +183,8 @@ fn demonstrateKeyExchange(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn demonstrateEncryption(allocator: std.mem.Allocator) !void {
+fn demonstrateEncryption(io: std.Io, allocator: std.mem.Allocator) !void {
+    _ = io;
     print("1. Setting up encryption...\n", .{});
 
     // Generate key pair
@@ -241,7 +242,8 @@ fn demonstrateEncryption(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn demonstrateUtils(allocator: std.mem.Allocator) !void {
+fn demonstrateUtils(io: std.Io, allocator: std.mem.Allocator) !void {
+    _ = io;
     print("1. Testing KDF (Key Derivation Function)...\n", .{});
 
     const input_data = "shared secret for key derivation";
@@ -315,7 +317,8 @@ fn WasmRng() void {
     rand.fillFn(rand.ptr, &buffer);
 }
 
-fn demonstrateSM9(allocator: std.mem.Allocator) !void {
+fn demonstrateSM9(io: std.Io, allocator: std.mem.Allocator) !void {
+    _ = io;
     print("1. Initializing SM9 Complete Implementation...\n", .{});
 
     // Initialize SM9 system with proper parameters

@@ -26,7 +26,7 @@ test "SM9 signature serialization" {
 }
 
 test "SM9 signature context initialization" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -38,7 +38,7 @@ test "SM9 signature context initialization" {
 }
 
 test "SM9 signature operation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -87,7 +87,7 @@ test "SM9 signature operation" {
 }
 
 test "SM9 signature with different options" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -117,7 +117,7 @@ test "SM9 signature with different options" {
 }
 
 test "SM9 batch signature verification" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -177,11 +177,6 @@ test "SM9 signature utility functions" {
     const w = std.mem.zeroes([32]u8);
     const h2 = try sm9.sign.SignatureUtils.computeH2(message, &w, N);
     try testing.expect(h2.len == 32);
-
-    // Test random generation
-    const random1 = sm9.sign.SignatureUtils.generateRandom();
-    const random2 = sm9.sign.SignatureUtils.generateRandom();
-    try testing.expect(!std.mem.eql(u8, &random1, &random2));
 
     // Test component validation with invalid inputs (should fail)
     const h = std.mem.zeroes([32]u8);

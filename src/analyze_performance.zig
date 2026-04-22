@@ -1,12 +1,7 @@
 const std = @import("std");
+const Io = std.Io;
 const print = std.debug.print;
 const builtin = @import("builtin");
-
-/// Conditional compilation for Zig version compatibility
-const isZig015OrNewer = blk: {
-    const version = builtin.zig_version;
-    break :blk (version.major == 0 and version.minor >= 15);
-};
 
 // Performance record structure that matches the JSONL format
 const PerformanceRecord = struct {
@@ -68,24 +63,22 @@ const AnalysisReport = struct {
 };
 
 fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !std.ArrayList(PerformanceRecord) {
-    var history = if (isZig015OrNewer)
-        std.ArrayList(PerformanceRecord){}
-    else
-        std.ArrayList(PerformanceRecord).init(allocator);
+    var history = std.ArrayList(PerformanceRecord).empty;
 
     const history_path = try std.fmt.allocPrint(allocator, "{s}/performance-history.jsonl", .{data_dir});
     defer allocator.free(history_path);
-
-    const file = std.fs.cwd().openFile(history_path, .{}) catch |err| switch (err) {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const file = std.Io.Dir.cwd().openFile(io, history_path, .{}) catch |err| switch (err) {
         error.FileNotFound => return history,
         else => return err,
     };
-    defer file.close();
+    defer file.close(io);
 
-    const file_size = try file.getEndPos();
+    const file_size = try file.length(io);
     const content = try allocator.alloc(u8, file_size);
     defer allocator.free(content);
-    _ = try file.readAll(content);
+
+    _ = file.reader(io, content);
 
     var lines = std.mem.splitScalar(u8, content, '\n');
     while (lines.next()) |line| {
@@ -97,11 +90,7 @@ fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !s
 
         // Deep copy the record to avoid use-after-free
         const record = try copyPerformanceRecord(allocator, parsed.value);
-        if (isZig015OrNewer) {
-            try history.append(allocator, record);
-        } else {
-            try history.append(record);
-        }
+        try history.append(allocator, record);
     }
 
     return history;
@@ -170,11 +159,7 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
         var trend_iter = trends.iterator();
         while (trend_iter.next()) |entry| {
             allocator.free(entry.key_ptr.*);
-            if (isZig015OrNewer) {
-                entry.value_ptr.deinit(allocator);
-            } else {
-                entry.value_ptr.deinit();
-            }
+            entry.value_ptr.deinit(allocator);
         }
         trends.deinit();
     }
@@ -186,25 +171,15 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 
             const get_result = try trends.getOrPut(key);
             if (!get_result.found_existing) {
-                get_result.value_ptr.* = if (isZig015OrNewer)
-                    std.ArrayList(PerformanceDataPoint){}
-                else
-                    std.ArrayList(PerformanceDataPoint).init(allocator);
+                get_result.value_ptr.* = std.ArrayList(PerformanceDataPoint).empty;
             } else {
                 allocator.free(key);
             }
 
-            if (isZig015OrNewer) {
-                try get_result.value_ptr.append(allocator, .{
-                    .timestamp = result.timestamp,
-                    .performance_value = result.performance_value,
-                });
-            } else {
-                try get_result.value_ptr.append(.{
-                    .timestamp = result.timestamp,
-                    .performance_value = result.performance_value,
-                });
-            }
+            try get_result.value_ptr.append(allocator, .{
+                .timestamp = result.timestamp,
+                .performance_value = result.performance_value,
+            });
         }
     }
 
@@ -259,24 +234,12 @@ fn analyzePerformanceTrends(allocator: std.mem.Allocator, history: std.ArrayList
 }
 
 fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
-    var output = if (isZig015OrNewer)
-        std.ArrayList(u8){}
-    else
-        std.ArrayList(u8).init(allocator);
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(allocator);
 
-    if (isZig015OrNewer) {
-        defer output.deinit(allocator);
-    } else {
-        defer output.deinit();
-    }
-
-    const writer = if (isZig015OrNewer)
-        output.writer(allocator)
-    else
-        output.writer();
+    var writer = std.Io.Writer.fromArrayList(&output);
 
     try writer.print("=== GM-Zig Performance Analysis Report ===\n", .{});
-    try writer.print("Generated: {}\n", .{std.time.timestamp()});
     try writer.print("Data points analyzed: {} runs\n\n", .{report.total_data_points});
 
     // Summary statistics
@@ -355,36 +318,19 @@ fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
 
 fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
     // Convert HashMap to an array of key-value pairs for JSON serialization
-    var trends_array = if (isZig015OrNewer)
-        std.ArrayList(struct {
+    var trends_array = std.ArrayList(struct {
             algorithm_operation: []const u8,
             analysis: TrendAnalysis,
-        }){}
-    else
-        std.ArrayList(struct {
-            algorithm_operation: []const u8,
-            analysis: TrendAnalysis,
-        }).init(allocator);
+        }).empty;
 
-    if (isZig015OrNewer) {
-        defer trends_array.deinit(allocator);
-    } else {
-        defer trends_array.deinit();
-    }
+    defer trends_array.deinit(allocator);
 
     var iterator = report.performance_trends.iterator();
     while (iterator.next()) |entry| {
-        if (isZig015OrNewer) {
-            try trends_array.append(allocator, .{
-                .algorithm_operation = entry.key_ptr.*,
-                .analysis = entry.value_ptr.*,
-            });
-        } else {
-            try trends_array.append(.{
-                .algorithm_operation = entry.key_ptr.*,
-                .analysis = entry.value_ptr.*,
-            });
-        }
+        try trends_array.append(allocator, .{
+            .algorithm_operation = entry.key_ptr.*,
+            .analysis = entry.value_ptr.*,
+        });
     }
 
     const json_data = struct {
@@ -406,21 +352,9 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
     };
 
     // Manual JSON serialization for simplicity
-    var output = if (isZig015OrNewer)
-        std.ArrayList(u8){}
-    else
-        std.ArrayList(u8).init(allocator);
-
-    if (isZig015OrNewer) {
-        defer output.deinit(allocator);
-    } else {
-        defer output.deinit();
-    }
-
-    const writer = if (isZig015OrNewer)
-        output.writer(allocator)
-    else
-        output.writer();
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(allocator);
+    var writer = std.Io.Writer.fromArrayList(&output);
 
     try writer.print("{{", .{});
     try writer.print("\"summary\":{{", .{});
@@ -447,20 +381,17 @@ fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
     try writer.print("]", .{});
     try writer.print("}}", .{});
 
-    return if (isZig015OrNewer)
-        try output.toOwnedSlice(allocator)
-    else
-        try output.toOwnedSlice();
+    return try output.toOwnedSlice(allocator);
 }
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+pub fn main(init: std.process.Init) !void {
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+    const io = std.Io.Threaded.global_single_threaded.io();
 
     // Parse command line arguments
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
     var data_dir: []const u8 = ".performance-data";
     var output_format: []const u8 = "text";
@@ -489,7 +420,7 @@ pub fn main() !void {
     }
 
     // Check if data directory exists
-    std.fs.cwd().access(data_dir, .{}) catch |err| switch (err) {
+    Io.Dir.cwd().access(io, data_dir, .{}) catch |err| switch (err) {
         error.FileNotFound => {
             print("Error: Performance data directory '{s}' not found\n", .{data_dir});
             std.process.exit(1);
@@ -508,11 +439,7 @@ pub fn main() !void {
         for (history.items) |record| {
             freePerformanceRecord(allocator, record);
         }
-        if (isZig015OrNewer) {
-            history.deinit(allocator);
-        } else {
-            history.deinit();
-        }
+        history.deinit(allocator);
     }
 
     if (history.items.len == 0) {
@@ -539,9 +466,9 @@ pub fn main() !void {
 
     // Output report
     if (output_file) |file_path| {
-        const file = try std.fs.cwd().createFile(file_path, .{});
-        defer file.close();
-        try file.writeAll(report_content);
+        const file = try std.Io.Dir.cwd().createFile(io, file_path, .{});
+        defer file.close(io);
+        try file.writeStreamingAll(io, report_content);
         print("Performance report written to {s}\n", .{file_path});
     } else {
         print("{s}", .{report_content});

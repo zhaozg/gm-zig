@@ -8,7 +8,7 @@ const sm9 = @import("../sm9.zig");
 
 // Test vectors for H1 hash function from GM/T 0044-2016
 test "SM9 H1 standard test vectors" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -28,7 +28,7 @@ test "SM9 H1 standard test vectors" {
 
 // Test vectors for H2 hash function from GM/T 0044-2016
 test "SM9 H2 standard test vectors" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -105,7 +105,7 @@ test "SM9 master key generation standard compliance" {
 
 // Test key extraction with standard test vectors
 test "SM9 key extraction standard test vectors" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -134,7 +134,7 @@ test "SM9 key extraction standard test vectors" {
 
 // Test signature and verification with standard test vectors
 test "SM9 signature standard test vectors" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -168,7 +168,7 @@ test "SM9 signature standard test vectors" {
 
 // Test encryption and decryption with standard test vectors
 test "SM9 encryption standard test vectors" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

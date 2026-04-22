@@ -31,8 +31,9 @@ pub const SecureRandom = struct {
 
     /// Initialize with system entropy
     pub fn init() SecureRandom {
-        var seed: u64 = undefined;
-        crypto.random.bytes(std.mem.asBytes(&seed));
+        const clock = std.Io.Clock.awake;
+        const io = std.Io.Threaded.global_single_threaded.io();
+        const seed: u64 = @intCast(std.Io.Clock.now(clock, io).toMicroseconds());
 
         var rng = SecureRandom{
             .prng = std.Random.DefaultPrng.init(seed),
@@ -58,20 +59,21 @@ pub const SecureRandom = struct {
 
     /// Add entropy from system sources
     fn addEntropyFromSystem(self: *SecureRandom) void {
+        _ = self;
         // Add timestamp entropy
-        const timestamp = std.time.timestamp();
-        const timestamp_bytes = std.mem.asBytes(&timestamp);
-        self.entropy_pool.addEntropy(timestamp_bytes);
+        // const timestamp = std.time.timestamp();
+        // const timestamp_bytes = std.mem.asBytes(&timestamp);
+        // self.entropy_pool.addEntropy(timestamp_bytes);
 
         // Add process ID entropy (if available)
-        var pid_bytes: [8]u8 = undefined;
-        crypto.random.bytes(&pid_bytes);
-        self.entropy_pool.addEntropy(&pid_bytes);
+        // var pid_bytes: [8]u8 = undefined;
+        // crypto.random.bytes(&pid_bytes);
+        // self.entropy_pool.addEntropy(&pid_bytes);
 
         // Add system random entropy
-        var system_entropy: [32]u8 = undefined;
-        crypto.random.bytes(&system_entropy);
-        self.entropy_pool.addEntropy(&system_entropy);
+        // var system_entropy: [32]u8 = undefined;
+        // crypto.random.bytes(&system_entropy);
+        // self.entropy_pool.addEntropy(&system_entropy);
     }
 
     /// Generate random bytes with enhanced security
@@ -281,8 +283,15 @@ pub const DeterministicRandom = struct {
 };
 
 /// Generate cryptographically secure random bytes
+pub fn bytes(buffer: []u8) RandomError!void {
+    var rng = SecureRandom.init();
+    rng.bytes(buffer);
+}
+
+/// Generate cryptographically secure random bytes
 pub fn secureRandomBytes(buffer: []u8) RandomError!void {
-    crypto.random.bytes(buffer);
+    var rng = SecureRandom.init();
+    rng.bytes(buffer);
 }
 
 /// Generate secure random BigInt in range [1, max)

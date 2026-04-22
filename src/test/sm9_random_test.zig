@@ -3,7 +3,7 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 Random Number Generation - Secure Random" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const params = sm9.params.SystemParams.init();
@@ -98,7 +98,7 @@ test "SM9 Random Number Generation - Random Point Generation" {
 }
 
 test "SM9 Random Number Generation - Key Derivation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

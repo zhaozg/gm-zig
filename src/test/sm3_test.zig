@@ -60,13 +60,6 @@ test "finalResult" {
     try assertEqual("66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0", &out);
 }
 
-test "writer" {
-    var h = SM3.init(.{});
-    try h.writer().print("{s}", .{"abc"});
-    const out = h.finalResult();
-    try assertEqual("66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0", &out);
-}
-
 test "aligned final" {
     var block = [_]u8{0} ** SM3.block_length;
     var out: [SM3.digest_length]u8 = undefined;

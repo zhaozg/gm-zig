@@ -3,20 +3,10 @@ const crypto = std.crypto;
 const mem = std.mem;
 const params = @import("params.zig");
 const key_extract = @import("key_extract.zig");
-const random = @import("random.zig");
 const bigint = @import("bigint.zig");
 const SM3 = @import("../sm3.zig").SM3;
 
 const builtin = @import("builtin");
-
-/// Compile-time detection for Zig 0.15 or newer version
-pub const isZig015OrNewer = blk: {
-    // Zig version structure: major.minor.patch
-    const version = builtin.zig_version;
-
-    // 0.15.0 or newer version
-    break :blk (version.major == 0 and version.minor >= 15);
-};
 
 /// SM9 Digital Signature and Verification
 /// Based on GM/T 0044-2016 standard
@@ -482,10 +472,7 @@ pub const BatchSignature = struct {
         return BatchSignature{
             .context = context,
             .allocator = allocator,
-            .signatures = if (isZig015OrNewer)
-                Signatures{}
-            else
-                Signatures.init(allocator),
+            .signatures = Signatures.empty,
         };
     }
 
@@ -496,19 +483,11 @@ pub const BatchSignature = struct {
         signature: Signature,
         user_id: key_extract.UserId,
     ) !void {
-        if (isZig015OrNewer) {
-            try self.signatures.append(self.allocator, SignatureBatch{
-                .message = message,
-                .signature = signature,
-                .user_id = user_id,
-            });
-        } else {
-            try self.signatures.append(SignatureBatch{
-                .message = message,
-                .signature = signature,
-                .user_id = user_id,
-            });
-        }
+        try self.signatures.append(self.allocator, SignatureBatch{
+            .message = message,
+            .signature = signature,
+            .user_id = user_id,
+        });
     }
 
     /// Verify all signatures in batch
@@ -551,12 +530,8 @@ pub const BatchSignature = struct {
 
     /// Cleanup resources
     pub fn deinit(self: BatchSignature) void {
-        if (isZig015OrNewer) {
-            var mutable_signatures = @constCast(&self.signatures);
-            mutable_signatures.deinit(self.allocator);
-        } else {
-            self.signatures.deinit();
-        }
+        var mutable_signatures = @constCast(&self.signatures);
+        mutable_signatures.deinit(self.allocator);
     }
 };
 
@@ -595,13 +570,6 @@ pub const SignatureUtils = struct {
         const hash = @import("hash.zig");
         const allocator = std.heap.page_allocator;
         return hash.h2Hash(message, w, N, allocator);
-    }
-
-    /// Generate cryptographically secure random number
-    pub fn generateRandom() [32]u8 {
-        var random_bytes: [32]u8 = undefined;
-        crypto.random.bytes(&random_bytes);
-        return random_bytes;
     }
 
     /// Validate signature components

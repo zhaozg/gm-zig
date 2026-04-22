@@ -236,22 +236,9 @@ pub const Utils = struct {
         };
     }
 
-    /// Generate cryptographically secure random bytes
-    pub fn generateRandomBytes(length: usize, allocator: std.mem.Allocator) ![]u8 {
-        const bytes = try allocator.alloc(u8, length);
-        crypto.random.bytes(bytes);
-        return bytes;
-    }
-
     /// Secure zero memory
     pub fn secureZero(bytes: []u8) void {
-        if (@hasDecl(crypto, "utils")) {
-            // Zig 0.14+
-            crypto.utils.secureZero(u8, bytes);
-        } else {
-            // Zig 0.13 and earlier
-            crypto.secureZero(u8, bytes);
-        }
+        crypto.secureZero(u8, bytes);
     }
 
     /// Constant-time byte comparison

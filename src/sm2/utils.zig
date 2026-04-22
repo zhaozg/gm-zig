@@ -6,15 +6,6 @@ const SM3 = sm3.SM3;
 
 const builtin = @import("builtin");
 
-/// 编译时检测是否为 Zig 0.15 或更新版本
-pub const isZig015OrNewer = blk: {
-    // Zig 版本号结构: major.minor.patch
-    const version = builtin.zig_version;
-
-    // 0.15.0 或更新版本
-    break :blk (version.major == 0 and version.minor >= 15);
-};
-
 const Buffer = std.ArrayList(u8);
 
 /// Key Derivation Function (KDF) based on SM3
@@ -120,113 +111,58 @@ pub const SignatureEncoding = enum {
 /// Input: r and s as 32-byte arrays
 /// Output: DER-encoded signature
 pub fn encodeSignatureDER(allocator: std.mem.Allocator, r: [32]u8, s: [32]u8) ![]u8 {
-    if (isZig015OrNewer) {
-        // Simple DER encoding: SEQUENCE { r INTEGER, s INTEGER }
-        var buffer: Buffer = .empty;
-        defer buffer.deinit(allocator);
+    // Simple DER encoding: SEQUENCE { r INTEGER, s INTEGER }
+    var buffer: Buffer = .empty;
+    defer buffer.deinit(allocator);
 
-        // Helper function to encode integer
-        const encodeInteger = struct {
-            fn call(buf: *Buffer, allocat: std.mem.Allocator, value: [32]u8) !void {
-                try buf.append(allocat, 0x02); // INTEGER tag
+    // Helper function to encode integer
+    const encodeInteger = struct {
+        fn call(buf: *Buffer, allocat: std.mem.Allocator, value: [32]u8) !void {
+            try buf.append(allocat, 0x02); // INTEGER tag
 
-                // Find first non-zero byte
-                var start: usize = 0;
-                while (start < 32 and value[start] == 0) start += 1;
+            // Find first non-zero byte
+            var start: usize = 0;
+            while (start < 32 and value[start] == 0) start += 1;
 
-                // If the number is zero
-                if (start == 32) {
-                    try buf.append(allocat, 0x01); // length
-                    try buf.append(allocat, 0x00); // value
-                    return;
-                }
-
-                // Check if we need to add padding for positive number
-                const need_padding = (value[start] & 0x80) != 0;
-                const content_len = 32 - start + @as(usize, if (need_padding) 1 else 0);
-
-                try buf.append(allocat, @intCast(content_len)); // length
-
-                if (need_padding) {
-                    try buf.append(allocat, 0x00); // padding byte
-                }
-
-                try buf.appendSlice(allocat, value[start..]);
+            // If the number is zero
+            if (start == 32) {
+                try buf.append(allocat, 0x01); // length
+                try buf.append(allocat, 0x00); // value
+                return;
             }
-        }.call;
 
-        // Encode r
-        var r_buffer: Buffer = .empty;
-        defer r_buffer.deinit(allocator);
-        try encodeInteger(&r_buffer, allocator, r);
+            // Check if we need to add padding for positive number
+            const need_padding = (value[start] & 0x80) != 0;
+            const content_len = 32 - start + @as(usize, if (need_padding) 1 else 0);
 
-        // Encode s
-        var s_buffer: Buffer = .empty;
-        defer s_buffer.deinit(allocator);
-        try encodeInteger(&s_buffer, allocator, s);
+            try buf.append(allocat, @intCast(content_len)); // length
 
-        // Build SEQUENCE
-        try buffer.append(allocator, 0x30); // SEQUENCE tag
-        const content_length = r_buffer.items.len + s_buffer.items.len;
-        try buffer.append(allocator, @intCast(content_length)); // length
-        try buffer.appendSlice(allocator, r_buffer.items);
-        try buffer.appendSlice(allocator, s_buffer.items);
-
-        return try buffer.toOwnedSlice(allocator);
-    } else {
-        var buffer = Buffer.init(allocator);
-        defer buffer.deinit();
-
-        // Helper function to encode integer
-        const encodeInteger = struct {
-            fn call(buf: *Buffer, allocat: std.mem.Allocator, value: [32]u8) !void {
-                _ = allocat;
-
-                try buf.append(0x02); // INTEGER tag
-                // Find first non-zero byte
-                var start: usize = 0;
-                while (start < 32 and value[start] == 0) start += 1;
-
-                // If the number is zero
-                if (start == 32) {
-                    try buf.append(0x01); // length
-                    try buf.append(0x00); // value
-                    return;
-                }
-
-                // Check if we need to add padding for positive number
-                const need_padding = (value[start] & 0x80) != 0;
-                const content_len = 32 - start + @as(usize, if (need_padding) 1 else 0);
-
-                try buf.append(@intCast(content_len)); // length
-
-                if (need_padding) {
-                    try buf.append(0x00); // padding byte
-                }
-
-                try buf.appendSlice(value[start..]);
+            if (need_padding) {
+                try buf.append(allocat, 0x00); // padding byte
             }
-        }.call;
 
-        // Encode r
-        var r_buffer = Buffer.init(allocator);
-        defer r_buffer.deinit();
-        try encodeInteger(&r_buffer, allocator, r);
+            try buf.appendSlice(allocat, value[start..]);
+        }
+    }.call;
 
-        // Encode s
-        var s_buffer = Buffer.init(allocator);
-        defer s_buffer.deinit();
-        try encodeInteger(&s_buffer, allocator, s);
+    // Encode r
+    var r_buffer: Buffer = .empty;
+    defer r_buffer.deinit(allocator);
+    try encodeInteger(&r_buffer, allocator, r);
 
-        // Build SEQUENCE
-        try buffer.append(0x30); // SEQUENCE tag
-        const content_length = r_buffer.items.len + s_buffer.items.len;
-        try buffer.append(@intCast(content_length)); // length
-        try buffer.appendSlice(r_buffer.items);
-        try buffer.appendSlice(s_buffer.items);
+    // Encode s
+    var s_buffer: Buffer = .empty;
+    defer s_buffer.deinit(allocator);
+    try encodeInteger(&s_buffer, allocator, s);
 
-        return try buffer.toOwnedSlice();
-    }
+    // Build SEQUENCE
+    try buffer.append(allocator, 0x30); // SEQUENCE tag
+    const content_length = r_buffer.items.len + s_buffer.items.len;
+    try buffer.append(allocator, @intCast(content_length)); // length
+    try buffer.appendSlice(allocator, r_buffer.items);
+    try buffer.appendSlice(allocator, s_buffer.items);
+
+    return try buffer.toOwnedSlice(allocator);
 }
 
 /// Decode DER-encoded SM2 signature
@@ -301,11 +237,6 @@ pub fn constantTimeEqual(a: []const u8, b: []const u8) bool {
     }
 
     return diff == 0;
-}
-
-/// Generate cryptographically secure random bytes
-pub fn secureRandom(buffer: []u8) void {
-    crypto.random.bytes(buffer);
 }
 
 test "KDF basic functionality" {

@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-ZIG_VERSION="0.15.1"
+ZIG_VERSION="0.16.0"
 
 echo -e "${BLUE}=== GM-Zig Development Environment Setup ===${NC}"
 echo -e "${BLUE}Setting up development environment for the GM-Zig cryptographic library${NC}"
@@ -47,22 +47,22 @@ echo "----------------------------------------"
 # Check for required tools
 if command_exists zig; then
     CURRENT_ZIG=$(zig version)
-    if [[ "$CURRENT_ZIG" == "0.14."* ]] || [[ "$CURRENT_ZIG" == "0.15."* ]]; then
+    if [[ "$CURRENT_ZIG" == "0.16."* ]]; then
         print_status "ok" "Zig $CURRENT_ZIG is installed (compatible)"
     else
         print_status "warn" "Zig $CURRENT_ZIG detected - may have compatibility issues"
-        print_status "info" "Recommended version: 0.14.1+ or 0.15.x"
+        print_status "info" "Recommended version: 0.16.0"
     fi
 else
     print_status "error" "Zig not found - installing Zig $ZIG_VERSION"
-    
+
     # Download and install Zig
     cd /tmp
     wget "https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz" -O "zig-$ZIG_VERSION.tar.xz"
     tar -xf "zig-$ZIG_VERSION.tar.xz"
     sudo mv "zig-linux-x86_64-$ZIG_VERSION" /usr/local/zig
     sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
-    
+
     if command_exists zig; then
         print_status "ok" "Zig $ZIG_VERSION installed successfully"
     else
@@ -153,7 +153,7 @@ print_status "info" "Add 'source $ALIAS_FILE' to your shell profile to use alias
 # Setup git hooks (optional)
 if [ -d "$PROJECT_ROOT/.git" ]; then
     HOOKS_DIR="$PROJECT_ROOT/.git/hooks"
-    
+
     # Pre-commit hook for formatting
     cat > "$HOOKS_DIR/pre-commit" << 'EOF'
 #!/bin/bash

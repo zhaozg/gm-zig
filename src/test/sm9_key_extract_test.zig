@@ -3,7 +3,7 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 signature user key extraction" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -24,7 +24,7 @@ test "SM9 signature user key extraction" {
 }
 
 test "SM9 encryption user key extraction" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -45,7 +45,7 @@ test "SM9 encryption user key extraction" {
 }
 
 test "SM9 user public key derivation for signature" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -65,7 +65,7 @@ test "SM9 user public key derivation for signature" {
 }
 
 test "SM9 user public key derivation for encryption" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -85,7 +85,7 @@ test "SM9 user public key derivation for encryption" {
 }
 
 test "SM9 key extraction context" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -111,7 +111,7 @@ test "SM9 key extraction context" {
 }
 
 test "SM9 user key serialization" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

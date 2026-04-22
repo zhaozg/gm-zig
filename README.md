@@ -1,7 +1,7 @@
 # GM-Zig
 
 [![CI](https://github.com/zhaozg/gm-zig/workflows/CI/badge.svg)](https://github.com/zhaozg/gm-zig/actions)
-[![Zig Version](https://img.shields.io/badge/zig-0.14.1+-blue.svg)](https://ziglang.org/download/)
+[![Zig Version](https://img.shields.io/badge/zig-0.16.0+-blue.svg)](https://ziglang.org/download/)
 [![License](https://img.shields.io/github/license/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig/blob/main/LICENSE)
 [![Repository Size](https://img.shields.io/github/repo-size/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig)
 [![Last Commit](https://img.shields.io/github/last-commit/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig/commits/main)
@@ -68,7 +68,7 @@ The library leverages Zig's compile-time safety guarantees and focuses on memory
 
 ### Prerequisites
 
-- Zig 0.14.1 or later
+- Zig 0.16.0 or later
 - Git (for cloning the repository)
 
 ### Installation
@@ -103,7 +103,7 @@ const std = @import("std");
 const gmlib = @import("gmlib");
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -150,7 +150,7 @@ const std = @import("std");
 const sm9 = @import("gmlib").sm9;
 
 pub fn testSM9Implementation() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

@@ -67,7 +67,7 @@ test "SM9 master key pair fromPrivateKey correctness" {
     var private_key = [_]u8{0} ** 32;
     var attempts: u32 = 0;
     while (attempts < 100) : (attempts += 1) {
-        std.crypto.random.bytes(&private_key);
+        try std.Io.randomSecure(testing.io, &private_key);
         if (!sm9.params.isZero(private_key) and sm9.params.isLessThan(private_key, system_params.N)) break;
     }
     // 如果100次尝试都失败，使用确定性的合法私钥

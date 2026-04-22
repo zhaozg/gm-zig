@@ -22,7 +22,7 @@ test "SM9 bigint operations" {
 }
 
 test "SM9 hash functions" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -142,7 +142,7 @@ test "SM9 system parameters" {
 }
 
 test "SM9 key extraction" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -163,7 +163,7 @@ test "SM9 key extraction" {
 }
 
 test "SM9 signature roundtrip" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -193,7 +193,7 @@ test "SM9 signature roundtrip" {
 }
 
 test "SM9 encryption roundtrip" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -221,7 +221,7 @@ test "SM9 encryption roundtrip" {
 }
 
 test "SM9 complete workflow" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -257,7 +257,7 @@ test "SM9 complete workflow" {
 }
 
 test "SM9 Phase 4 - Enhanced mathematical correctness" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
 
     // Test enhanced modular arithmetic with coprime values
@@ -296,7 +296,7 @@ test "SM9 Phase 4 - Enhanced mathematical correctness" {
 }
 
 test "SM9 Phase 4 - Enhanced key extraction" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -326,7 +326,7 @@ test "SM9 Phase 4 - Enhanced key extraction" {
 }
 
 test "SM9 Phase 4 - Enhanced signature operations" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -362,7 +362,7 @@ test "SM9 Phase 4 - Enhanced signature operations" {
 }
 
 test "SM9 Phase 4 - Enhanced encryption operations" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -407,7 +407,7 @@ test "SM9 Phase 4 - Enhanced encryption operations" {
 }
 
 test "SM9 Phase 4 - Enhanced pairing and curve operations" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const system = sm9.params.SM9System.init();
@@ -455,7 +455,7 @@ test "SM9 Phase 4 - Enhanced pairing and curve operations" {
 }
 
 test "SM9 Phase 4 - Complete end-to-end enhanced workflow" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -511,7 +511,7 @@ test "SM9 Phase 4 - Complete end-to-end enhanced workflow" {
 }
 
 test "SM9 Phase 4 - DER signature encoding and validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -541,7 +541,7 @@ test "SM9 Phase 4 - DER signature encoding and validation" {
 }
 
 test "SM9 Phase 4 - Enhanced curve operations and key derivation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
 
     const system = sm9.params.SM9System.init();

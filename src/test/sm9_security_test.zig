@@ -44,7 +44,7 @@ test "SM9 secure memory clearing" {
 
 // Test improved modular inverse
 test "SM9 modular inverse improvements" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
 
     // Test with small values first
@@ -84,7 +84,7 @@ test "SM9 curve point validation" {
 
 // Test hash function improvements
 test "SM9 improved hash functions" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -120,7 +120,7 @@ test "SM9 improved hash functions" {
 
 // Test input validation in encryption
 test "SM9 encryption input validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

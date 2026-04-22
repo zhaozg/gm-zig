@@ -3,7 +3,7 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 key agreement basic functionality" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -70,7 +70,7 @@ test "SM9 key agreement basic functionality" {
 }
 
 test "SM9 key agreement with different key lengths" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -151,7 +151,7 @@ test "SM9 key agreement parameter validation" {
 }
 
 test "SM9 key agreement session ID generation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -206,7 +206,7 @@ test "SM9 key agreement session ID generation" {
 }
 
 test "SM9 key agreement deterministic behavior" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -255,7 +255,7 @@ test "SM9 key agreement deterministic behavior" {
 }
 
 test "SM9 key agreement error handling" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

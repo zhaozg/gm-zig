@@ -6,7 +6,7 @@ const sm9 = @import("../sm9.zig");
 // This file contains focused tests for each key SM9 operation
 
 test "SM9 basic key extraction validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -52,7 +52,7 @@ test "SM9 basic key extraction validation" {
 }
 
 test "SM9 basic hash functions H1 and H2" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

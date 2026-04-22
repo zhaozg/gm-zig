@@ -67,7 +67,7 @@ test "GM/T 0044-2016 - Generator point format compliance" {
 }
 
 test "GM/T 0044-2016 - Hash function H1 compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -123,7 +123,7 @@ test "GM/T 0044-2016 - Master key generation compliance" {
 }
 
 test "GM/T 0044-2016 - Key extraction compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -201,7 +201,7 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
 }
 
 test "GM/T 0044-2016 - End-to-end signature compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -226,7 +226,7 @@ test "GM/T 0044-2016 - End-to-end signature compliance" {
 }
 
 test "GM/T 0044-2016 - End-to-end encryption compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -253,7 +253,7 @@ test "GM/T 0044-2016 - End-to-end encryption compliance" {
 }
 
 test "GM/T 0044-2016 - Hash function H2 compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -278,7 +278,7 @@ test "GM/T 0044-2016 - Hash function H2 compliance" {
 }
 
 test "GM/T 0044-2016 - KDF compliance and security" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -314,7 +314,7 @@ test "GM/T 0044-2016 - KDF compliance and security" {
 }
 
 test "GM/T 0044-2016 - Key extraction format compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -347,7 +347,7 @@ test "GM/T 0044-2016 - Key extraction format compliance" {
 }
 
 test "GM/T 0044-2016 - Digital signature compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -385,7 +385,7 @@ test "GM/T 0044-2016 - Digital signature compliance" {
 }
 
 test "GM/T 0044-2016 - Public key encryption compliance" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -427,7 +427,7 @@ test "GM/T 0044-2016 - Public key encryption compliance" {
 }
 
 test "GM/T 0044-2016 - Cross-user interoperability" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -477,7 +477,7 @@ test "GM/T 0044-2016 - Cross-user interoperability" {
 }
 
 test "GM/T 0044-2016 - Performance and security validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

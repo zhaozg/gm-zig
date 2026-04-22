@@ -3,7 +3,7 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 ciphertext creation and validation" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -27,7 +27,7 @@ test "SM9 ciphertext creation and validation" {
 }
 
 test "SM9 ciphertext serialization" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -63,7 +63,7 @@ test "SM9 ciphertext serialization" {
 }
 
 test "SM9 encryption context initialization" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -74,7 +74,7 @@ test "SM9 encryption context initialization" {
 }
 
 test "SM9 encryption and decryption" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -114,7 +114,7 @@ test "SM9 encryption and decryption" {
 }
 
 test "SM9 encryption with different formats" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -151,7 +151,7 @@ test "SM9 encryption with different formats" {
 }
 
 test "SM9 key encapsulation mechanism" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -186,7 +186,7 @@ test "SM9 key encapsulation mechanism" {
 }
 
 test "SM9 encryption utility functions" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -220,7 +220,7 @@ test "SM9 encryption utility functions" {
 }
 
 test "SM9 encryption with large messages" {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

@@ -4,12 +4,6 @@ const mem = std.mem;
 const math = std.math;
 const builtin = @import("builtin");
 
-/// Conditional compilation for Zig version compatibility
-const isZig015OrNewer = blk: {
-    const version = builtin.zig_version;
-    break :blk (version.major == 0 and version.minor >= 15);
-};
-
 const S0 = [256]u8{
     0x3e, 0x72, 0x5b, 0x47, 0xca, 0xe0, 0x00, 0x33, 0x04, 0xd1, 0x54, 0x98, 0x09, 0xb9, 0x6d, 0xcb,
     0x7b, 0x1b, 0xf9, 0x32, 0xaf, 0x9d, 0x6a, 0xa5, 0xb8, 0x2d, 0xfc, 0x1d, 0x08, 0x53, 0x03, 0x90,
@@ -697,6 +691,8 @@ test "ZUC large keystream generation" {
 
 // 性能测试（可选）
 test "ZUC performance" {
+    const io = std.Io.Threaded.global_single_threaded.io();
+
     const key = [_]u8{0x77} ** 16;
     const iv = [_]u8{0x88} ** 16;
 
@@ -705,7 +701,8 @@ test "ZUC performance" {
     const iterations = 1000;
     var total_bytes: u64 = 0;
 
-    const start_time = std.time.milliTimestamp();
+    const clock = std.Io.Clock.awake;
+    const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
     for (0..iterations) |_| {
         var keystream: [64]u32 = undefined; // 256 bytes per iteration
@@ -713,12 +710,12 @@ test "ZUC performance" {
         total_bytes += keystream.len * 4;
     }
 
-    const end_time = std.time.milliTimestamp();
-    const elapsed_ms = @as(f64, @floatFromInt(end_time - start_time));
+    const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
+    const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
 
-    const mbps = (@as(f64, @floatFromInt(total_bytes)) / (1024 * 1024)) / (elapsed_ms / 1000);
+    const mbps = (@as(f64, @floatFromInt(total_bytes)) / (1024 * 1024)) / (elapsed_ns / std.time.ns_per_s);
 
-    std.debug.print("\nZUC Performance: {d:.2} MB/s ({d} bytes in {d} ms)\n", .{ mbps, total_bytes, elapsed_ms });
+    std.debug.print("\nZUC Performance: {d:.2} MB/s ({d} bytes in {d} ns)\n", .{ mbps, total_bytes, elapsed_ns });
 
     // 性能测试不失败，只是输出信息
     try testing.expect(true);
@@ -901,22 +898,25 @@ test "ZUC MAC with special patterns" {
 }
 
 test "ZUC MAC performance" {
+    const io = std.Io.Threaded.global_single_threaded.io();
+
     const key = [_]u8{0x99} ** 16;
     const iv = [_]u8{0xAA} ** 16;
 
     const iterations = 1000;
     const message = "Performance test message for ZUC MAC generation";
 
-    const start_time = std.time.milliTimestamp();
+    const clock = std.Io.Clock.awake;
+    const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
     for (0..iterations) |_| {
         _ = ZUC.generateMACWithKey(&key, &iv, message);
     }
 
-    const end_time = std.time.milliTimestamp();
-    const elapsed_ms = @as(f64, @floatFromInt(end_time - start_time));
+    const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
+    const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
 
-    std.debug.print("\nZUC MAC Performance: {d} MACs in {d} ms ({d:.2} MACs/ms)\n", .{ iterations, elapsed_ms, @as(f64, @floatFromInt(iterations)) / elapsed_ms });
+    std.debug.print("\nZUC MAC Performance: {d} MACs in {d} ns ({d:.2} MACs/ns)\n", .{ iterations, elapsed_ns, @as(f64, @floatFromInt(iterations)) / elapsed_ns });
 
     try testing.expect(true);
 }
@@ -986,7 +986,8 @@ test "ZUC MAC with null pointers" {
 test "ZUC MAC benchmark" {
     const key = [_]u8{0x55} ** 16;
     const iv = [_]u8{0x66} ** 16;
-
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const clock = std.Io.Clock.awake;
     const test_sizes = [_]usize{ 1, 16, 64, 256, 1024, 4096 };
 
     for (test_sizes) |size| {
@@ -998,14 +999,14 @@ test "ZUC MAC benchmark" {
             byte.* = @as(u8, @intCast(i & 0xFF));
         }
 
-        const start_time = std.time.nanoTimestamp();
+        const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
         const iterations = 100;
 
         for (0..iterations) |_| {
             _ = ZUC.generateMACWithKey(&key, &iv, message);
         }
 
-        const end_time = std.time.nanoTimestamp();
+        const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
         const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
         const ns_per_operation = elapsed_ns / @as(f64, @floatFromInt(iterations));
         const mbps = (@as(f64, @floatFromInt(size)) / (1024 * 1024)) / (ns_per_operation / 1e9);
@@ -1055,7 +1056,7 @@ test "ZUC MAC usage example" {
     try testing.expect(!is_tampered_valid);
 }
 
-pub fn testZUCPerformance(allocator: std.mem.Allocator) !void {
+pub fn testZUCPerformance(io: std.Io, allocator: std.mem.Allocator) !void {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
@@ -1077,10 +1078,7 @@ pub fn testZUCPerformance(allocator: std.mem.Allocator) !void {
 
     for (test_sizes) |size| {
         // 分配输入缓冲区
-        const alignment = if (isZig015OrNewer)
-            @as(std.mem.Alignment, @enumFromInt(16))
-        else
-            @as(u29, 16);
+        const alignment = @as(std.mem.Alignment, @enumFromInt(16));
         const input = try allocator.alignedAlloc(u8, alignment, size);
         defer allocator.free(input);
 
@@ -1098,15 +1096,16 @@ pub fn testZUCPerformance(allocator: std.mem.Allocator) !void {
 
         // 加密性能测试
         zuc = ZUC.init(&key, &iv);
-        const encrypt_start = std.time.nanoTimestamp();
+        const clock = std.Io.Clock.awake;
+        const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
         zuc.crypt(input, output);
-        const encrypt_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - encrypt_start));
+        const encrypt_time = @as(f64, @floatFromInt(std.Io.Clock.now(clock, io).toNanoseconds() - encrypt_start));
 
         // MAC性能测试
         zuc = ZUC.init(&key, &iv);
-        const mac_start = std.time.nanoTimestamp();
+        const mac_start = std.Io.Clock.now(clock, io).toNanoseconds();
         const mac = zuc.generateMAC(input);
-        const mac_time = @as(f64, @floatFromInt(std.time.nanoTimestamp() - mac_start));
+        const mac_time = @as(f64, @floatFromInt(std.Io.Clock.now(clock, io).toNanoseconds() - mac_start));
 
         // 计算速度 (MB/s)
         const bytes_per_mb = 1024.0 * 1024.0;

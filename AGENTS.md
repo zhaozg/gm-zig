@@ -8,6 +8,6 @@
 
 ## requirements
 
-- Must build and test pass with zig 0.14.x and 0.15.x, download URL in https://ziglang.org/download/index.json
+- Must build and test pass with zig 0.16.x, download URL in https://ziglang.org/download/index.json
 - All CI must pass.
 - Push PR after `zig fmt src`
