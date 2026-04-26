@@ -689,38 +689,6 @@ test "ZUC large keystream generation" {
     try testing.expect(has_non_zero);
 }
 
-// 性能测试（可选）
-test "ZUC performance" {
-    const io = testing.io;
-
-    const key = [_]u8{0x77} ** 16;
-    const iv = [_]u8{0x88} ** 16;
-
-    var zuc = ZUC.init(&key, &iv);
-
-    const iterations = 1000;
-    var total_bytes: u64 = 0;
-
-    const clock = std.Io.Clock.awake;
-    const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
-
-    for (0..iterations) |_| {
-        var keystream: [64]u32 = undefined; // 256 bytes per iteration
-        zuc.generateKeystream(&keystream);
-        total_bytes += keystream.len * 4;
-    }
-
-    const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
-    const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
-
-    const mbps = (@as(f64, @floatFromInt(total_bytes)) / (1024 * 1024)) / (elapsed_ns / std.time.ns_per_s);
-
-    std.debug.print("\nZUC Performance: {d:.2} MB/s ({d} bytes in {d} ns)\n", .{ mbps, total_bytes, elapsed_ns });
-
-    // 性能测试不失败，只是输出信息
-    try testing.expect(true);
-}
-
 // 完整性保护测试用例
 test "ZUC MAC generation - empty message" {
     const key = [_]u8{0x11} ** 16;
@@ -897,30 +865,6 @@ test "ZUC MAC with special patterns" {
     try testing.expect(mac != 0);
 }
 
-test "ZUC MAC performance" {
-    const io = testing.io;
-
-    const key = [_]u8{0x99} ** 16;
-    const iv = [_]u8{0xAA} ** 16;
-
-    const iterations = 1000;
-    const message = "Performance test message for ZUC MAC generation";
-
-    const clock = std.Io.Clock.awake;
-    const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
-
-    for (0..iterations) |_| {
-        _ = ZUC.generateMACWithKey(&key, &iv, message);
-    }
-
-    const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
-    const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
-
-    std.debug.print("\nZUC MAC Performance: {d} MACs in {d} ns ({d:.2} MACs/ns)\n", .{ iterations, elapsed_ns, @as(f64, @floatFromInt(iterations)) / elapsed_ns });
-
-    try testing.expect(true);
-}
-
 // 添加GMT 0001.3标准测试向量
 test "ZUC-128-MAC standard test vector 1" {
     // 测试向量来自GMT 0001.3标准
@@ -980,43 +924,6 @@ test "ZUC MAC with null pointers" {
     const message = [_]u8{ 0x01, 0x02, 0x03 };
     const mac2 = ZUC.generateMACWithKey(&key, &iv, &message);
     try testing.expect(mac2 != 0);
-}
-
-// MAC性能基准测试（已移至benchmark.zig）
-test "ZUC MAC benchmark" {
-    const key = [_]u8{0x55} ** 16;
-    const iv = [_]u8{0x66} ** 16;
-    const io = testing.io;
-    const clock = std.Io.Clock.awake;
-    const test_sizes = [_]usize{ 1, 16, 64, 256, 1024, 4096 };
-
-    for (test_sizes) |size| {
-        const message = std.heap.page_allocator.alloc(u8, size) catch unreachable;
-        defer std.heap.page_allocator.free(message);
-
-        // 填充测试数据
-        for (message, 0..) |*byte, i| {
-            byte.* = @as(u8, @intCast(i & 0xFF));
-        }
-
-        const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
-        const iterations = 100;
-
-        for (0..iterations) |_| {
-            _ = ZUC.generateMACWithKey(&key, &iv, message);
-        }
-
-        const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
-        const elapsed_ns = @as(f64, @floatFromInt(end_time - start_time));
-        const ns_per_operation = elapsed_ns / @as(f64, @floatFromInt(iterations));
-        const mbps = (@as(f64, @floatFromInt(size)) / (1024 * 1024)) / (ns_per_operation / 1e9);
-        const total_bits = @as(f64, @floatFromInt(size * 8));
-        const ns_per_bit = ns_per_operation / total_bits;
-
-        std.debug.print("ZUC MAC {d} bytes: {d:.2} MB/s ({d:.4} ns/bit)\n", .{ size, mbps, ns_per_bit });
-    }
-
-    try testing.expect(true);
 }
 
 // 添加并发安全测试
