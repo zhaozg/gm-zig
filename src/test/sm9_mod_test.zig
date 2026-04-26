@@ -7,7 +7,7 @@ test "SM9 context initialization" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const context = sm9.SM9Context.init(allocator);
+    const context = sm9.SM9Context.init(testing.io, allocator);
 
     try testing.expect(context.validate());
     try testing.expect(context.system.validate());
@@ -19,7 +19,7 @@ test "SM9 context with custom parameters" {
     const allocator = gpa.allocator();
 
     const custom_params = sm9.SystemParams.init();
-    const context = try sm9.SM9Context.initWithParams(allocator, custom_params);
+    const context = try sm9.SM9Context.initWithParams(testing.io, allocator, custom_params);
 
     try testing.expect(context.validate());
 }
@@ -29,7 +29,7 @@ test "SM9 complete workflow" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var context = sm9.SM9Context.init(allocator);
+    var context = sm9.SM9Context.init(testing.io, allocator);
 
     const alice_id = "alice@example.com";
     const bob_id = "bob@example.com";
@@ -116,12 +116,8 @@ test "SM9 utility functions" {
 }
 
 test "SM9 test vectors validation" {
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
     // This test validates the implementation with known test vectors
-    const validation_result = try sm9.TestVectors.validateImplementation(allocator);
+    const validation_result = try sm9.TestVectors.validateImplementation(testing.io, testing.allocator);
     try testing.expect(validation_result);
 }
 
@@ -148,7 +144,7 @@ test "SM9 error handling" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var context = sm9.SM9Context.init(allocator);
+    var context = sm9.SM9Context.init(testing.io, allocator);
 
     // Test invalid user ID
     const invalid_id = "";
@@ -164,6 +160,7 @@ test "SM9 error handling" {
 }
 
 test "SM9 cross-module integration" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -172,20 +169,20 @@ test "SM9 cross-module integration" {
     const system = sm9.params.SM9System.init();
 
     // Key extraction
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
     const user_id = "integration@example.com";
     const sign_key = try key_context.extractSignKey(user_id);
     const encrypt_key = try key_context.extractEncryptKey(user_id);
 
     // Signature
-    const sig_context = sm9.sign.SignatureContext.init(system, allocator);
+    const sig_context = sm9.sign.SignatureContext.init(system, io, allocator);
     const message = "Integration test message";
     const signature = try sig_context.sign(message, sign_key, sm9.sign.SignatureOptions{});
     const is_valid = try sig_context.verify(message, signature, user_id, sm9.sign.SignatureOptions{});
     try testing.expect(is_valid);
 
     // Encryption
-    const enc_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const enc_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
     const ciphertext = try enc_context.encrypt(message, user_id, sm9.encrypt.EncryptionOptions{});
     defer ciphertext.deinit();
 

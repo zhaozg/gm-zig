@@ -226,8 +226,8 @@ test "SM2: Public key scalar multiplication verification" {
 }
 
 test "SM2: ECDH key exchange" {
-    const dha = SM2.scalar.random(.little);
-    const dhb = SM2.scalar.random(.little);
+    const dha = SM2.scalar.random(testing.io, .little);
+    const dhb = SM2.scalar.random(testing.io, .little);
 
     const dhA = try SM2.basePoint.mul(dha, .little);
     const dhB = try SM2.basePoint.mul(dhb, .little);
@@ -251,7 +251,7 @@ test "SM2: Create point from affine coordinates" {
 }
 
 test "SM2: SEC1 compressed format encoding/decoding" {
-    const p = SM2.random();
+    const p = SM2.random(testing.io);
     const s = p.toCompressedSec1();
     const q = try SM2.fromSec1(&s);
     try testing.expect(p.equivalent(q));
@@ -259,7 +259,7 @@ test "SM2: SEC1 compressed format encoding/decoding" {
 
 test "SM2: SEC1 uncompressed format encoding/decoding" {
     // 生成随机点
-    const p = SM2.random();
+    const p = SM2.random(testing.io);
 
     // 编码为非压缩格式
     const s = p.toUncompressedSec1();
@@ -362,7 +362,7 @@ test "SM2: Scalar parity" {
 
 test "SM2: Random point curve verification" {
     // 生成随机点
-    const point = SM2.random();
+    const point = SM2.random(testing.io);
     try point.rejectIdentity();
 
     // 获取仿射坐标

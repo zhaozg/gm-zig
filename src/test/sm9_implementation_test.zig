@@ -147,7 +147,7 @@ test "SM9 key extraction" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const context = sm9.key_extract.KeyExtractionContext.init(system, testing.io, allocator);
 
     const user_id = "alice@example.com";
 
@@ -169,8 +169,8 @@ test "SM9 signature roundtrip" {
 
     // Initialize SM9 system
     const system = sm9.params.SM9System.init();
-    const signature_context = sm9.sign.SignatureContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const signature_context = sm9.sign.SignatureContext.init(system, testing.io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, testing.io, allocator);
 
     const user_id = "alice@example.com";
     const message = "Hello, SM9 signature!";
@@ -193,14 +193,15 @@ test "SM9 signature roundtrip" {
 }
 
 test "SM9 encryption roundtrip" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // Initialize SM9 system
     const system = sm9.params.SM9System.init();
-    const encryption_context = sm9.encrypt.EncryptionContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const encryption_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     const user_id = "bob@example.com";
     const message = "Hello, SM9 encryption!";
@@ -226,7 +227,7 @@ test "SM9 complete workflow" {
     const allocator = gpa.allocator();
 
     // Initialize complete SM9 context
-    var sm9_context = sm9.SM9Context.init(allocator);
+    var sm9_context = sm9.SM9Context.init(testing.io, allocator);
     try testing.expect(sm9_context.validate());
 
     const alice_id = "alice@example.com";
@@ -296,12 +297,13 @@ test "SM9 Phase 4 - Enhanced mathematical correctness" {
 }
 
 test "SM9 Phase 4 - Enhanced key extraction" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     const user_id = "enhanced_user@test.com";
 
@@ -326,13 +328,14 @@ test "SM9 Phase 4 - Enhanced key extraction" {
 }
 
 test "SM9 Phase 4 - Enhanced signature operations" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     const user_id = "signer@enhanced.test";
     const message = "Enhanced SM9 signature with proper modular arithmetic";
@@ -362,13 +365,14 @@ test "SM9 Phase 4 - Enhanced signature operations" {
 }
 
 test "SM9 Phase 4 - Enhanced encryption operations" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     const user_id = "recipient@enhanced.test";
     const message = "Enhanced SM9 encryption with proper KDF and security";
@@ -455,15 +459,16 @@ test "SM9 Phase 4 - Enhanced pairing and curve operations" {
 }
 
 test "SM9 Phase 4 - Complete end-to-end enhanced workflow" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     // Initialize enhanced SM9 system
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     // Test users
     const alice_id = "alice@enhanced.sm9.test";

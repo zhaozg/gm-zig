@@ -227,12 +227,13 @@ pub fn decrypt(
 
 /// Encrypt with specified format (convenience function)
 pub fn encryptWithFormat(
+    io: std.Io,
     allocator: std.mem.Allocator,
     message: []const u8,
     public_key: SM2,
     format: CiphertextFormat,
 ) ![]u8 {
-    const ciphertext = try encrypt(allocator, message, public_key, format);
+    const ciphertext = try encrypt(io, allocator, message, public_key, format);
     defer ciphertext.deinit(allocator);
 
     return try ciphertext.toBytes(allocator);

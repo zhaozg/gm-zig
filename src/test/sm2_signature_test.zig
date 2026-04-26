@@ -6,12 +6,12 @@ const kp = @import("../sm2/keypair.zig");
 const KeyPair = kp.KeyPair;
 
 test "SM2 signature creation and verification" {
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
     const message = "hello world";
     const options = signature.SignatureOptions{ .hash_type = .sm3 };
 
     // Create signature
-    const sig = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
+    const sig = try signature.sign(testing.io, message, key_pair.private_key, key_pair.public_key, options);
 
     // Verify signature
     const is_valid = try signature.verify(message, sig, key_pair.public_key, options);
@@ -24,12 +24,12 @@ test "SM2 signature creation and verification" {
 }
 
 test "SM2 signature with precomputed hash" {
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
     const message_hash = [_]u8{0x01} ** 32;
     const options = signature.SignatureOptions{ .hash_type = .precomputed };
 
     // Create signature
-    const sig = try signature.sign(&message_hash, key_pair.private_key, key_pair.public_key, options);
+    const sig = try signature.sign(testing.io, &message_hash, key_pair.private_key, key_pair.public_key, options);
 
     // Verify signature
     const is_valid = try signature.verify(&message_hash, sig, key_pair.public_key, options);
@@ -37,13 +37,14 @@ test "SM2 signature with precomputed hash" {
 }
 
 test "SM2 signature serialization" {
+    const io = testing.io;
     const allocator = testing.allocator;
 
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(io);
     const message = "test message";
     const options = signature.SignatureOptions{};
 
-    const sig = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
+    const sig = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
 
     // Test raw bytes serialization
     const bytes = sig.toBytes();
@@ -62,7 +63,7 @@ test "SM2 signature serialization" {
 }
 
 test "SM2 public key from coordinates" {
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
     const coords = key_pair.getPublicKeyCoordinates();
 
     const reconstructed_key = try kp.publicKeyFromCoordinates(coords.x, coords.y);
@@ -71,7 +72,7 @@ test "SM2 public key from coordinates" {
 }
 
 test "SM2 public key from SEC1" {
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
 
     // Test uncompressed format
     const uncompressed = key_pair.getPublicKeyUncompressed();
@@ -85,14 +86,15 @@ test "SM2 public key from SEC1" {
 }
 
 test "SM2 signature comprehensive tests" {
+    const io = testing.io;
     const allocator = testing.allocator;
 
     // Test 1: Basic key generation
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
     try key_pair.public_key.rejectIdentity();
 
     // Test 2: Key pair from private key
-    const private_key = SM2.SM2.scalar.random(.big);
+    const private_key = SM2.SM2.scalar.random(testing.io, .big);
     const key_pair2 = try KeyPair.fromPrivateKey(private_key);
     try testing.expect(std.mem.eql(u8, &key_pair2.private_key, &private_key));
 
@@ -100,7 +102,7 @@ test "SM2 signature comprehensive tests" {
     const message = "SM2 digital signature test";
     const options = signature.SignatureOptions{};
 
-    const sig = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
+    const sig = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
     const is_valid = try signature.verify(message, sig, key_pair.public_key, options);
     try testing.expect(is_valid);
 
@@ -110,7 +112,7 @@ test "SM2 signature comprehensive tests" {
         .hash_type = .sm3,
     };
 
-    const sig_custom = try signature.sign(message, key_pair.private_key, key_pair.public_key, custom_options);
+    const sig_custom = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, custom_options);
     const is_valid_custom = try signature.verify(message, sig_custom, key_pair.public_key, custom_options);
     try testing.expect(is_valid_custom);
 
@@ -118,7 +120,7 @@ test "SM2 signature comprehensive tests" {
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
     const message_hash = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ** 8; // 32 bytes
 
-    const sig_hash = try signature.sign(&message_hash, key_pair.private_key, key_pair.public_key, hash_options);
+    const sig_hash = try signature.sign(io, &message_hash, key_pair.private_key, key_pair.public_key, hash_options);
     const is_valid_hash = try signature.verify(&message_hash, sig_hash, key_pair.public_key, hash_options);
     try testing.expect(is_valid_hash);
 
@@ -157,7 +159,7 @@ test "SM2 signature comprehensive tests" {
 }
 
 test "SM2 signature error handling" {
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
     const message = "test message";
     const options = signature.SignatureOptions{};
 
@@ -165,25 +167,26 @@ test "SM2 signature error handling" {
     const invalid_hash = [_]u8{0x01} ** 16; // Wrong length
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
 
-    try testing.expectError(error.InvalidPrecomputedHashLength, signature.sign(&invalid_hash, key_pair.private_key, key_pair.public_key, hash_options));
+    try testing.expectError(error.InvalidPrecomputedHashLength,
+        signature.sign(testing.io, &invalid_hash, key_pair.private_key, key_pair.public_key, hash_options));
 
     // Test signature verification with identity element should fail
     const identity_key = SM2.SM2.identityElement;
-    const sig = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
+    const sig = try signature.sign(testing.io, message, key_pair.private_key, key_pair.public_key, options);
 
     try testing.expectError(error.IdentityElement, signature.verify(message, sig, identity_key, options));
 }
 
 test "SM2 signature compatibility" {
     // Test signature compatibility across different key pairs
-    const key_pair1 = kp.generateKeyPair();
-    const key_pair2 = kp.generateKeyPair();
+    const key_pair1 = kp.generateKeyPair(testing.io);
+    const key_pair2 = kp.generateKeyPair(testing.io);
 
     const message = "cross compatibility test";
     const options = signature.SignatureOptions{};
 
     // Sign with key_pair1
-    const sig1 = try signature.sign(message, key_pair1.private_key, key_pair1.public_key, options);
+    const sig1 = try signature.sign(testing.io, message, key_pair1.private_key, key_pair1.public_key, options);
 
     // Should verify with key_pair1 public key
     const valid1 = try signature.verify(message, sig1, key_pair1.public_key, options);
@@ -195,13 +198,14 @@ test "SM2 signature compatibility" {
 }
 
 test "SM2 signature deterministic properties" {
+    const io = testing.io;
     // Test that signatures are non-deterministic (due to random k)
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(io);
     const message = "deterministic test";
     const options = signature.SignatureOptions{};
 
-    const sig1 = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
-    const sig2 = try signature.sign(message, key_pair.private_key, key_pair.public_key, options);
+    const sig1 = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
+    const sig2 = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
 
     // Signatures should be different (due to random k)
     const different = !std.mem.eql(u8, &sig1.r, &sig2.r) or !std.mem.eql(u8, &sig1.s, &sig2.s);
@@ -217,7 +221,7 @@ test "SM2 signature deterministic properties" {
 test "SM2 signature large message handling" {
     const allocator = testing.allocator;
 
-    const key_pair = kp.generateKeyPair();
+    const key_pair = kp.generateKeyPair(testing.io);
     const options = signature.SignatureOptions{};
 
     // Test with large message (1MB)
@@ -229,7 +233,7 @@ test "SM2 signature large message handling" {
         byte.* = @intCast(i & 0xFF);
     }
 
-    const sig = try signature.sign(large_message, key_pair.private_key, key_pair.public_key, options);
+    const sig = try signature.sign(testing.io, large_message, key_pair.private_key, key_pair.public_key, options);
     const is_valid = try signature.verify(large_message, sig, key_pair.public_key, options);
     try testing.expect(is_valid);
 }

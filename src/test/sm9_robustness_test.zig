@@ -9,7 +9,7 @@ test "SM9 key extraction mathematical robustness" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, testing.io, allocator);
 
     // Test edge case user IDs that might cause mathematical issues
     const edge_case_ids = [_][]const u8{
@@ -158,13 +158,14 @@ test "SM9 bigint mathematical boundary conditions" {
 
 // Test signature and verification robustness
 test "SM9 signature robustness with edge cases" {
+    const io: std.Io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     const user_id = "robustness_test@example.com";
 
@@ -217,13 +218,14 @@ test "SM9 signature robustness with edge cases" {
 
 // Test encryption and decryption robustness
 test "SM9 encryption robustness with edge cases" {
+    const io: std.Io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io,allocator);
 
     const user_id = "robustness_encrypt_test@example.com";
 

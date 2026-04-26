@@ -3,13 +3,14 @@ const testing = std.testing;
 const sm9 = @import("../sm9.zig");
 
 test "SM9 key agreement basic functionality" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, io, allocator);
 
     // Test users
     const alice_id = "alice@example.com";
@@ -70,13 +71,14 @@ test "SM9 key agreement basic functionality" {
 }
 
 test "SM9 key agreement with different key lengths" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, io, allocator);
 
     const alice_id = "alice@test.com";
     const bob_id = "bob@test.com";
@@ -206,13 +208,14 @@ test "SM9 key agreement session ID generation" {
 }
 
 test "SM9 key agreement deterministic behavior" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,allocator);
+    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, io, allocator);
 
     const alice_id = "deterministic_alice@test.com";
     const bob_id = "deterministic_bob@test.com";
@@ -255,13 +258,14 @@ test "SM9 key agreement deterministic behavior" {
 }
 
 test "SM9 key agreement error handling" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, io, allocator);
 
     const alice_id = "alice@error.test";
     const bob_id = "bob@error.test";

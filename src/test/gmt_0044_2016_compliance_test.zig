@@ -84,7 +84,8 @@ test "GM/T 0044-2016 Key Extraction Strict Compliance" {
 
 // Test GM/T 0044-2016 compliance for random number generation
 test "GM/T 0044-2016 Random Generation Strict Compliance" {
-    var secure_random = sm9.random.SecureRandom.init();
+    const io = testing.io;
+    var secure_random = sm9.random.SecureRandom.init(io);
     const params = sm9.params.SystemParams.init();
 
     // Test that random G1 point generation fails securely rather than using fallbacks

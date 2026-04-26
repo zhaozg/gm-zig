@@ -68,7 +68,7 @@ test "SM9 encryption context initialization" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const context = sm9.encrypt.EncryptionContext.init(system, testing.io, allocator);
 
     try testing.expect(context.system_params.validate());
 }
@@ -79,7 +79,7 @@ test "SM9 encryption and decryption" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const context = sm9.encrypt.EncryptionContext.init(system, testing.io, allocator);
 
     const user_id = "bob@example.com";
     const message = "Confidential message for SM9 encryption!";
@@ -114,12 +114,13 @@ test "SM9 encryption and decryption" {
 }
 
 test "SM9 encryption with different formats" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     const user_id = "test@example.com";
     const message = "Test message with different formats";
@@ -151,12 +152,13 @@ test "SM9 encryption with different formats" {
 }
 
 test "SM9 key encapsulation mechanism" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const encryption_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const encryption_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
     const kem_context = sm9.encrypt.KEMContext.init(encryption_context);
 
     const user_id = "test@example.com";
@@ -225,7 +227,7 @@ test "SM9 encryption with large messages" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const context = sm9.encrypt.EncryptionContext.init(system, testing.io, allocator);
 
     const user_id = "test@example.com";
 

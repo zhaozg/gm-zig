@@ -26,30 +26,32 @@ test "SM9 signature serialization" {
 }
 
 test "SM9 signature context initialization" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.sign.SignatureContext.init(system, allocator);
+    const context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     // Context should be initialized with system parameters
     try testing.expect(context.system_params.validate());
 }
 
 test "SM9 signature operation" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.sign.SignatureContext.init(system, allocator);
+    const context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     const user_id = "alice@example.com";
     const message = "Hello, SM9 signature!";
 
     // Extract user signing key using the new key extraction context
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
     const user_key = try key_context.extractSignKey(user_id);
 
     // Test key validation
@@ -87,12 +89,13 @@ test "SM9 signature operation" {
 }
 
 test "SM9 signature with different options" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.sign.SignatureContext.init(system, allocator);
+    const context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     const user_id = "test@example.com";
     const message = "Test message with options";
@@ -117,12 +120,13 @@ test "SM9 signature with different options" {
 }
 
 test "SM9 batch signature verification" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.sign.SignatureContext.init(system, allocator);
+    const context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     var batch = sm9.sign.BatchSignature.init(allocator, context);
     defer batch.deinit();

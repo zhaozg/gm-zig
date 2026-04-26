@@ -9,7 +9,7 @@ test "SM9 Random Number Generation - Secure Random" {
     const params = sm9.params.SystemParams.init();
 
     // Test SecureRandom initialization
-    var rng = sm9.random.SecureRandom.init();
+    var rng = sm9.random.SecureRandom.init(testing.io);
 
     // Test random bytes generation
     var buffer: [32]u8 = undefined;
@@ -77,7 +77,7 @@ test "SM9 Random Number Generation - Deterministic Random" {
 
 test "SM9 Random Number Generation - Random Point Generation" {
     const params = sm9.params.SystemParams.init();
-    var rng = sm9.random.SecureRandom.init();
+    var rng = sm9.random.SecureRandom.init(testing.io);
 
     // Test G1 point generation
     const g1_point = rng.randomG1Point(params) catch |err| {
@@ -187,7 +187,7 @@ test "SM9 Random Number Generation - Test Entropy" {
 }
 
 test "SM9 Random Number Generation - Error Handling" {
-    var rng = sm9.random.SecureRandom.init();
+    var rng = sm9.random.SecureRandom.init(testing.io);
 
     // Test with zero max (should error)
     const zero_max = [_]u8{0} ** 32;
@@ -197,22 +197,23 @@ test "SM9 Random Number Generation - Error Handling" {
 }
 
 test "SM9 Random Number Generation - Secure Functions" {
+    const io: std.Io = testing.io;
     const params = sm9.params.SystemParams.init();
 
     // Test secure random bytes
     var buffer: [32]u8 = undefined;
-    const bytes_result = sm9.random.secureRandomBytes(&buffer);
+    const bytes_result = sm9.random.secureRandomBytes(io, &buffer);
     try testing.expect(bytes_result != sm9.random.RandomError.EntropyFailure);
 
     // Test secure random BigInt
-    const bigint_result = sm9.random.secureRandomBigInt(params.N);
+    const bigint_result = sm9.random.secureRandomBigInt(io, params.N);
     try testing.expect(bigint_result != sm9.random.RandomError.InvalidRange);
 
     // Test secure random field element
-    const field_result = sm9.random.secureRandomFieldElement(params.q);
+    const field_result = sm9.random.secureRandomFieldElement(io, params.q);
     try testing.expect(field_result != sm9.random.RandomError.InvalidRange);
 
     // Test secure random scalar
-    const scalar_result = sm9.random.secureRandomScalar(params);
+    const scalar_result = sm9.random.secureRandomScalar(io, params);
     try testing.expect(scalar_result != sm9.random.RandomError.InvalidRange);
 }

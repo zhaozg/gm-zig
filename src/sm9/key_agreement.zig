@@ -40,7 +40,7 @@ pub const EphemeralKeyPair = struct {
 
     /// Initialize ephemeral key pair
     /// GM/T 0044-2016 compliant - uses cryptographically secure random generation
-    pub fn generate(user_id: []const u8, allocator: std.mem.Allocator) !EphemeralKeyPair {
+    pub fn generate(io: std.Io, user_id: []const u8, allocator: std.mem.Allocator) !EphemeralKeyPair {
         _ = user_id; // Parameter kept for API compatibility but not used in current implementation
         _ = allocator; // Parameter kept for API compatibility but not used in current implementation
 
@@ -50,7 +50,7 @@ pub const EphemeralKeyPair = struct {
         // Use proper cryptographic random generation - no fallback mechanisms
         const random_module = @import("random.zig");
         const params_module = @import("params.zig");
-        private_key = try random_module.secureRandomScalar(params_module.SM9System.init().params);
+        private_key = try random_module.secureRandomScalar(io, params_module.SM9System.init().params);
 
         // Ensure private key is not zero and is valid for curve operations
         if (std.mem.allEqual(u8, &private_key, 0)) {
@@ -138,17 +138,20 @@ pub const KeyAgreementContext = struct {
     system_params: params.SystemParams,
     sign_master_public: params.SignMasterKeyPair,
     encrypt_master_public: params.EncryptMasterKeyPair,
+    io: std.Io,
     allocator: std.mem.Allocator,
 
     /// Initialize key agreement context
     pub fn init(
         system: params.SM9System,
+        io: std.Io,
         allocator: std.mem.Allocator,
     ) KeyAgreementContext {
         return KeyAgreementContext{
             .system_params = system.params,
             .sign_master_public = system.sign_master,
             .encrypt_master_public = system.encrypt_master,
+            .io = io,
             .allocator = allocator,
         };
     }
@@ -374,7 +377,7 @@ pub const KeyAgreementContext = struct {
         self: KeyAgreementContext,
         user_id: []const u8,
     ) !EphemeralKeyPair {
-        return EphemeralKeyPair.generate(user_id, self.allocator);
+        return EphemeralKeyPair.generate(self.io, user_id, self.allocator);
     }
 };
 

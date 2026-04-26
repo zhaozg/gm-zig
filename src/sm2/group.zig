@@ -133,8 +133,8 @@ pub const SM2 = struct {
     }
 
     /// Return a random point.
-    pub fn random() SM2 {
-        const n = scalar.random(.little);
+    pub fn random(io: std.Io) SM2 {
+        const n = scalar.random(io, .little);
         return basePoint.mul(n, .little) catch unreachable;
     }
 

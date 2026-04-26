@@ -288,20 +288,20 @@ pub fn bytes(buffer: []u8) RandomError!void {
 }
 
 /// Generate cryptographically secure random bytes
-pub fn secureRandomBytes(buffer: []u8) RandomError!void {
-    var rng = SecureRandom.init();
+pub fn secureRandomBytes(io: std.Io, buffer: []u8) RandomError!void {
+    var rng = SecureRandom.init(io);
     rng.bytes(buffer);
 }
 
 /// Generate secure random BigInt in range [1, max)
-pub fn secureRandomBigInt(max: bigint.BigInt) RandomError!bigint.BigInt {
-    var rng = SecureRandom.init();
+pub fn secureRandomBigInt(io: std.Io, max: bigint.BigInt) RandomError!bigint.BigInt {
+    var rng = SecureRandom.init(io);
     return rng.randomBigInt(max);
 }
 
 /// Generate secure random field element
-pub fn secureRandomFieldElement(p: bigint.BigInt) RandomError!bigint.BigInt {
-    var rng = SecureRandom.init();
+pub fn secureRandomFieldElement(io: std.Io, p: bigint.BigInt) RandomError!bigint.BigInt {
+    var rng = SecureRandom.init(io);
     return rng.randomFieldElement(p);
 }
 

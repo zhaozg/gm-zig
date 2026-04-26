@@ -90,7 +90,7 @@ test "SM9 key extraction context" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const context = sm9.key_extract.KeyExtractionContext.init(system, testing.io, allocator);
 
     const user_id = "test@example.com";
 

@@ -53,6 +53,8 @@ pub const PartyRole = key_agreement.PartyRole;
 
 /// SM9 comprehensive context for all operations
 pub const SM9Context = struct {
+    io: std.Io,
+
     /// System parameters and master keys
     system: SM9System,
 
@@ -69,28 +71,31 @@ pub const SM9Context = struct {
     allocator: std.mem.Allocator,
 
     /// Initialize SM9 context with default parameters
-    pub fn init(allocator: std.mem.Allocator) SM9Context {
+    pub fn init(io: std.Io, allocator: std.mem.Allocator) SM9Context {
         const system = SM9System.init();
         return SM9Context{
+            .io = io,
             .system = system,
-            .key_extraction = KeyExtractionContext.init(system, allocator),
-            .signature = SignatureContext.init(system, allocator),
-            .encryption = EncryptionContext.init(system, allocator),
+            .key_extraction = KeyExtractionContext.init(system, io, allocator),
+            .signature = SignatureContext.init(system, io, allocator),
+            .encryption = EncryptionContext.init(system, io, allocator),
             .allocator = allocator,
         };
     }
 
     /// Initialize SM9 context with custom system parameters
     pub fn initWithParams(
+        io: std.Io,
         allocator: std.mem.Allocator,
         system_params: SystemParams,
     ) !SM9Context {
         const system = try SM9System.initWithParams(system_params);
         return SM9Context{
+            .io = io,
             .system = system,
-            .key_extraction = KeyExtractionContext.init(system, allocator),
-            .signature = SignatureContext.init(system, allocator),
-            .encryption = EncryptionContext.init(system, allocator),
+            .key_extraction = KeyExtractionContext.init(system, io, allocator),
+            .signature = SignatureContext.init(system, io, allocator),
+            .encryption = EncryptionContext.init(system, io, allocator),
             .allocator = allocator,
         };
     }
@@ -263,8 +268,8 @@ pub const TestVectors = struct {
     pub const test_message = "SM9 test message for cryptographic validation";
 
     /// Validate SM9 implementation with test vectors
-    pub fn validateImplementation(allocator: std.mem.Allocator) !bool {
-        var context = SM9Context.init(allocator);
+    pub fn validateImplementation(io: std.Io, allocator: std.mem.Allocator) !bool {
+        var context = SM9Context.init(io, allocator);
 
         // Test key extraction
         const sign_key = context.extractSignKey(test_user_id) catch return false;

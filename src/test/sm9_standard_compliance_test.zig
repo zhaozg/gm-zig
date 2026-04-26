@@ -123,12 +123,13 @@ test "GM/T 0044-2016 - Master key generation compliance" {
 }
 
 test "GM/T 0044-2016 - Key extraction compliance" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Test with standard identifiers from GM/T 0044-2016
     const standard_ids = [_][]const u8{
@@ -201,13 +202,14 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
 }
 
 test "GM/T 0044-2016 - End-to-end signature compliance" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const signature_context = sm9.sign.SignatureContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const signature_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Standard test case from GM/T 0044-2016
     const user_id = "Alice@bupt.edu.cn";
@@ -226,13 +228,14 @@ test "GM/T 0044-2016 - End-to-end signature compliance" {
 }
 
 test "GM/T 0044-2016 - End-to-end encryption compliance" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const encryption_context = sm9.encrypt.EncryptionContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const encryption_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Standard test case from GM/T 0044-2016
     const user_id = "Bob@bupt.edu.cn";
@@ -314,12 +317,13 @@ test "GM/T 0044-2016 - KDF compliance and security" {
 }
 
 test "GM/T 0044-2016 - Key extraction format compliance" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Test with standard user ID formats from GM/T 0044-2016
     const test_users = [_][]const u8{
@@ -347,13 +351,14 @@ test "GM/T 0044-2016 - Key extraction format compliance" {
 }
 
 test "GM/T 0044-2016 - Digital signature compliance" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     const user_id = "Alice@bupt.edu.cn";
     const message = "Chinese IBS standard";
@@ -385,13 +390,14 @@ test "GM/T 0044-2016 - Digital signature compliance" {
 }
 
 test "GM/T 0044-2016 - Public key encryption compliance" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     const user_id = "Bob@bupt.edu.cn";
     const message = "encryption standard";
@@ -427,14 +433,15 @@ test "GM/T 0044-2016 - Public key encryption compliance" {
 }
 
 test "GM/T 0044-2016 - Cross-user interoperability" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     // Test multiple users
     const alice_id = "Alice@bupt.edu.cn";
@@ -477,13 +484,14 @@ test "GM/T 0044-2016 - Cross-user interoperability" {
 }
 
 test "GM/T 0044-2016 - Performance and security validation" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
 
     const user_id = "performance_test@bupt.edu.cn";
 

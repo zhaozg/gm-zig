@@ -6,6 +6,7 @@ const sm9 = @import("../sm9.zig");
 // This file contains focused tests for each key SM9 operation
 
 test "SM9 basic key extraction validation" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -27,9 +28,7 @@ test "SM9 basic key extraction validation" {
 
     // Create key extraction context
     const key_context = sm9.key_extract.KeyExtractionContext.init(
-        full_system,
-        allocator,
-    );
+        full_system, io, allocator);
 
     // Test user key extraction
     const user_id = "test@example.com";

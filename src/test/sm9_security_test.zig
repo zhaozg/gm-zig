@@ -120,12 +120,13 @@ test "SM9 improved hash functions" {
 
 // Test input validation in encryption
 test "SM9 encryption input validation" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const ctx = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const ctx = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     // Test empty message
     const empty_message = "";

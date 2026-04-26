@@ -105,12 +105,13 @@ test "SM9 master key generation standard compliance" {
 
 // Test key extraction with standard test vectors
 test "SM9 key extraction standard test vectors" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Standard test identities from GM/T 0044-2016
     const test_ids = [_][]const u8{
@@ -134,13 +135,14 @@ test "SM9 key extraction standard test vectors" {
 
 // Test signature and verification with standard test vectors
 test "SM9 signature standard test vectors" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const signature_context = sm9.sign.SignatureContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const signature_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Standard test vectors from GM/T 0044-2016 Appendix A
     const test_cases = [_]struct {
@@ -168,13 +170,14 @@ test "SM9 signature standard test vectors" {
 
 // Test encryption and decryption with standard test vectors
 test "SM9 encryption standard test vectors" {
+    const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const encryption_context = sm9.encrypt.EncryptionContext.init(system, allocator);
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
+    const encryption_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
 
     // Standard test vectors from GM/T 0044-2016 Appendix A
     const test_cases = [_]struct {
