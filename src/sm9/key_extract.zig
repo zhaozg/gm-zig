@@ -430,17 +430,20 @@ pub const KeyExtractionContext = struct {
     system_params: params.SystemParams,
     sign_master: params.SignMasterKeyPair,
     encrypt_master: params.EncryptMasterKeyPair,
+    io: std.Io,
     allocator: std.mem.Allocator,
 
     /// Initialize key extraction context
     pub fn init(
         system: params.SM9System,
+        io: std.Io,
         allocator: std.mem.Allocator,
     ) KeyExtractionContext {
         return KeyExtractionContext{
             .system_params = system.params,
             .sign_master = system.sign_master,
             .encrypt_master = system.encrypt_master,
+            .io = io,
             .allocator = allocator,
         };
     }

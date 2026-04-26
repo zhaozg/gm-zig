@@ -52,6 +52,7 @@ pub const SignatureOptions = struct {
 /// Sign a message using SM2 digital signature algorithm
 /// Implements the signing process as specified in GM/T 0003.2-2012
 pub fn sign(
+    io: std.Io,
     message: []const u8,
     private_key: [32]u8,
     public_key: SM2,
@@ -90,7 +91,7 @@ pub fn sign(
 
     while (true) {
         // Step 1: Generate random k
-        const k_bytes = SM2.scalar.random(.big);
+        const k_bytes = SM2.scalar.random(io, .big);
         const k = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
 
         // Ensure k is not zero

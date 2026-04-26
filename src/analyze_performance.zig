@@ -62,12 +62,11 @@ const AnalysisReport = struct {
     }
 };
 
-fn loadPerformanceHistory(allocator: std.mem.Allocator, data_dir: []const u8) !std.ArrayList(PerformanceRecord) {
+fn loadPerformanceHistory(io: std.Io, allocator: std.mem.Allocator, data_dir: []const u8) !std.ArrayList(PerformanceRecord) {
     var history = std.ArrayList(PerformanceRecord).empty;
 
     const history_path = try std.fmt.allocPrint(allocator, "{s}/performance-history.jsonl", .{data_dir});
     defer allocator.free(history_path);
-    const io = std.Io.Threaded.global_single_threaded.io();
     const file = std.Io.Dir.cwd().openFile(io, history_path, .{}) catch |err| switch (err) {
         error.FileNotFound => return history,
         else => return err,
@@ -388,7 +387,7 @@ pub fn main(init: std.process.Init) !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-    const io = std.Io.Threaded.global_single_threaded.io();
+    const io = init.io;
 
     // Parse command line arguments
     const args = try init.minimal.args.toSlice(init.arena.allocator());
@@ -429,7 +428,7 @@ pub fn main(init: std.process.Init) !void {
     };
 
     // Load performance history
-    var history = loadPerformanceHistory(allocator, data_dir) catch |err| switch (err) {
+    var history = loadPerformanceHistory(io, allocator, data_dir) catch |err| switch (err) {
         else => {
             print("Error loading performance history: {}\n", .{err});
             std.process.exit(1);

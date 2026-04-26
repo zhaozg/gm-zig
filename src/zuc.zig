@@ -691,7 +691,7 @@ test "ZUC large keystream generation" {
 
 // 性能测试（可选）
 test "ZUC performance" {
-    const io = std.Io.Threaded.global_single_threaded.io();
+    const io = testing.io;
 
     const key = [_]u8{0x77} ** 16;
     const iv = [_]u8{0x88} ** 16;
@@ -898,7 +898,7 @@ test "ZUC MAC with special patterns" {
 }
 
 test "ZUC MAC performance" {
-    const io = std.Io.Threaded.global_single_threaded.io();
+    const io = testing.io;
 
     const key = [_]u8{0x99} ** 16;
     const iv = [_]u8{0xAA} ** 16;
@@ -986,7 +986,7 @@ test "ZUC MAC with null pointers" {
 test "ZUC MAC benchmark" {
     const key = [_]u8{0x55} ** 16;
     const iv = [_]u8{0x66} ** 16;
-    const io = std.Io.Threaded.global_single_threaded.io();
+    const io = testing.io;
     const clock = std.Io.Clock.awake;
     const test_sizes = [_]usize{ 1, 16, 64, 256, 1024, 4096 };
 

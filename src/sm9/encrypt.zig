@@ -215,16 +215,19 @@ pub const EncryptionOptions = struct {
 pub const EncryptionContext = struct {
     system_params: params.SystemParams,
     encrypt_master_public: params.EncryptMasterKeyPair,
+    io: std.Io,
     allocator: std.mem.Allocator,
 
     /// Initialize encryption context
     pub fn init(
         system: params.SM9System,
+        io: std.Io,
         allocator: std.mem.Allocator,
     ) EncryptionContext {
         return EncryptionContext{
             .system_params = system.params,
             .encrypt_master_public = system.encrypt_master,
+            .io = io,
             .allocator = allocator,
         };
     }
@@ -278,7 +281,7 @@ pub const EncryptionContext = struct {
 
         // Step 2: Generate cryptographically secure random r
         // CRITICAL: Must use secure randomness for CPA security compliance with GM/T 0044-2016
-        const r = random.secureRandomScalar(self.system_params) catch {
+        const r = random.secureRandomScalar(self.io, self.system_params) catch {
             // SECURITY: No fallback to deterministic values - fail securely
             // Deterministic encryption violates CPA security requirements
             return EncryptionError.RandomGenerationFailed;

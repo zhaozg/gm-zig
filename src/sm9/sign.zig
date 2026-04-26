@@ -177,16 +177,19 @@ pub const SignatureOptions = struct {
 pub const SignatureContext = struct {
     system_params: params.SystemParams,
     sign_master_public: params.SignMasterKeyPair,
+    io: std.Io,
     allocator: std.mem.Allocator,
 
     /// Initialize signature context
     pub fn init(
         system: params.SM9System,
+        io: std.Io,
         allocator: std.mem.Allocator,
     ) SignatureContext {
         return SignatureContext{
             .system_params = system.params,
             .sign_master_public = system.sign_master,
+            .io = io,
             .allocator = allocator,
         };
     }

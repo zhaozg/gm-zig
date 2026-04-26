@@ -30,9 +30,8 @@ pub const SecureRandom = struct {
     initialized: bool,
 
     /// Initialize with system entropy
-    pub fn init() SecureRandom {
+    pub fn init(io: std.Io) SecureRandom {
         const clock = std.Io.Clock.awake;
-        const io = std.Io.Threaded.global_single_threaded.io();
         const seed: u64 = @intCast(std.Io.Clock.now(clock, io).toMicroseconds());
 
         var rng = SecureRandom{
@@ -307,8 +306,8 @@ pub fn secureRandomFieldElement(p: bigint.BigInt) RandomError!bigint.BigInt {
 }
 
 /// Generate secure random scalar for curve operations
-pub fn secureRandomScalar(curve_params: params.SystemParams) RandomError!bigint.BigInt {
-    var rng = SecureRandom.init();
+pub fn secureRandomScalar(io: std.Io, curve_params: params.SystemParams) RandomError!bigint.BigInt {
+    var rng = SecureRandom.init(io);
     return rng.randomScalar(curve_params);
 }
 

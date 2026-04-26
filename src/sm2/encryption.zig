@@ -92,6 +92,7 @@ pub const Ciphertext = struct {
 /// Encrypt a message using SM2 public key encryption
 /// Implements the encryption process as specified in GM/T 0003.4-2012
 pub fn encrypt(
+    io: std.Io,
     allocator: std.mem.Allocator,
     message: []const u8,
     public_key: SM2,
@@ -104,7 +105,7 @@ pub fn encrypt(
 
     while (true) {
         // Step 1: Generate random k ∈ [1, n-1]
-        const k_bytes = SM2.scalar.random(.big);
+        const k_bytes = SM2.scalar.random(io, .big);
         const k_scalar = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
 
         if (k_scalar.isZero()) continue;

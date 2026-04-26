@@ -48,10 +48,9 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn demonstrateSignature(io: std.Io, allocator: std.mem.Allocator) !void {
-    _ = io;
     // Generate key pair
     print("1. Generating SM2 key pair...\n", .{});
-    const key_pair = sm2.kp.generateKeyPair();
+    const key_pair = sm2.kp.generateKeyPair(io);
 
     // Display public key in different formats
     const compressed = key_pair.getPublicKeyCompressed();
@@ -75,7 +74,7 @@ fn demonstrateSignature(io: std.Io, allocator: std.mem.Allocator) !void {
         .hash_type = .sm3,
     };
 
-    const signature = try sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, options);
+    const signature = try sm2.signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
     print("   Message: {s}\n", .{message});
     print("   Signature R: ", .{});
     printHex(&signature.r);
@@ -101,11 +100,10 @@ fn demonstrateSignature(io: std.Io, allocator: std.mem.Allocator) !void {
 }
 
 fn demonstrateKeyExchange(io: std.Io, allocator: std.mem.Allocator) !void {
-    _ = io;
     print("1. Setting up key exchange participants...\n", .{});
 
     // Alice's setup
-    const alice_private = sm2.SM2.scalar.random(.big);
+    const alice_private = sm2.SM2.scalar.random(io, .big);
     const alice_public = try sm2.SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice@company.com";
 
@@ -113,7 +111,7 @@ fn demonstrateKeyExchange(io: std.Io, allocator: std.mem.Allocator) !void {
     printHex(&alice_private);
 
     // Bob's setup
-    const bob_private = sm2.SM2.scalar.random(.big);
+    const bob_private = sm2.SM2.scalar.random(io, .big);
     const bob_public = try sm2.SM2.basePoint.mul(bob_private, .big);
     const bob_id = "bob@company.com";
 
@@ -121,8 +119,8 @@ fn demonstrateKeyExchange(io: std.Io, allocator: std.mem.Allocator) !void {
     printHex(&bob_private);
 
     // Initialize key exchange contexts
-    var alice_ctx = sm2.key_exchange.KeyExchangeContext.init(.initiator, alice_private, alice_public, alice_id);
-    var bob_ctx = sm2.key_exchange.KeyExchangeContext.init(.responder, bob_private, bob_public, bob_id);
+    var alice_ctx = sm2.key_exchange.KeyExchangeContext.init(io, .initiator, alice_private, alice_public, alice_id);
+    var bob_ctx = sm2.key_exchange.KeyExchangeContext.init(io, .responder, bob_private, bob_public, bob_id);
 
     print("2. Exchanging ephemeral keys...\n", .{});
 
@@ -184,11 +182,10 @@ fn demonstrateKeyExchange(io: std.Io, allocator: std.mem.Allocator) !void {
 }
 
 fn demonstrateEncryption(io: std.Io, allocator: std.mem.Allocator) !void {
-    _ = io;
     print("1. Setting up encryption...\n", .{});
 
     // Generate key pair
-    const private_key = sm2.SM2.scalar.random(.big);
+    const private_key = sm2.SM2.scalar.random(io, .big);
     const public_key = try sm2.kp.publicKeyFromPrivateKey(private_key);
 
     print("   Private key: ", .{});
@@ -214,7 +211,7 @@ fn demonstrateEncryption(io: std.Io, allocator: std.mem.Allocator) !void {
         print("3. Testing {any} format...\n", .{name});
 
         // Encrypt
-        const ciphertext = try sm2.encryption.encrypt(allocator, message, public_key, format);
+        const ciphertext = try sm2.encryption.encrypt(io, allocator, message, public_key, format);
         defer ciphertext.deinit(allocator);
 
         print("   C1 (point): ", .{});
@@ -318,7 +315,6 @@ fn WasmRng() void {
 }
 
 fn demonstrateSM9(io: std.Io, allocator: std.mem.Allocator) !void {
-    _ = io;
     print("1. Initializing SM9 Complete Implementation...\n", .{});
 
     // Initialize SM9 system with proper parameters
@@ -326,9 +322,9 @@ fn demonstrateSM9(io: std.Io, allocator: std.mem.Allocator) !void {
     print("   ✅ SM9 system initialized with GM/T 0044-2016 parameters\n", .{});
 
     // Initialize contexts for key extraction, signing, and encryption
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,  allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     // Demo users following standard format
     const alice_id = "Alice@bupt.edu.cn";

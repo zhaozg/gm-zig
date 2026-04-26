@@ -182,13 +182,12 @@ fn getPlatform() []const u8 {
 }
 
 // Benchmark SM3 hash performance
-pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
+pub fn benchmarkSM3(io: std.Io, allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
     const test_sizes = [_]usize{
         64 * 1024, // 64KB
         1024 * 1024, // 1MB
         10 * 1024 * 1024, // 10MB
     };
-    const io = std.Io.Threaded.global_single_threaded.io();
     const clock = std.Io.Clock.awake;
     const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
@@ -246,7 +245,7 @@ pub fn benchmarkSM3(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 }
 
 // Benchmark SM4 encryption performance
-pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
+pub fn benchmarkSM4(io: std.Io, allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
@@ -259,7 +258,6 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         10 * 1024 * 1024, // 10MB
     };
 
-    const io = std.Io.Threaded.global_single_threaded.io();
     const clock = std.Io.Clock.awake;
     const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
@@ -360,7 +358,7 @@ pub fn benchmarkSM4(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 }
 
 // Benchmark ZUC stream cipher performance
-pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
+pub fn benchmarkZUC(io: std.Io, allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
     const key = [16]u8{
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -376,7 +374,6 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         1024 * 1024, // 1MB
     };
 
-    const io = std.Io.Threaded.global_single_threaded.io();
     const clock = std.Io.Clock.awake;
     const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
@@ -485,8 +482,7 @@ pub fn benchmarkZUC(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 }
 
 // Benchmark SM2 elliptic curve cryptography performance
-pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
-    const io = std.Io.Threaded.global_single_threaded.io();
+pub fn benchmarkSM2(io: std.Io, allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
     const clock = std.Io.Clock.awake;
     const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
@@ -504,7 +500,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
         const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
         for (0..iterations) |_| {
-            _ = sm2.kp.generateKeyPair();
+            _ = sm2.kp.generateKeyPair(io);
         }
 
         const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
@@ -526,7 +522,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
     }
 
     // Generate a key pair for subsequent operations
-    const key_pair = sm2.kp.generateKeyPair();
+    const key_pair = sm2.kp.generateKeyPair(io);
     const sign_options = sm2.signature.SignatureOptions{
         .user_id = "benchmark@test.com",
         .hash_type = .sm3,
@@ -542,7 +538,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
             for (0..iterations) |_| {
-                _ = sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
+                _ = sm2.signature.sign(io, message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
             }
 
             const end_time = std.Io.Clock.now(clock, io).toNanoseconds();
@@ -565,7 +561,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 
         // Signature verification
         {
-            const signature = sm2.signature.sign(message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
+            const signature = sm2.signature.sign(io, message, key_pair.private_key, key_pair.public_key, sign_options) catch continue;
             const iterations: u32 = if (i == 2) 10 else 50;
             const start_time = std.Io.Clock.now(clock, io).toNanoseconds();
 
@@ -598,7 +594,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             // Encryption
             const encrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
             for (0..iterations) |_| {
-                const ciphertext = sm2.encryption.encrypt(allocator, message, key_pair.public_key, .c1c3c2) catch continue;
+                const ciphertext = sm2.encryption.encrypt(io, allocator, message, key_pair.public_key, .c1c3c2) catch continue;
                 ciphertext.deinit(allocator);
             }
             const encrypt_end = std.Io.Clock.now(clock, io).toNanoseconds();
@@ -620,7 +616,7 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
             try suite.addResult(encrypt_result);
 
             // Decryption
-            const ciphertext = sm2.encryption.encrypt(allocator, message, key_pair.public_key, .c1c3c2) catch return;
+            const ciphertext = sm2.encryption.encrypt(io, allocator, message, key_pair.public_key, .c1c3c2) catch return;
             defer ciphertext.deinit(allocator);
 
             const decrypt_start = std.Io.Clock.now(clock, io).toNanoseconds();
@@ -650,16 +646,15 @@ pub fn benchmarkSM2(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 }
 
 // Benchmark SM9 identity-based cryptography performance
-pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
-    const io = std.Io.Threaded.global_single_threaded.io();
+pub fn benchmarkSM9(io: std.Io, allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void {
     const clock = std.Io.Clock.awake;
     const timestamp = std.Io.Clock.now(clock, io).toNanoseconds();
 
     // Initialize SM9 system
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,  allocator);
+    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     const test_user_id = "benchmark@test.edu.cn";
     const test_messages = [_][]const u8{
@@ -841,15 +836,15 @@ pub fn benchmarkSM9(allocator: std.mem.Allocator, suite: *BenchmarkSuite) !void 
 }
 
 // Run all benchmarks and output JSON
-pub fn runBenchmarks(allocator: std.mem.Allocator, output_json: bool) !void {
+pub fn runBenchmarks(io: std.Io, allocator: std.mem.Allocator, output_json: bool) !void {
     var suite = BenchmarkSuite.init(allocator);
     defer suite.deinit();
 
-    try benchmarkSM3(allocator, &suite);
-    try benchmarkSM4(allocator, &suite);
-    try benchmarkZUC(allocator, &suite);
-    try benchmarkSM2(allocator, &suite);
-    try benchmarkSM9(allocator, &suite);
+    try benchmarkSM3(io, allocator, &suite);
+    try benchmarkSM4(io, allocator, &suite);
+    try benchmarkZUC(io, allocator, &suite);
+    try benchmarkSM2(io, allocator, &suite);
+    try benchmarkSM9(io, allocator, &suite);
 
     if (output_json) {
         // Output JSON for CI consumption
@@ -876,5 +871,5 @@ pub fn main(init: std.process.Init) !void {
     // Set JSON mode to suppress info logging
     json_mode = output_json;
 
-    try runBenchmarks(allocator, output_json);
+    try runBenchmarks(init.io, allocator, output_json);
 }

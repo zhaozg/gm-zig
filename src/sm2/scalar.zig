@@ -4,6 +4,7 @@ const crypto = std.crypto;
 const debug = std.debug;
 const math = std.math;
 const mem = std.mem;
+const rand = @import("../random.zig");
 
 const builtin = @import("builtin");
 
@@ -70,8 +71,8 @@ pub fn sub(a: CompressedScalar, b: CompressedScalar, endian: std.builtin.Endian)
 }
 
 /// Return a random scalar
-pub fn random(endian: std.builtin.Endian) CompressedScalar {
-    return Scalar.random().toBytes(endian);
+pub fn random(io: std.Io, endian: std.builtin.Endian) CompressedScalar {
+    return Scalar.random(io, .little).toBytes(endian);
 }
 
 /// A scalar in unpacked representation.
@@ -172,28 +173,22 @@ pub const Scalar = struct {
     }
 
     /// Return a random scalar < L.
-    pub fn random() Scalar {
+    pub fn random(io: std.Io, endian: std.builtin.Endian) Scalar {
         var s: [48]u8 = undefined;
 
-        if (builtin.os.tag == .freestanding) {
-            // In WASI, we use the global random generator.
-            const wasmRng = @import("../wasmRng.zig");
-            wasmRng.random(&s);
+        rand.bytes(io, &s);
 
-            return Scalar.fromBytes48(s, .little);
+        const n = Scalar.fromBytes48(s, endian);
+        if (!n.isZero()) {
+            return n;
         }
 
-        const io = std.Io.Threaded.global_single_threaded.io();
-        const clock = std.Io.Clock.awake;
-        const seed: u64 = @intCast(std.Io.Clock.now(clock, io).toMicroseconds());
-        var prng = std.Random.DefaultPrng.init(seed);
-        const rand = prng.random();
-
+        // Extremely rare case: generated scalar is zero, retry
         while (true) {
-            s = rand.array(u8, 48);
-            const n = Scalar.fromBytes48(s, .little);
-            if (!n.isZero()) {
-                return n;
+            rand.bytes(io, &s);
+            const n2 = Scalar.fromBytes48(s, endian);
+            if (!n2.isZero()) {
+                return n2;
             }
         }
     }
