@@ -143,7 +143,7 @@ alias gmzig-run='zig build run'
 alias gmzig-fmt='zig fmt build.zig src/'
 alias gmzig-fmt-check='zig fmt --check build.zig src/'
 alias gmzig-clean='rm -rf zig-cache zig-out'
-alias gmzig-perf='./scripts/collect-performance-data.sh'
+alias gmzig-perf='zig build bench'
 alias gmzig-validate='zig build && zig build -Doptimize=ReleaseFast && zig build test'
 EOF
 
@@ -176,15 +176,11 @@ echo ""
 echo -e "${BLUE}4. Establishing Performance Baseline${NC}"
 echo "----------------------------------------"
 
-if [ -x "$PROJECT_ROOT/scripts/collect-performance-data.sh" ]; then
-    print_status "info" "Running performance baseline (this may take 30-60 seconds)..."
-    if timeout 120 "$PROJECT_ROOT/scripts/collect-performance-data.sh" >/dev/null 2>&1; then
-        print_status "ok" "Performance baseline established"
-    else
-        print_status "warn" "Performance baseline failed - not critical for development"
-    fi
+print_status "info" "Running performance baseline via zig build bench (this may take 30-60 seconds)..."
+if timeout 120 zig build bench >/dev/null 2>&1; then
+    print_status "ok" "Performance baseline established"
 else
-    print_status "warn" "Performance script not found - skipping baseline"
+    print_status "warn" "Performance baseline failed - not critical for development"
 fi
 
 echo ""

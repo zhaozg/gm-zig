@@ -117,14 +117,14 @@ The repository includes comprehensive performance monitoring:
 ### Manual Performance Analysis
 
 ```bash
-# Collect current performance data
-./scripts/collect-performance-data.sh
+# Run benchmarks
+zig build bench
 
 # Analyze performance trends
-zig build analyze
+zig build bench
 
 # Generate detailed reports
-zig build analyze -- --format json
+zig build bench
 ```
 
 ## 🔒 Security-First Development

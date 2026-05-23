@@ -34,21 +34,13 @@ jobs:
     - name: Run build tests
       run: zig build test
 
-    - name: Run performance benchmarks
+    - name: Run benchmarks (zig build bench)
       continue-on-error: true
       run: |
-        # Install jq for JSON processing
-        sudo apt-get update && sudo apt-get install -y jq
-
-        # Run performance data collection with error handling
-        if ./scripts/collect-performance-data.sh; then
-          echo "✅ Performance data collected successfully"
+        if zig build bench; then
+          echo "✅ Benchmarks completed successfully"
         else
-          echo "⚠️ Performance benchmark failed, but continuing CI"
-          echo "This may happen due to version compatibility issues"
-          # Create empty performance data for artifact upload
-          mkdir -p .performance-data
-          echo '{"error": "benchmark_failed", "zig_version": "${{ matrix.zig-version }}"}' > .performance-data/error.json
+          echo "⚠️ Benchmarks failed, but continuing CI"
         fi
 
     - name: Check code format
@@ -60,11 +52,3 @@ jobs:
           echo "⚠️ Code formatting issues found, but not failing CI"
           echo "Run 'zig fmt build.zig src/' to fix formatting"
         fi
-
-    - name: Upload performance data
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: performance-data-${{ matrix.zig-version }}-${{ github.sha }}
-        path: .performance-data/
-        retention-days: 90

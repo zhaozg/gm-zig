@@ -136,9 +136,9 @@ else
 fi
 
 if [ -f "scripts/collect-performance-data.sh" ]; then
-    print_status "ok" "Performance collection script exists"
+    print_status "warn" "Performance collection script exists (deprecated, use 'zig build bench' instead)"
 else
-    print_status "warn" "Performance collection script not found"
+    print_status "ok" "Performance collection script removed (use 'zig build bench' instead)"
 fi
 
 echo ""
