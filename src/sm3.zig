@@ -100,20 +100,23 @@ pub const SM3 = struct {
         var w: [68]u32 = undefined;
         var w1: [64]u32 = undefined;
 
-        // 消息字加载 - 大端序
-        for (0..16) |j| {
+        // 消息字加载 - 大端序 (unrolled)
+        comptime var j = 0;
+        inline while (j < 16) : (j += 1) {
             w[j] = mem.readInt(u32, block[j * 4 ..][0..4], .big);
         }
 
-        // 消息扩展
-        for (16..68) |j| {
-            w[j] = p1(w[j - 16] ^ w[j - 9] ^ math.rotl(u32, w[j - 3], 15)) ^
-                math.rotl(u32, w[j - 13], 7) ^ w[j - 6];
+        // 消息扩展 (unrolled)
+        comptime var j_ext = 16;
+        inline while (j_ext < 68) : (j_ext += 1) {
+            w[j_ext] = p1(w[j_ext - 16] ^ w[j_ext - 9] ^ math.rotl(u32, w[j_ext - 3], 15)) ^
+                math.rotl(u32, w[j_ext - 13], 7) ^ w[j_ext - 6];
         }
 
-        // 计算W'
-        for (0..64) |j| {
-            w1[j] = w[j] ^ w[j + 4];
+        // 计算W' (unrolled)
+        comptime var j_w1 = 0;
+        inline while (j_w1 < 64) : (j_w1 += 1) {
+            w1[j_w1] = w[j_w1] ^ w[j_w1 + 4];
         }
 
         // 初始化工作变量 (A,B,C,D,E,F,G,H)
@@ -126,18 +129,19 @@ pub const SM3 = struct {
         var g = d.s[6];
         var h = d.s[7];
 
-        // 64轮迭代 - 修复工作变量更新逻辑
-        for (0..64) |j| {
-            const t_j = if (j < 16) @as(u32, 0x79CC4519) else @as(u32, 0x7A879D8A);
-            const shift = @as(u5, @intCast(j % 32));
+        // 64轮迭代 - 完全展开 (unrolled)
+        comptime var j_round = 0;
+        inline while (j_round < 64) : (j_round += 1) {
+            const t_j = if (j_round < 16) @as(u32, 0x79CC4519) else @as(u32, 0x7A879D8A);
+            const shift = @as(u5, @intCast(j_round % 32));
             const ss1 = math.rotl(u32, math.rotl(u32, a, 12) +% e +% math.rotl(u32, t_j, shift), 7);
             const ss2 = ss1 ^ math.rotl(u32, a, 12);
 
-            const ff_j = if (j < 16) a ^ b ^ c else (a & b) | (a & c) | (b & c);
-            const gg_j = if (j < 16) e ^ f ^ g else (e & f) | (~e & g);
+            const ff_j = if (j_round < 16) a ^ b ^ c else (a & b) | (a & c) | (b & c);
+            const gg_j = if (j_round < 16) e ^ f ^ g else (e & f) | (~e & g);
 
-            const tt1 = ff_j +% dd +% ss2 +% w1[j];
-            const tt2 = gg_j +% h +% ss1 +% w[j];
+            const tt1 = ff_j +% dd +% ss2 +% w1[j_round];
+            const tt2 = gg_j +% h +% ss1 +% w[j_round];
 
             // 正确的工作变量更新顺序
             dd = c; // D = C

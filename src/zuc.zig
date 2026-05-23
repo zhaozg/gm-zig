@@ -77,8 +77,9 @@ pub const ZUC = struct {
         var x1: u32 = undefined;
         var x2: u32 = undefined;
 
-        // 32 initialization rounds
-        for (0..32) |_| {
+        // 32 initialization rounds (unrolled)
+        comptime var init_round = 0;
+        inline while (init_round < 32) : (init_round += 1) {
             bitReconstruction3(&self.lfsr, &x0, &x1, &x2);
             const w = f(x0, x1, x2, &r1, &r2);
             lfsrWithInitialisationMode(&self.lfsr, w >> 1);
@@ -115,7 +116,6 @@ pub const ZUC = struct {
         }
     }
 
-    /// Encrypt/decrypt data
     pub fn crypt(self: *ZUC, input: []const u8, output: []u8) void {
         std.debug.assert(input.len == output.len);
 
@@ -151,7 +151,8 @@ pub const ZUC = struct {
 
         // 处理完整块
         const num_blocks = message.len / block_size;
-        for (0..num_blocks) |i| {
+        var i: usize = 0;
+        while (i < num_blocks) : (i += 1) {
             const block = mem.readInt(u32, message[i * block_size ..][0..block_size], .big);
             const keystream = self.generateKeyword();
             mac ^= block ^ keystream;
@@ -179,8 +180,6 @@ pub const ZUC = struct {
 
         return mac;
     }
-
-    /// 验证消息完整性
     pub fn verifyMAC(self: *ZUC, message: []const u8, received_mac: u32) bool {
         const computed_mac = self.generateMAC(message);
         return computed_mac == received_mac;
@@ -295,6 +294,7 @@ fn lfsrWithWorkMode(lfsr: *[16]u32) void {
     // 第二次模约简，直接赋值给32位变量
     const v = @as(u32, @intCast((a & 0x7FFFFFFF) + (a >> 31)));
 
+    // 移位寄存器
     for (0..15) |j| {
         lfsr[j] = lfsr[j + 1];
     }

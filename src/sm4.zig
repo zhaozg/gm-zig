@@ -48,8 +48,8 @@ const CK = [32]u32{
     0x10171e25, 0x2c333a41, 0x484f565d, 0x646b7279,
 };
 
-// Rotate left helper function (needed for T-table initialization)
-fn rotl(x: u32, n: u5) u32 {
+// Rotate left helper function (inline for performance)
+inline fn rotl(x: u32, n: u5) u32 {
     return (x << n) | (x >> @as(u5, @intCast(@as(u6, 32) - n)));
 }
 
@@ -92,7 +92,7 @@ const T3: [256]u32 = computeTTable(3); // Byte 3 (least significant)
 pub const SM4 = struct {
     rk: [ROUNDS]u32, // Round keys
 
-    // Initialize SM4 context with key
+    // Initialize SM4 context with key (optimized key schedule)
     pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4 {
         var ctx: SM4 = undefined;
         var k: [4]u32 = undefined;
@@ -103,25 +103,32 @@ pub const SM4 = struct {
         k[2] = std.mem.readInt(u32, key[8..12], .big) ^ FK[2];
         k[3] = std.mem.readInt(u32, key[12..16], .big) ^ FK[3];
 
-        // Generate round keys
-        for (0..ROUNDS) |i| {
-            const x = k[(i + 1) % 4] ^ k[(i + 2) % 4] ^ k[(i + 3) % 4] ^ CK[i];
+        // Generate round keys with unrolled key schedule
+        comptime var i = 0;
+        inline while (i < ROUNDS) : (i += 1) {
+            const idx0 = i % 4;
+            const idx1 = (i + 1) % 4;
+            const idx2 = (i + 2) % 4;
+            const idx3 = (i + 3) % 4;
+            const x = k[idx1] ^ k[idx2] ^ k[idx3] ^ CK[i];
             const t = l_prime(tau(x));
-            ctx.rk[i] = k[i % 4] ^ t;
-            k[i % 4] = ctx.rk[i];
+            ctx.rk[i] = k[idx0] ^ t;
+            k[idx0] = ctx.rk[i];
         }
 
         return ctx;
     }
 
-    // Encrypt single 128-bit block
+    // Encrypt single 128-bit block with unrolled loop
     pub fn encryptBlock(ctx: *const SM4, input: *const [SM4_BLOCK_SIZE]u8, output: *[SM4_BLOCK_SIZE]u8) void {
         var x0 = std.mem.readInt(u32, input[0..4], .big);
         var x1 = std.mem.readInt(u32, input[4..8], .big);
         var x2 = std.mem.readInt(u32, input[8..12], .big);
         var x3 = std.mem.readInt(u32, input[12..16], .big);
 
-        for (0..ROUNDS) |i| {
+        // Unrolled 32 rounds for maximum performance
+        comptime var i = 0;
+        inline while (i < ROUNDS) : (i += 1) {
             const tmp = round(x0, x1, x2, x3, ctx.rk[i]);
             x0 = x1;
             x1 = x2;
@@ -135,14 +142,16 @@ pub const SM4 = struct {
         std.mem.writeInt(u32, output[12..16], x0, .big);
     }
 
-    // Decrypt single 128-bit block
+    // Decrypt single 128-bit block with unrolled loop
     pub fn decryptBlock(ctx: *const SM4, input: *const [SM4_BLOCK_SIZE]u8, output: *[SM4_BLOCK_SIZE]u8) void {
         var x0 = std.mem.readInt(u32, input[0..4], .big);
         var x1 = std.mem.readInt(u32, input[4..8], .big);
         var x2 = std.mem.readInt(u32, input[8..12], .big);
         var x3 = std.mem.readInt(u32, input[12..16], .big);
 
-        for (0..ROUNDS) |i| {
+        // Unrolled 32 rounds for maximum performance
+        comptime var i = 0;
+        inline while (i < ROUNDS) : (i += 1) {
             const tmp = round(x0, x1, x2, x3, ctx.rk[ROUNDS - 1 - i]);
             x0 = x1;
             x1 = x2;
@@ -156,12 +165,12 @@ pub const SM4 = struct {
         std.mem.writeInt(u32, output[12..16], x0, .big);
     }
 
-    fn l_prime(b: u32) u32 {
+    inline fn l_prime(b: u32) u32 {
         return b ^ rotl(b, 13) ^ rotl(b, 23);
     }
 
-    // Optimized round function using T-tables
-    fn round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
+    // Optimized round function using T-tables (inline for performance)
+    inline fn round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
         const t = x1 ^ x2 ^ x3 ^ rk;
 
         // Extract bytes and use T-table lookup
@@ -175,7 +184,7 @@ pub const SM4 = struct {
     }
 
     // Nonlinear transformation τ (S-box substitution)
-    fn tau(a: u32) u32 {
+    inline fn tau(a: u32) u32 {
         return (@as(u32, SBOX[@as(u8, @truncate(a >> 24))]) << 24) |
             (@as(u32, SBOX[@as(u8, @truncate(a >> 16))]) << 16) |
             (@as(u32, SBOX[@as(u8, @truncate(a >> 8))]) << 8) |
