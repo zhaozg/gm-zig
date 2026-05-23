@@ -107,4 +107,30 @@ pub fn build(b: *std.Build) void {
 
     const analyze_step = b.step("analyze", "Analyze performance data");
     analyze_step.dependOn(&analyze_cmd.step);
+
+    // Add bench tool using zbench
+    const zbench_dep = b.dependency("zbench", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const bench_mod = b.createModule(.{
+        .root_source_file = b.path("src/bench.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    bench_mod.addImport("gmlib", lib_mod);
+    bench_mod.addImport("zbench", zbench_dep.module("zbench"));
+
+    const bench_exe = b.addExecutable(.{
+        .name = "bench",
+        .root_module = bench_mod,
+    });
+    b.installArtifact(bench_exe);
+
+    const bench_cmd = b.addRunArtifact(bench_exe);
+    bench_cmd.step.dependOn(b.getInstallStep());
+
+    const bench_step = b.step("bench", "Run zbench performance benchmarks");
+    bench_step.dependOn(&bench_cmd.step);
 }
