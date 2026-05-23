@@ -489,8 +489,8 @@ fn benchSm9DecryptMedium(allocator: std.mem.Allocator) void {
     allocator.free(decrypted);
 }
 
-pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     var threaded: std.Io.Threaded = .init_single_threaded;
     const io = threaded.io();
