@@ -1,0 +1,42 @@
+  Operating System: macos x86_64
+  CPU:              Intel(R) Core(TM) i7-1068NG7 CPU @ 2.30GHz
+  CPU Cores:        4
+  Total Memory:     16.000GiB
+benchmark         runs     total time     time/run (avg ± σ)    (min ... max)                p75        p99        p995      
+------------------------------------------------------------------------------------------------------------------------------
+SM3 hash 64B      100000   61.389ms       613ns ± 816ns         (541ns ... 54.653us)         616ns      669ns      673ns      
+SM3 hash 1K       100000   533.438ms      5.334us ± 2.366us     (4.765us ... 175.344us)      5.392us    5.47us     6.535us    
+SM3 hash 64K      5817     1.919s         330.056us ± 31.33us   (291.316us ... 706.289us)    326.657us  463.358us  504.32us   
+SM3 hash 1M       361      1.939s         5.373ms ± 573.281us   (4.63ms ... 8.107ms)         5.573ms    7.397ms    7.674ms    
+SM3 hash 10M      36       1.882s         52.293ms ± 5.901ms    (46.822ms ... 68.094ms)      54.816ms   68.094ms   68.094ms   
+SM4 ECB E 16B     100000   21.636ms       216ns ± 360ns         (207ns ... 55.836us)         212ns      240ns      242ns      
+SM4 ECB D 16B     100000   22.554ms       225ns ± 428ns         (208ns ... 54.772us)         223ns      241ns      243ns      
+SM4 ECB E 1K      100000   21.675ms       216ns ± 364ns         (207ns ... 48.17us)          212ns      241ns      242ns      
+SM4 ECB E 64K     100000   23.949ms       239ns ± 295ns         (218ns ... 42.631us)         241ns      245ns      248ns      
+SM4 ECB E 1M      171      2.03s          11.876ms ± 819.216us  (10.9ms ... 16.287ms)        12.413ms   13.825ms   16.287ms   
+SM4 ECB D 1M      169      1.97s          11.66ms ± 732.903us   (10.959ms ... 15.755ms)      12.233ms   14.657ms   15.755ms   
+ZUC key stream    100000   43.984ms       439ns ± 425ns         (423ns ... 44.275us)         433ns      458ns      489ns      
+ZUC crypt 1K      100000   972.202ms      9.722us ± 3.615us     (8.822us ... 274.317us)      9.985us    14.342us   32.663us   
+ZUC crypt 64K     6147     2.079s         338.32us ± 42.234us   (310.069us ... 855.262us)    347.324us  497.426us  537.9us    
+ZUC crypt 1M      373      1.94s          5.201ms ± 352.275us   (4.819ms ... 7.406ms)        5.491ms    6.23ms     6.54ms     
+ZUC MAC 16B       100000   44.708ms       447ns ± 638ns         (423ns ... 51.885us)         433ns      488ns      491ns      
+ZUC MAC 4K        100000   1.749s         17.493us ± 4.765us    (16.732us ... 341.639us)     17.217us   35.827us   54.438us   
+SM2 key gen       6617     2.011s         303.982us ± 49.978us  (255.141us ... 938.023us)    306.263us  550.626us  584.69us   
+SM2 sign small    2992     2.001s         668.905us ± 65.535us  (594.069us ... 1.627ms)      685.251us  987.533us  1.043ms    
+SM2 sign med      2990     2.066s         691.193us ± 108.73us  (596.686us ... 1.494ms)      693.032us  1.252ms    1.331ms    
+SM2 verify sml    1473     1.965s         1.334ms ± 156.558us   (1.179ms ... 4.349ms)        1.35ms     2.067ms    2.353ms    
+SM2 verify med    1522     2.002s         1.315ms ± 99.245us    (1.177ms ... 2.586ms)        1.344ms    1.729ms    1.847ms    
+SM2 enc small     2069     2.011s         972.248us ± 143.687us (827.516us ... 2.683ms)      970.696us  1.75ms     1.836ms    
+SM2 enc med       2114     1.99s          941.518us ± 72.471us  (829.037us ... 1.668ms)      963.69us   1.25ms     1.374ms    
+SM2 dec small     1592     2.062s         1.295ms ± 211.58us    (1.111ms ... 2.831ms)        1.299ms    2.393ms    2.472ms    
+SM2 dec med       1532     1.942s         1.268ms ± 97.04us     (1.116ms ... 2.49ms)         1.294ms    1.651ms    1.772ms    
+SM9 ext sign      93       1.981s         21.309ms ± 800.539us  (20.142ms ... 26.194ms)      21.699ms   26.194ms   26.194ms   
+SM9 ext enc       12540    2.004s         159.842us ± 23.399us  (145.561us ... 637.421us)    162.335us  257.816us  284.962us  
+SM9 sign small    30       1.986s         66.225ms ± 1.454ms    (63.976ms ... 69.432ms)      66.899ms   69.432ms   69.432ms   
+SM9 sign med      30       2.013s         67.125ms ± 5.237ms    (62.54ms ... 89.55ms)        67.496ms   89.55ms    89.55ms    
+SM9 verify sml    17       1.86s          109.441ms ± 1.984ms   (105.932ms ... 113.67ms)     110.467ms  113.67ms   113.67ms   
+SM9 verify med    18       1.95s          108.356ms ± 1.843ms   (105.469ms ... 111.885ms)    109.887ms  111.885ms  111.885ms  
+SM9 enc small     42       1.989s         47.364ms ± 3.536ms    (43.529ms ... 62.1ms)        47.505ms   62.1ms     62.1ms     
+SM9 enc med       44       1.989s         45.225ms ± 1.322ms    (43.116ms ... 48.158ms)      46.399ms   48.158ms   48.158ms   
+SM9 dec small     43       1.995s         46.417ms ± 4.938ms    (41.998ms ... 70.359ms)      46.69ms    70.359ms   70.359ms   
+SM9 dec med       43       1.926s         44.801ms ± 1.257ms    (42.356ms ... 47.578ms)      45.865ms   47.578ms   47.578ms   
