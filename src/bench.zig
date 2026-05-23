@@ -5,6 +5,7 @@ const sm4 = root.sm4;
 const sm2 = root.sm2;
 const sm9 = root.sm9;
 const zuc = root.zuc;
+const sm4_bitslice = @import("./sm4_bitslice.zig");
 const zbench = @import("zbench");
 
 /// SM3 hash benchmark (64 B)
@@ -160,6 +161,110 @@ fn benchSm4EcbDecrypt1M(allocator: std.mem.Allocator) void {
         const start = i * 16;
         ctx.decryptBlock(buf[start..][0..16], out[start..][0..16]);
     }
+}
+
+/// SM4 Bitslice encryption benchmark (single block)
+fn benchSm4BitsliceEncrypt16B(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const plaintext = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00 };
+    var ciphertext: [16]u8 = undefined;
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.encryptBlock(&plaintext, &ciphertext);
+    _ = allocator;
+}
+
+/// SM4 Bitslice decryption benchmark (single block)
+fn benchSm4BitsliceDecrypt16B(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const ciphertext = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x00 };
+    var plaintext: [16]u8 = undefined;
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.decryptBlock(&ciphertext, &plaintext);
+    _ = allocator;
+}
+
+/// SM4 Bitslice encryption benchmark (1 KB)
+fn benchSm4BitsliceEncrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
+    const size: usize = 1024;
+    const buf = allocator.alloc(u8, size) catch return;
+    defer allocator.free(buf);
+    const out = allocator.alloc(u8, size) catch return;
+    defer allocator.free(out);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(buf);
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.encryptBlocks(buf, out);
+}
+
+/// SM4 Bitslice decryption benchmark (1 KB)
+fn benchSm4BitsliceDecrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
+    const size: usize = 1024;
+    const buf = allocator.alloc(u8, size) catch return;
+    defer allocator.free(buf);
+    const out = allocator.alloc(u8, size) catch return;
+    defer allocator.free(out);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(buf);
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.decryptBlocks(buf, out);
+}
+
+/// SM4 Bitslice encryption benchmark (64 KB)
+fn benchSm4BitsliceEncrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
+    const size: usize = 64 * 1024;
+    const buf = allocator.alloc(u8, size) catch return;
+    defer allocator.free(buf);
+    const out = allocator.alloc(u8, size) catch return;
+    defer allocator.free(out);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(buf);
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.encryptBlocks(buf, out);
+}
+
+/// SM4 Bitslice decryption benchmark (64 KB)
+fn benchSm4BitsliceDecrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
+    const size: usize = 64 * 1024;
+    const buf = allocator.alloc(u8, size) catch return;
+    defer allocator.free(buf);
+    const out = allocator.alloc(u8, size) catch return;
+    defer allocator.free(out);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(buf);
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.decryptBlocks(buf, out);
+}
+
+/// SM4 Bitslice encryption benchmark (1 MB)
+fn benchSm4BitsliceEncrypt1M(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
+    const size = 1024 * 1024;
+    const buf = allocator.alloc(u8, size) catch return;
+    defer allocator.free(buf);
+    const out = allocator.alloc(u8, size) catch return;
+    defer allocator.free(out);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(buf);
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.encryptBlocks(buf, out);
+}
+
+/// SM4 Bitslice decryption benchmark (1 MB)
+fn benchSm4BitsliceDecrypt1M(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
+    const size = 1024 * 1024;
+    const buf = allocator.alloc(u8, size) catch return;
+    defer allocator.free(buf);
+    const out = allocator.alloc(u8, size) catch return;
+    defer allocator.free(out);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(buf);
+    const ctx = sm4_bitslice.SM4_Bitslice.init(&key);
+    ctx.decryptBlocks(buf, out);
 }
 
 /// ZUC keystream generation benchmark (64 words)
@@ -520,6 +625,16 @@ pub fn main(init: std.process.Init) !void {
     try bench.add("SM4 ECB D 64K ", benchSm4EcbDecrypt64K, .{});
     try bench.add("SM4 ECB E 1M  ", benchSm4EcbEncrypt1M, .{});
     try bench.add("SM4 ECB D 1M  ", benchSm4EcbDecrypt1M, .{});
+
+    // SM4 Bitslice benchmarks
+    try bench.add("SM4 BS E 16B  ", benchSm4BitsliceEncrypt16B, .{});
+    try bench.add("SM4 BS D 16B  ", benchSm4BitsliceDecrypt16B, .{});
+    try bench.add("SM4 BS E 1K   ", benchSm4BitsliceEncrypt1K, .{});
+    try bench.add("SM4 BS D 1K   ", benchSm4BitsliceDecrypt1K, .{});
+    try bench.add("SM4 BS E 64K  ", benchSm4BitsliceEncrypt64K, .{});
+    try bench.add("SM4 BS D 64K  ", benchSm4BitsliceDecrypt64K, .{});
+    try bench.add("SM4 BS E 1M   ", benchSm4BitsliceEncrypt1M, .{});
+    try bench.add("SM4 BS D 1M   ", benchSm4BitsliceDecrypt1M, .{});
 
     // ZUC benchmarks
     try bench.add("ZUC key stream ", benchZucKeystream, .{});
