@@ -214,7 +214,7 @@ test "SM9 key agreement deterministic behavior" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
     const ka_context = sm9.key_agreement.KeyAgreementContext.init(system, io, allocator);
 
     const alice_id = "deterministic_alice@test.com";

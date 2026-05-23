@@ -27,8 +27,7 @@ test "SM9 basic key extraction validation" {
     };
 
     // Create key extraction context
-    const key_context = sm9.key_extract.KeyExtractionContext.init(
-        full_system, io, allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(full_system, io, allocator);
 
     // Test user key extraction
     const user_id = "test@example.com";

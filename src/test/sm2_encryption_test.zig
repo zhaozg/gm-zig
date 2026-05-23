@@ -148,8 +148,7 @@ test "SM2 encryption error cases" {
     const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     // Test empty message
-    try testing.expectError(error.EmptyMessage, encryption.encrypt(
-        testing.io, allocator, "", public_key, .c1c3c2));
+    try testing.expectError(error.EmptyMessage, encryption.encrypt(testing.io, allocator, "", public_key, .c1c3c2));
 
     // Test invalid private key (all zeros)
     const invalid_private = [_]u8{0} ** 32;
@@ -308,8 +307,7 @@ test "SM2 encryption error handling" {
     const public_key = try kp.publicKeyFromPrivateKey(private_key);
 
     // Test empty message
-    try testing.expectError(error.EmptyMessage,
-        encryption.encrypt(io, allocator, "", public_key, .c1c3c2));
+    try testing.expectError(error.EmptyMessage, encryption.encrypt(io, allocator, "", public_key, .c1c3c2));
 
     // Test invalid public key (identity element)
     const identity_key = SM2.identityElement;

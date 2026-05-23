@@ -318,9 +318,9 @@ fn generateTextReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u
 fn generateJsonReport(allocator: std.mem.Allocator, report: AnalysisReport) ![]u8 {
     // Convert HashMap to an array of key-value pairs for JSON serialization
     var trends_array = std.ArrayList(struct {
-            algorithm_operation: []const u8,
-            analysis: TrendAnalysis,
-        }).empty;
+        algorithm_operation: []const u8,
+        analysis: TrendAnalysis,
+    }).empty;
 
     defer trends_array.deinit(allocator);
 

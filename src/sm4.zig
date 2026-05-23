@@ -274,10 +274,7 @@ pub const SM4_ECB = struct {
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
             const block = input[i .. i + SM4_BLOCK_SIZE];
-            self.sm4.encryptBlock(
-                @as(*const [16]u8, @ptrCast(block.ptr)),
-                @as(*[16]u8, @ptrCast(output[i..].ptr))
-            );
+            self.sm4.encryptBlock(@as(*const [16]u8, @ptrCast(block.ptr)), @as(*[16]u8, @ptrCast(output[i..].ptr)));
         }
     }
 
@@ -288,10 +285,7 @@ pub const SM4_ECB = struct {
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
             const block = input[i .. i + SM4_BLOCK_SIZE];
-            self.sm4.decryptBlock(
-                @as(*const [16]u8, @ptrCast(block.ptr)),
-                @as(*[16]u8, @ptrCast(output[i..].ptr))
-            );
+            self.sm4.decryptBlock(@as(*const [16]u8, @ptrCast(block.ptr)), @as(*[16]u8, @ptrCast(output[i..].ptr)));
         }
     }
 };
@@ -407,14 +401,7 @@ pub const SM4_GCM = struct {
         return y;
     }
 
-    pub fn encrypt(
-        self: *const SM4_GCM,
-        nonce: *const [12]u8,
-        plaintext: []const u8,
-        additional_data: []const u8,
-        ciphertext: []u8,
-        tag: *[16]u8
-    ) void {
+    pub fn encrypt(self: *const SM4_GCM, nonce: *const [12]u8, plaintext: []const u8, additional_data: []const u8, ciphertext: []u8, tag: *[16]u8) void {
         assert(ciphertext.len >= plaintext.len);
 
         // Construct initial counter block
@@ -445,7 +432,7 @@ pub const SM4_GCM = struct {
         while (i < additional_data.len) : (i += 16) {
             var block = [_]u8{0} ** 16;
             const remaining = @min(16, additional_data.len - i);
-            @memcpy(block[0..remaining], additional_data[i..i + remaining]);
+            @memcpy(block[0..remaining], additional_data[i .. i + remaining]);
             for (0..16) |j| {
                 y[j] ^= block[j];
             }
@@ -457,7 +444,7 @@ pub const SM4_GCM = struct {
         while (i < plaintext.len) : (i += 16) {
             var block = [_]u8{0} ** 16;
             const remaining = @min(16, plaintext.len - i);
-            @memcpy(block[0..remaining], ciphertext[i..i + remaining]);
+            @memcpy(block[0..remaining], ciphertext[i .. i + remaining]);
             for (0..16) |j| {
                 y[j] ^= block[j];
             }
@@ -483,14 +470,7 @@ pub const SM4_GCM = struct {
         }
     }
 
-    pub fn decrypt(
-        self: *const SM4_GCM,
-        nonce: *const [12]u8,
-        ciphertext: []const u8,
-        additional_data: []const u8,
-        tag: *const [16]u8,
-        plaintext: []u8
-    ) bool {
+    pub fn decrypt(self: *const SM4_GCM, nonce: *const [12]u8, ciphertext: []const u8, additional_data: []const u8, tag: *const [16]u8, plaintext: []u8) bool {
         assert(plaintext.len >= ciphertext.len);
 
         // Verify tag first by computing GHASH incrementally
@@ -506,7 +486,7 @@ pub const SM4_GCM = struct {
         while (i < additional_data.len) : (i += 16) {
             var block = [_]u8{0} ** 16;
             const remaining = @min(16, additional_data.len - i);
-            @memcpy(block[0..remaining], additional_data[i..i + remaining]);
+            @memcpy(block[0..remaining], additional_data[i .. i + remaining]);
             for (0..16) |j| {
                 y[j] ^= block[j];
             }
@@ -518,7 +498,7 @@ pub const SM4_GCM = struct {
         while (i < ciphertext.len) : (i += 16) {
             var block = [_]u8{0} ** 16;
             const remaining = @min(16, ciphertext.len - i);
-            @memcpy(block[0..remaining], ciphertext[i..i + remaining]);
+            @memcpy(block[0..remaining], ciphertext[i .. i + remaining]);
             for (0..16) |j| {
                 y[j] ^= block[j];
             }
@@ -613,7 +593,7 @@ pub const SM4_XTS = struct {
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
             var block: [16]u8 = undefined;
-            @memcpy(&block, input[i..i + 16]);
+            @memcpy(&block, input[i .. i + 16]);
 
             // XOR with tweak
             for (0..16) |j| {
@@ -646,7 +626,7 @@ pub const SM4_XTS = struct {
         var i: usize = 0;
         while (i < input.len) : (i += SM4_BLOCK_SIZE) {
             var block: [16]u8 = undefined;
-            @memcpy(&block, input[i..i + 16]);
+            @memcpy(&block, input[i .. i + 16]);
 
             // XOR with tweak
             for (0..16) |j| {

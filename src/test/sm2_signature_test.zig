@@ -167,8 +167,7 @@ test "SM2 signature error handling" {
     const invalid_hash = [_]u8{0x01} ** 16; // Wrong length
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
 
-    try testing.expectError(error.InvalidPrecomputedHashLength,
-        signature.sign(testing.io, &invalid_hash, key_pair.private_key, key_pair.public_key, hash_options));
+    try testing.expectError(error.InvalidPrecomputedHashLength, signature.sign(testing.io, &invalid_hash, key_pair.private_key, key_pair.public_key, hash_options));
 
     // Test signature verification with identity element should fail
     const identity_key = SM2.SM2.identityElement;

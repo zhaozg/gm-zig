@@ -351,9 +351,7 @@ test "SM2 key exchange coordinate extraction" {
     const alice_public = try SM2.basePoint.mul(alice_private, .big);
     const alice_id = "alice";
 
-    var alice_ctx = key_exchange.KeyExchangeContext.init(
-    testing.io,
-    .initiator, alice_private, alice_public, alice_id);
+    var alice_ctx = key_exchange.KeyExchangeContext.init(testing.io, .initiator, alice_private, alice_public, alice_id);
 
     // Test coordinate extraction
     const coords = alice_ctx.getEphemeralCoordinates();

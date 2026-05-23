@@ -4,7 +4,6 @@ const builtin = @import("builtin");
 /// CSPRNG random number generator module.
 /// Provides cryptographically secure random bytes using system entropy.
 /// For WASM targets, falls back to Web Crypto API via wasmRng.
-
 /// Fill buffer with cryptographically secure random bytes.
 /// Uses system CSPRNG on native targets, Web Crypto API on WASM.
 pub fn bytes(io: std.Io, buffer: []u8) void {
@@ -16,7 +15,6 @@ pub fn bytes(io: std.Io, buffer: []u8) void {
         std.Io.random(io, buffer);
     }
 }
-
 
 test "random.bytes fills buffer" {
     var buf: [32]u8 = undefined;

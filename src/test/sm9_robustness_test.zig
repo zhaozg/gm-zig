@@ -224,8 +224,8 @@ test "SM9 encryption robustness with edge cases" {
     const allocator = gpa.allocator();
 
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io,allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
+    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
     const user_id = "robustness_encrypt_test@example.com";
 

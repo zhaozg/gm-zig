@@ -323,7 +323,6 @@ test "ZUC-128 standard test vector 1" {
     var keystream: [10]u32 = undefined;
     zuc.generateKeystream(&keystream);
 
-
     // zig fmt: off
     const expected = [_]u32{
         0x27BEDE74, 0x018082DA, 0x87D4E5B6, 0x9F18BF66, 0x32070E0F,

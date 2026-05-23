@@ -652,7 +652,7 @@ pub fn benchmarkSM9(io: std.Io, allocator: std.mem.Allocator, suite: *BenchmarkS
 
     // Initialize SM9 system
     const system = sm9.params.SM9System.init();
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io,  allocator);
+    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
     const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
     const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
 
