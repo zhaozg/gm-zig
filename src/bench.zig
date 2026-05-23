@@ -75,30 +75,58 @@ fn benchSm4EcbDecrypt16B(allocator: std.mem.Allocator) void {
 /// SM4 ECB encryption benchmark (1 KB)
 fn benchSm4EcbEncrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    var plaintext: [1024]u8 = undefined;
-    for (&plaintext, 0..) |*b, i| {
-        b.* = @as(u8, @truncate(i));
-    }
-    var ciphertext: [1024]u8 = undefined;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
     var ctx = sm4.SM4_ECB.init(&key);
-    ctx.encrypt(&plaintext, &ciphertext);
-    _ = allocator;
+    ctx.encrypt(plaintext, ciphertext);
 }
 
-/// SM4 ECB encryption benchmark (64 KB)
 fn benchSm4EcbEncrypt64K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    var plaintext: [65536]u8 = undefined;
-    for (&plaintext, 0..) |*b, i| {
-        b.* = @as(u8, @truncate(i));
-    }
-    var ciphertext: [65536]u8 = undefined;
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
     var ctx = sm4.SM4_ECB.init(&key);
-    ctx.encrypt(&plaintext, &ciphertext);
-    _ = allocator;
+    ctx.encrypt(plaintext, ciphertext);
 }
 
 /// SM4 ECB encryption benchmark (1 MB)
+/// SM4 ECB decryption benchmark (1 KB)
+fn benchSm4EcbDecrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const size: usize = 1024;
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(ciphertext);
+    var ctx = sm4.SM4_ECB.init(&key);
+    ctx.decrypt(ciphertext, plaintext);
+}
+
+fn benchSm4EcbDecrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const size: usize = 64 * 1024;
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(ciphertext);
+    var ctx = sm4.SM4_ECB.init(&key);
+    ctx.decrypt(ciphertext, plaintext);
+}
+
 fn benchSm4EcbEncrypt1M(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10 };
     const size = 1024 * 1024;
@@ -487,7 +515,9 @@ pub fn main() !void {
     try bench.add("SM4 ECB E 16B ", benchSm4EcbEncrypt16B, .{});
     try bench.add("SM4 ECB D 16B ", benchSm4EcbDecrypt16B, .{});
     try bench.add("SM4 ECB E 1K  ", benchSm4EcbEncrypt1K, .{});
+    try bench.add("SM4 ECB D 1K  ", benchSm4EcbDecrypt1K, .{});
     try bench.add("SM4 ECB E 64K ", benchSm4EcbEncrypt64K, .{});
+    try bench.add("SM4 ECB D 64K ", benchSm4EcbDecrypt64K, .{});
     try bench.add("SM4 ECB E 1M  ", benchSm4EcbEncrypt1M, .{});
     try bench.add("SM4 ECB D 1M  ", benchSm4EcbDecrypt1M, .{});
 
