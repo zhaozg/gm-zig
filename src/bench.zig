@@ -169,6 +169,7 @@ fn benchZucKeystream(allocator: std.mem.Allocator) void {
     var keystream: [64]u32 = undefined;
     var zuc_ctx = zuc.ZUC.init(&key, &iv);
     zuc_ctx.generateKeystream(&keystream);
+    std.mem.doNotOptimizeAway(keystream);
     _ = allocator;
 }
 
@@ -185,6 +186,7 @@ fn benchZucCrypt1K(allocator: std.mem.Allocator) void {
     prng.random().bytes(plaintext);
     var ctx = zuc.ZUC.init(&key, &iv);
     ctx.crypt(plaintext, ciphertext);
+    std.mem.doNotOptimizeAway(ciphertext);
 }
 
 /// ZUC crypt benchmark (64 KB)
@@ -200,6 +202,7 @@ fn benchZucCrypt64K(allocator: std.mem.Allocator) void {
     prng.random().bytes(plaintext);
     var ctx = zuc.ZUC.init(&key, &iv);
     ctx.crypt(plaintext, ciphertext);
+    std.mem.doNotOptimizeAway(ciphertext);
 }
 
 /// ZUC crypt benchmark (1 MB)
@@ -215,6 +218,7 @@ fn benchZucCrypt1M(allocator: std.mem.Allocator) void {
     prng.random().bytes(plaintext);
     var ctx = zuc.ZUC.init(&key, &iv);
     ctx.crypt(plaintext, ciphertext);
+    std.mem.doNotOptimizeAway(ciphertext);
 }
 
 /// ZUC MAC generation benchmark (16 B)
@@ -222,7 +226,9 @@ fn benchZucMac16B(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     const iv = [_]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     const message = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    _ = zuc.ZUC.generateMACWithKey(&key, &iv, &message);
+    var zuc_ctx = zuc.ZUC.init(&key, &iv);
+    const mac = zuc_ctx.generateMAC(&message);
+    std.mem.doNotOptimizeAway(mac);
     _ = allocator;
 }
 
@@ -235,7 +241,10 @@ fn benchZucMac4K(allocator: std.mem.Allocator) void {
     defer allocator.free(message);
     var prng = std.Random.DefaultPrng.init(0);
     prng.random().bytes(message);
-    _ = zuc.ZUC.generateMACWithKey(&key, &iv, message);
+    var zuc_ctx = zuc.ZUC.init(&key, &iv);
+    const mac = zuc_ctx.generateMAC(message);
+    // 防止编译器优化掉MAC计算
+    std.mem.doNotOptimizeAway(mac);
 }
 
 /// SM2 key generation benchmark
