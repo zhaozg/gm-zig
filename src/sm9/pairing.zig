@@ -680,6 +680,11 @@ fn millerLoop(P: curve.G1Point, Q: curve.G2Point, curve_params: params.SystemPar
 }
 
 /// Evaluate line function for Miller's algorithm
+/// Computes the line function value at point P for the line through A and B
+/// For BN curves with G1 over Fp and G2 over Fp2:
+/// - Line doubling: l_{T,T}(P) evaluates the tangent line at T
+/// - Line addition: l_{T,Q}(P) evaluates the line through T and Q
+/// The result is an Fp12 element (as GtElement)
 fn evaluateLine(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, curve_params: params.SystemParams) GtElement {
     _ = curve_params;
 
@@ -689,55 +694,149 @@ fn evaluateLine(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, curve_para
 
     const is_doubling = pointsEqual(A, B);
 
-    var hasher = SM3.init(.{});
-    hasher.update(&P.x);
-    hasher.update(&P.y);
-    if (is_doubling) {
-        hasher.update(&A.x);
-        hasher.update(&A.y);
-        hasher.update("LINE_DOUBLING");
-    } else {
-        hasher.update(&A.x);
-        hasher.update(&A.y);
-        hasher.update(&B.x);
-        hasher.update(&B.y);
-        hasher.update("LINE_ADDITION");
-    }
+    // Extract G2 point coordinates (Fp2 elements: 64 bytes each = two 32-byte Fp elements)
+    var ax: [64]u8 = undefined;
+    var ay: [64]u8 = undefined;
+    var bx: [64]u8 = undefined;
+    var by: [64]u8 = undefined;
+    @memcpy(&ax, A.x[0..64]);
+    @memcpy(&ay, A.y[0..64]);
+    @memcpy(&bx, B.x[0..64]);
+    @memcpy(&by, B.y[0..64]);
 
-    var hash: [32]u8 = undefined;
-    hasher.final(&hash);
+    // Extract G1 point P coordinates (Fp elements: 32 bytes each)
+    var px: [32]u8 = undefined;
+    var py: [32]u8 = undefined;
+    @memcpy(&px, P.x[0..32]);
+    @memcpy(&py, P.y[0..32]);
+
+    // Compute the line function value using Fp2 arithmetic
+    // For BN curves, the line function at P = (x_P, y_P) for points on G2 is:
+    // l(P) = (y_P - y_T) - λ*(x_P - x_T)  embedded into Fp12
+    //
+    // In the tower Fp12 = Fp6[w]/(w^2 - v), the line function is stored as:
+    // c0 + c1*w where c0, c1 ∈ Fp6 = Fp2[v]/(v^3 - ξ)
+    //
+    // The embedding of Fp elements into Fp12 uses the tower:
+    // Fp -> Fp2 (via u^2 + 1 = 0)
+    // Fp2 -> Fp6 (via v^3 - ξ = 0, where ξ = 1+u)
+    // Fp6 -> Fp12 (via w^2 - v = 0)
+    //
+    // So x_P ∈ Fp is embedded as (x_P, 0) in Fp2, then as ((x_P,0), 0, 0) in Fp6
+    // and finally as c0 + c1*w where c1 = ((x_P,0), 0, 0) and c0 = 0
+    // Similarly y_P is embedded as c0 where c0 = ((y_P,0), 0, 0) and c1 = 0
 
     var result = GtElement.identity();
-    var offset: usize = 0;
-    var counter: u32 = 0;
 
-    while (offset < 384) {
-        var expand_hasher = SM3.init(.{});
-        expand_hasher.update(&hash);
-        expand_hasher.update("LINE_EVAL");
+    // Embed P's x coordinate into Fp2: (x_P, 0)
+    var px_fp2: [64]u8 = [_]u8{0} ** 64;
+    @memcpy(px_fp2[0..32], &px);
 
-        const counter_bytes = [4]u8{
-            @as(u8, @intCast((counter >> 24) & 0xFF)),
-            @as(u8, @intCast((counter >> 16) & 0xFF)),
-            @as(u8, @intCast((counter >> 8) & 0xFF)),
-            @as(u8, @intCast(counter & 0xFF)),
-        };
-        expand_hasher.update(&counter_bytes);
+    // Embed P's y coordinate into Fp2: (y_P, 0)
+    var py_fp2: [64]u8 = [_]u8{0} ** 64;
+    @memcpy(py_fp2[0..32], &py);
 
-        var block: [32]u8 = undefined;
-        expand_hasher.final(&block);
+    if (is_doubling) {
+        // Point doubling: compute tangent line at A
+        // λ = 3*x_A^2 / (2*y_A) in Fp2
+        // line = (y_P - y_A) - λ*(x_P - x_A)
+        //
+        // As Fp12 element: c0 + c1*w where
+        // c0 = y_P - y_A - λ*(x_P - x_A)  (embedded in Fp6 as first component)
+        // c1 = 0
+        //
+        // Actually, the proper line function for BN curves:
+        // l_{T,T}(P) = (y_P * v - y_T) - λ * (x_P * v - x_T)
+        // where v is the quadratic non-residue for Fp2 -> Fp6
+        //
+        // For the tower Fp12 = Fp6[w]/(w^2 - v):
+        // c0 = -y_T + λ*x_T  (in Fp6, first component)
+        // c1 = y_P - λ*x_P  (in Fp6, first component, multiplied by v)
+        //
+        // Simplified: we compute the line as a sparse Fp12 element
 
-        const copy_len = @min(32, 384 - offset);
-        std.mem.copyForwards(u8, result.data[offset .. offset + copy_len], block[0..copy_len]);
-        offset += copy_len;
-        counter += 1;
+        // Compute 3*x_A^2 in Fp2
+        const ax_sq = fp2Multiply(ax, ax);
+        const three_x_sq = fp2Add(fp2Double(ax_sq), ax_sq); // 3*x^2 = 2*x^2 + x^2
+
+        // Compute 2*y_A in Fp2
+        const two_y = fp2Double(ay);
+
+        // Compute λ = 3*x_A^2 / (2*y_A) in Fp2
+        const lambda = fp2Divide(three_x_sq, two_y);
+
+        // Compute line value: l(P) = (y_P - y_A) - λ*(x_P - x_A)
+        // = (y_P - y_A) + λ*(x_A - x_P)
+        // = (λ*x_A - y_A) + (y_P - λ*x_P)
+
+        // Compute λ * x_A in Fp2
+        const lambda_ax = fp2Multiply(lambda, ax);
+
+        // c0_part = λ*x_A - y_A (Fp2)
+        const c0_fp2 = fp2Sub(lambda_ax, ay);
+
+        // c1_part = y_P - λ*x_P (Fp2)
+        const lambda_px = fp2Multiply(lambda, px_fp2);
+        const c1_fp2 = fp2Sub(py_fp2, lambda_px);
+
+        // Build Fp6 c0 = (c0_fp2, 0, 0)
+        var c0_fp6: [192]u8 = [_]u8{0} ** 192;
+        @memcpy(c0_fp6[0..64], &c0_fp2);
+
+        // Build Fp6 c1 = (c1_fp2, 0, 0)
+        var c1_fp6: [192]u8 = [_]u8{0} ** 192;
+        @memcpy(c1_fp6[0..64], &c1_fp2);
+
+        @memcpy(result.data[0..192], &c0_fp6);
+        @memcpy(result.data[192..384], &c1_fp6);
+    } else {
+        // Point addition: compute line through A and B
+        // λ = (y_B - y_A) / (x_B - x_A) in Fp2
+        // line = (y_P - y_A) - λ*(x_P - x_A)
+
+        // Compute Δx = x_B - x_A in Fp2
+        const dx = fp2Sub(bx, ax);
+
+        // Compute Δy = y_B - y_A in Fp2
+        const dy = fp2Sub(by, ay);
+
+        // Compute λ = Δy / Δx in Fp2
+        const lambda = fp2Divide(dy, dx);
+
+        // Compute λ * x_A in Fp2
+        const lambda_ax = fp2Multiply(lambda, ax);
+
+        // c0_part = λ*x_A - y_A (Fp2)
+        const c0_fp2 = fp2Sub(lambda_ax, ay);
+
+        // c1_part = y_P - λ*x_P (Fp2)
+        const lambda_px = fp2Multiply(lambda, px_fp2);
+        const c1_fp2 = fp2Sub(py_fp2, lambda_px);
+
+        // Build Fp6 c0 = (c0_fp2, 0, 0)
+        var c0_fp6: [192]u8 = [_]u8{0} ** 192;
+        @memcpy(c0_fp6[0..64], &c0_fp2);
+
+        // Build Fp6 c1 = (c1_fp2, 0, 0)
+        var c1_fp6: [192]u8 = [_]u8{0} ** 192;
+        @memcpy(c1_fp6[0..64], &c1_fp2);
+
+        @memcpy(result.data[0..192], &c0_fp6);
+        @memcpy(result.data[192..384], &c1_fp6);
     }
 
+    // Ensure result is not identity
     if (result.isIdentity()) {
         result.data[0] = 1;
     }
 
     return result;
+}
+
+/// Divide two Fp2 elements: a / b = a * b^(-1)
+fn fp2Divide(a: [64]u8, b: [64]u8) [64]u8 {
+    const b_inv = fp2Invert(b);
+    return fp2Multiply(a, b_inv);
 }
 
 /// Check if two G2 points are equal
@@ -777,9 +876,55 @@ fn frobenius6(f: GtElement) GtElement {
 }
 
 /// Frobenius map: f^(p^2)
+/// For BN curves, p^2 ≡ -1 (mod r), so Frobenius^2 acts as conjugation
+/// on Fp12 = Fp6[w]/(w^2 - v). For f = c0 + c1*w, we have:
+/// f^(p^2) = conj(c0) + conj(c1)*w
+/// where conj on Fp6 conjugates each Fp2 component
+/// and conj on Fp2 = Fp[u]/(u^2+1) maps (a + b*u) -> (a - b*u)
 fn frobenius2(f: GtElement) GtElement {
-    _ = f;
-    return GtElement.identity();
+    if (f.isIdentity()) {
+        return f;
+    }
+
+    var c0: [192]u8 = undefined;
+    @memcpy(&c0, f.data[0..192]);
+    var c1: [192]u8 = undefined;
+    @memcpy(&c1, f.data[192..384]);
+
+    // Apply Fp6 conjugation (conjugate each Fp2 component)
+    const conj_c0 = fp6Conjugate(c0);
+    const conj_c1 = fp6Conjugate(c1);
+
+    var result: [384]u8 = undefined;
+    @memcpy(result[0..192], &conj_c0);
+    @memcpy(result[192..384], &conj_c1);
+
+    return GtElement{ .data = result };
+}
+
+/// Conjugate Fp6 element: conjugate each Fp2 component
+fn fp6Conjugate(a: [192]u8) [192]u8 {
+    var result: [192]u8 = undefined;
+    for (0..3) |i| {
+        const start = i * 64;
+        var a_comp: [64]u8 = undefined;
+        @memcpy(&a_comp, a[start .. start + 64]);
+        const conj = fp2Conjugate(a_comp);
+        @memcpy(result[start .. start + 64], &conj);
+    }
+    return result;
+}
+
+/// Conjugate Fp2 element: (a + b*u) -> (a - b*u)
+fn fp2Conjugate(a: [64]u8) [64]u8 {
+    var a0: [32]u8 = undefined;
+    @memcpy(&a0, a[0..32]);
+    var a1: [32]u8 = undefined;
+    @memcpy(&a1, a[32..64]);
+    var result: [64]u8 = undefined;
+    @memcpy(result[0..32], &a0);
+    @memcpy(result[32..64], &fpNegate(a1));
+    return result;
 }
 
 /// Multi-pairing computation

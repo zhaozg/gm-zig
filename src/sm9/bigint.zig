@@ -1194,7 +1194,7 @@ const SM9_Q_U64: BigInt64 = [4]u64{ 0xB640000002A3A6F1, 0xD603AB4FF58EC745, 0x21
 
 /// Precomputed Montgomery parameters for SM9 prime q
 /// R = 2^256, N' = -q^(-1) mod R (precomputed)
-const SM9_Q_PRIME_U64: u64 = 0x87D20782E4866389; // -q^(-1) mod 2^64
+const SM9_Q_PRIME_U64: u64 = 0x892BC42C2F2EE42B; // -q^(-1) mod 2^64
 
 /// Montgomery multiplication for SM9 prime field
 /// Implements CIOS (Coarsely Integrated Operand Scanning) algorithm
@@ -1245,7 +1245,7 @@ fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
 /// Computes a * R mod q where R = 2^256
 fn toMontgomerySM9(a: BigInt64) BigInt64 {
     // R mod q (precomputed)
-    const R_MOD_Q: BigInt64 = [4]u64{ 0x49BFFFFFFD5C590E, 0x29FC54AFFAA73CBA, 0xDE0D6CB4E5851124, 0x1A9101B0DE964382 };
+    const R_MOD_Q: BigInt64 = [4]u64{ 0x49BFFFFFFD5C590E, 0x29FC54B00A7138BA, 0xDE0D6CB4E5851124, 0x1A9064D81CAEBA83 };
 
     return montgomeryMulSM9(a, R_MOD_Q);
 }
