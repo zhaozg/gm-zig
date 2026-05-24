@@ -174,7 +174,7 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
 
     // SM9 benchmarks
     try bench.add("SM9 ext sign   ", sm9_bench.benchSm9ExtractSignKey, .{});
-    try bench.add("SM9 ext enc    ", sm9_bench.benchSm9ExtractEncryptKey, .{});
+    try bench.add("SM9 ext enc    ", sm9_bench.benchSm9EncryptSmall, .{});
     try bench.add("SM9 sign small ", sm9_bench.benchSm9SignSmall, .{});
     try bench.add("SM9 sign med   ", sm9_bench.benchSm9SignMedium, .{});
     try bench.add("SM9 verify sml ", sm9_bench.benchSm9VerifySmall, .{});

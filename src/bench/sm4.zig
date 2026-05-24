@@ -134,16 +134,14 @@ pub fn benchSm4CbcDecrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
     const iv = [_]u8{0x00} ** 16;
     const size: usize = 1024;
-    const plaintext = allocator.alloc(u8, size) catch return;
-    defer allocator.free(plaintext);
     const ciphertext = allocator.alloc(u8, size + 16) catch return;
     defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
     var prng = std.Random.DefaultPrng.init(0);
-    prng.random().bytes(plaintext);
-    var enc_ctx = sm4.SM4_CBC.init(&key, &iv);
-    enc_ctx.encrypt(plaintext, ciphertext);
-    var dec_ctx = sm4.SM4_CBC.init(&key, &iv);
-    dec_ctx.decrypt(ciphertext[0..size], plaintext);
+    prng.random().bytes(ciphertext[0..size]);
+    var ctx = sm4.SM4_CBC.init(&key, &iv);
+    ctx.decrypt(ciphertext[0..size], plaintext);
 }
 
 /// SM4 CTR encryption benchmark (1 KB)
@@ -181,16 +179,14 @@ pub fn benchSm4CtrDecrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
     const nonce = [_]u8{0x00} ** 16;
     const size: usize = 1024;
-    const plaintext = allocator.alloc(u8, size) catch return;
-    defer allocator.free(plaintext);
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
     var prng = std.Random.DefaultPrng.init(0);
-    prng.random().bytes(plaintext);
-    var enc_ctx = sm4.SM4_CTR.init(&key, &nonce);
-    enc_ctx.encrypt(plaintext, ciphertext);
-    var dec_ctx = sm4.SM4_CTR.init(&key, &nonce);
-    dec_ctx.decrypt(ciphertext, plaintext);
+    prng.random().bytes(ciphertext);
+    var ctx = sm4.SM4_CTR.init(&key, &nonce);
+    ctx.decrypt(ciphertext, plaintext);
 }
 
 /// SM4 CTR decryption benchmark (64 KB)
@@ -198,16 +194,14 @@ pub fn benchSm4CtrDecrypt64K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
     const nonce = [_]u8{0x00} ** 16;
     const size: usize = 64 * 1024;
-    const plaintext = allocator.alloc(u8, size) catch return;
-    defer allocator.free(plaintext);
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
     var prng = std.Random.DefaultPrng.init(0);
-    prng.random().bytes(plaintext);
-    var enc_ctx = sm4.SM4_CTR.init(&key, &nonce);
-    enc_ctx.encrypt(plaintext, ciphertext);
-    var dec_ctx = sm4.SM4_CTR.init(&key, &nonce);
-    dec_ctx.decrypt(ciphertext, plaintext);
+    prng.random().bytes(ciphertext);
+    var ctx = sm4.SM4_CTR.init(&key, &nonce);
+    ctx.decrypt(ciphertext, plaintext);
 }
 
 /// SM4 GCM seal benchmark (1 KB)
@@ -278,30 +272,26 @@ pub fn benchSm4XtsEncrypt64K(allocator: std.mem.Allocator) void {
 pub fn benchSm4XtsDecrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{0x01} ** 32;
     const size: usize = 1024;
-    const plaintext = allocator.alloc(u8, size) catch return;
-    defer allocator.free(plaintext);
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
     var prng = std.Random.DefaultPrng.init(0);
-    prng.random().bytes(plaintext);
-    var enc_ctx = sm4.SM4_XTS.init(&key);
-    enc_ctx.encrypt(0, plaintext, ciphertext);
-    var dec_ctx = sm4.SM4_XTS.init(&key);
-    dec_ctx.decrypt(0, ciphertext, plaintext);
+    prng.random().bytes(ciphertext);
+    var ctx = sm4.SM4_XTS.init(&key);
+    ctx.decrypt(0, ciphertext, plaintext);
 }
 
 /// SM4 XTS decryption benchmark (64 KB)
 pub fn benchSm4XtsDecrypt64K(allocator: std.mem.Allocator) void {
     const key = [_]u8{0x01} ** 32;
     const size: usize = 64 * 1024;
-    const plaintext = allocator.alloc(u8, size) catch return;
-    defer allocator.free(plaintext);
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
     var prng = std.Random.DefaultPrng.init(0);
-    prng.random().bytes(plaintext);
-    var enc_ctx = sm4.SM4_XTS.init(&key);
-    enc_ctx.encrypt(0, plaintext, ciphertext);
-    var dec_ctx = sm4.SM4_XTS.init(&key);
-    dec_ctx.decrypt(0, ciphertext, plaintext);
+    prng.random().bytes(ciphertext);
+    var ctx = sm4.SM4_XTS.init(&key);
+    ctx.decrypt(0, ciphertext, plaintext);
 }
