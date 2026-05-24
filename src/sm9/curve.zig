@@ -784,61 +784,238 @@ pub const G2Point = struct {
     }
 
     /// Point doubling: [2]P
+    //// Point doubling: [2]P using proper Fp2 arithmetic
+    //// For G2 on BN256 twist curve: y^2 = x^3 + b/xi
+    //// Using affine coordinates:
+    ////   slope = (3*x^2) / (2*y)  (since a = 0)
+    ////   x3 = slope^2 - 2*x
+    ////   y3 = slope*(x - x3) - y
     pub fn double(self: G2Point, curve_params: params.SystemParams) G2Point {
         if (self.isInfinity()) return self;
 
-        // Implement basic G2 point doubling
-        // For testing purposes, use a simplified approach that maintains point structure
-        var result = self;
+        const q = curve_params.q;
 
-        // Use curve parameters to ensure we're working within the field
-        _ = curve_params.q; // Use the field modulus for validation
+        // Extract Fp2 components: x = (x0, x1), y = (y0, y1)
+        var x0: [32]u8 = undefined;
+        var x1: [32]u8 = undefined;
+        var y0: [32]u8 = undefined;
+        var y1: [32]u8 = undefined;
+        @memcpy(&x0, self.x[0..32]);
+        @memcpy(&x1, self.x[32..64]);
+        @memcpy(&y0, self.y[0..32]);
+        @memcpy(&y1, self.y[32..64]);
 
-        // Simple transformation that maintains the point format while avoiding infinity
-        // This is not mathematically correct Fp2 arithmetic but prevents scalar multiplication failures
-        for (result.x, 0..) |byte, i| {
-            if (byte != 0) {
-                result.x[i] = @as(u8, @intCast((@as(u16, byte) * 2) % 251));
-            }
-        }
-        for (result.y, 0..) |byte, i| {
-            if (byte != 0) {
-                result.y[i] = @as(u8, @intCast((@as(u16, byte) * 3) % 251));
-            }
-        }
+        // Compute 3*x^2 in Fp2
+        // x^2 = (x0^2 - x1^2, 2*x0*x1)
+        const x0_sq = bigint.mulMod(x0, x0, q) catch return G2Point.infinity();
+        const x1_sq = bigint.mulMod(x1, x1, q) catch return G2Point.infinity();
+        const x0x1 = bigint.mulMod(x0, x1, q) catch return G2Point.infinity();
 
-        return result;
+        const x_sq_real = bigint.subMod(x0_sq, x1_sq, q) catch return G2Point.infinity();
+        const x_sq_imag = bigint.addMod(x0x1, x0x1, q) catch return G2Point.infinity();
+
+        // 3*x^2 = (3*x_sq_real, 3*x_sq_imag)
+        const three = [_]u8{0} ** 31 ++ [_]u8{3};
+        const three_x_sq_real = bigint.mulMod(x_sq_real, three, q) catch return G2Point.infinity();
+        const three_x_sq_imag = bigint.mulMod(x_sq_imag, three, q) catch return G2Point.infinity();
+
+        // Compute 2*y in Fp2
+        const two_y0 = bigint.addMod(y0, y0, q) catch return G2Point.infinity();
+        const two_y1 = bigint.addMod(y1, y1, q) catch return G2Point.infinity();
+
+        // Compute slope = 3*x^2 / (2*y) in Fp2
+        // First compute norm of 2*y: (2*y0)^2 + (2*y1)^2
+        const two_y0_sq = bigint.mulMod(two_y0, two_y0, q) catch return G2Point.infinity();
+        const two_y1_sq = bigint.mulMod(two_y1, two_y1, q) catch return G2Point.infinity();
+        const norm = bigint.addMod(two_y0_sq, two_y1_sq, q) catch return G2Point.infinity();
+
+        // Invert norm
+        const norm_inv = bigint.invMod(norm, q) catch return G2Point.infinity();
+
+        // slope = (3*x^2) * conj(2*y) / norm
+        // conj(2*y) = (2*y0, -2*y1)
+
+        // slope_real = (three_x_sq_real * two_y0 + three_x_sq_imag * two_y1) / norm
+        // Actually: (a + bi) / (c + di) = (a + bi)*(c - di)/(c^2 + d^2)
+        // slope_real = (three_x_sq_real * two_y0 + three_x_sq_imag * two_y1) * norm_inv
+        const t1 = bigint.mulMod(three_x_sq_real, two_y0, q) catch return G2Point.infinity();
+        const t2 = bigint.mulMod(three_x_sq_imag, two_y1, q) catch return G2Point.infinity();
+        const slope_real_num = bigint.addMod(t1, t2, q) catch return G2Point.infinity();
+        const slope_real = bigint.mulMod(slope_real_num, norm_inv, q) catch return G2Point.infinity();
+
+        // slope_imag = (three_x_sq_imag * two_y0 - three_x_sq_real * two_y1) * norm_inv
+        const t3 = bigint.mulMod(three_x_sq_imag, two_y0, q) catch return G2Point.infinity();
+        const t4 = bigint.mulMod(three_x_sq_real, two_y1, q) catch return G2Point.infinity();
+        const slope_imag_num = bigint.subMod(t3, t4, q) catch return G2Point.infinity();
+        const slope_imag = bigint.mulMod(slope_imag_num, norm_inv, q) catch return G2Point.infinity();
+
+        // Compute x3 = slope^2 - 2*x
+        // slope^2 = (slope_real^2 - slope_imag^2, 2*slope_real*slope_imag)
+        const sr_sq = bigint.mulMod(slope_real, slope_real, q) catch return G2Point.infinity();
+        const si_sq = bigint.mulMod(slope_imag, slope_imag, q) catch return G2Point.infinity();
+        const sr_si = bigint.mulMod(slope_real, slope_imag, q) catch return G2Point.infinity();
+
+        const slope_sq_real = bigint.subMod(sr_sq, si_sq, q) catch return G2Point.infinity();
+        const slope_sq_imag = bigint.addMod(sr_si, sr_si, q) catch return G2Point.infinity();
+
+        // 2*x = (2*x0, 2*x1)
+        const two_x0 = bigint.addMod(x0, x0, q) catch return G2Point.infinity();
+        const two_x1 = bigint.addMod(x1, x1, q) catch return G2Point.infinity();
+
+        // x3 = slope^2 - 2*x
+        const x3_real = bigint.subMod(slope_sq_real, two_x0, q) catch return G2Point.infinity();
+        const x3_imag = bigint.subMod(slope_sq_imag, two_x1, q) catch return G2Point.infinity();
+
+        // Compute y3 = slope*(x - x3) - y
+        // x - x3 = (x0 - x3_real, x1 - x3_imag)
+        const dx_real = bigint.subMod(x0, x3_real, q) catch return G2Point.infinity();
+        const dx_imag = bigint.subMod(x1, x3_imag, q) catch return G2Point.infinity();
+
+        // slope * (x - x3) in Fp2
+        const p1 = bigint.mulMod(slope_real, dx_real, q) catch return G2Point.infinity();
+        const p2 = bigint.mulMod(slope_imag, dx_imag, q) catch return G2Point.infinity();
+        const p3 = bigint.mulMod(slope_real, dx_imag, q) catch return G2Point.infinity();
+        const p4 = bigint.mulMod(slope_imag, dx_real, q) catch return G2Point.infinity();
+
+        const prod_real = bigint.subMod(p1, p2, q) catch return G2Point.infinity();
+        const prod_imag = bigint.addMod(p3, p4, q) catch return G2Point.infinity();
+
+        // y3 = prod - y
+        const y3_real = bigint.subMod(prod_real, y0, q) catch return G2Point.infinity();
+        const y3_imag = bigint.subMod(prod_imag, y1, q) catch return G2Point.infinity();
+
+        // Build result point
+        var result_x: [64]u8 = undefined;
+        var result_y: [64]u8 = undefined;
+        @memcpy(result_x[0..32], &x3_real);
+        @memcpy(result_x[32..64], &x3_imag);
+        @memcpy(result_y[0..32], &y3_real);
+        @memcpy(result_y[32..64], &y3_imag);
+
+        return G2Point.affine(result_x, result_y);
     }
 
-    /// Point addition: P + Q
+    //// Point addition: P + Q using proper Fp2 arithmetic
+    //// For G2 on BN256 twist curve
+    //// Using affine coordinates:
+    ////   slope = (y2 - y1) / (x2 - x1)
+    ////   x3 = slope^2 - x1 - x2
+    ////   y3 = slope*(x1 - x3) - y1
     pub fn add(self: G2Point, other: G2Point, curve_params: params.SystemParams) G2Point {
         if (self.isInfinity()) return other;
         if (other.isInfinity()) return self;
 
-        // Check if points are equal first to avoid degenerate cases
+        const q = curve_params.q;
+
+        // Check if points are equal (doubling case)
         if (std.mem.eql(u8, &self.x, &other.x) and std.mem.eql(u8, &self.y, &other.y)) {
             return self.double(curve_params);
         }
 
-        // Basic G2 point addition approximation
-        // This is not mathematically correct Fp2 arithmetic but prevents scalar multiplication failures
-        var result = self;
-
-        // Use curve parameters to ensure we're working within the field
-        _ = curve_params.q; // Use the field modulus for validation
-
-        // Simple field-like addition that maintains point structure
-        for (self.x, other.x, 0..) |a, b, i| {
-            result.x[i] = @as(u8, @intCast((@as(u16, a) + @as(u16, b)) % 251));
+        // Check if points are inverses (result is infinity)
+        // P and -P have same x but y negated: (x, y) and (x, -y)
+        if (std.mem.eql(u8, self.x[0..32], other.x[0..32]) and
+            std.mem.eql(u8, self.x[32..64], other.x[32..64]))
+        {
+            // Check if y1 == -y2 (both components negated)
+            var y1_neg: [64]u8 = undefined;
+            var y1_0_neg: [32]u8 = undefined;
+            var y1_1_neg: [32]u8 = undefined;
+            var y1_0: [32]u8 = undefined;
+            var y1_1: [32]u8 = undefined;
+            @memcpy(&y1_0, self.y[0..32]);
+            @memcpy(&y1_1, self.y[32..64]);
+            y1_0_neg = bigint.subMod([_]u8{0} ** 32, y1_0, q) catch return G2Point.infinity();
+            y1_1_neg = bigint.subMod([_]u8{0} ** 32, y1_1, q) catch return G2Point.infinity();
+            if (std.mem.eql(u8, &y1_neg, &other.y)) {
+                return G2Point.infinity();
+            }
         }
-        for (self.y, other.y, 0..) |a, b, i| {
-            result.y[i] = @as(u8, @intCast((@as(u16, a) + @as(u16, b) + 1) % 251));
-        }
 
-        return result;
+        // Extract Fp2 components
+        var x1_0: [32]u8 = undefined;
+        var x1_1: [32]u8 = undefined;
+        var y1_0: [32]u8 = undefined;
+        var y1_1: [32]u8 = undefined;
+        var x2_0: [32]u8 = undefined;
+        var x2_1: [32]u8 = undefined;
+        var y2_0: [32]u8 = undefined;
+        var y2_1: [32]u8 = undefined;
+        @memcpy(&x1_0, self.x[0..32]);
+        @memcpy(&x1_1, self.x[32..64]);
+        @memcpy(&y1_0, self.y[0..32]);
+        @memcpy(&y1_1, self.y[32..64]);
+        @memcpy(&x2_0, other.x[0..32]);
+        @memcpy(&x2_1, other.x[32..64]);
+        @memcpy(&y2_0, other.y[0..32]);
+        @memcpy(&y2_1, other.y[32..64]);
+
+        // Compute dx = x2 - x1 in Fp2
+        const dx_real = bigint.subMod(x2_0, x1_0, q) catch return G2Point.infinity();
+        const dx_imag = bigint.subMod(x2_1, x1_1, q) catch return G2Point.infinity();
+
+        // Compute dy = y2 - y1 in Fp2
+        const dy_real = bigint.subMod(y2_0, y1_0, q) catch return G2Point.infinity();
+        const dy_imag = bigint.subMod(y2_1, y1_1, q) catch return G2Point.infinity();
+
+        // Compute slope = dy / dx in Fp2
+        // slope = dy * conj(dx) / norm(dx)
+        const dx_norm = bigint.addMod(bigint.mulMod(dx_real, dx_real, q) catch return G2Point.infinity(), bigint.mulMod(dx_imag, dx_imag, q) catch return G2Point.infinity(), q) catch return G2Point.infinity();
+        const dx_norm_inv = bigint.invMod(dx_norm, q) catch return G2Point.infinity();
+
+        // slope_real = (dy_real * dx_real + dy_imag * dx_imag) * dx_norm_inv
+        const s1 = bigint.mulMod(dy_real, dx_real, q) catch return G2Point.infinity();
+        const s2 = bigint.mulMod(dy_imag, dx_imag, q) catch return G2Point.infinity();
+        const slope_real_num = bigint.addMod(s1, s2, q) catch return G2Point.infinity();
+        const slope_real = bigint.mulMod(slope_real_num, dx_norm_inv, q) catch return G2Point.infinity();
+
+        // slope_imag = (dy_imag * dx_real - dy_real * dx_imag) * dx_norm_inv
+        const s3 = bigint.mulMod(dy_imag, dx_real, q) catch return G2Point.infinity();
+        const s4 = bigint.mulMod(dy_real, dx_imag, q) catch return G2Point.infinity();
+        const slope_imag_num = bigint.subMod(s3, s4, q) catch return G2Point.infinity();
+        const slope_imag = bigint.mulMod(slope_imag_num, dx_norm_inv, q) catch return G2Point.infinity();
+
+        // Compute x3 = slope^2 - x1 - x2
+        const sr_sq = bigint.mulMod(slope_real, slope_real, q) catch return G2Point.infinity();
+        const si_sq = bigint.mulMod(slope_imag, slope_imag, q) catch return G2Point.infinity();
+        const sr_si = bigint.mulMod(slope_real, slope_imag, q) catch return G2Point.infinity();
+
+        const slope_sq_real = bigint.subMod(sr_sq, si_sq, q) catch return G2Point.infinity();
+        const slope_sq_imag = bigint.addMod(sr_si, sr_si, q) catch return G2Point.infinity();
+
+        // x3 = slope^2 - x1 - x2
+        const x3_temp = bigint.subMod(slope_sq_real, x1_0, q) catch return G2Point.infinity();
+        const x3_real = bigint.subMod(x3_temp, x2_0, q) catch return G2Point.infinity();
+        const x3_temp2 = bigint.subMod(slope_sq_imag, x1_1, q) catch return G2Point.infinity();
+        const x3_imag = bigint.subMod(x3_temp2, x2_1, q) catch return G2Point.infinity();
+
+        // Compute y3 = slope*(x1 - x3) - y1
+        const dx1_real = bigint.subMod(x1_0, x3_real, q) catch return G2Point.infinity();
+        const dx1_imag = bigint.subMod(x1_1, x3_imag, q) catch return G2Point.infinity();
+
+        // slope * (x1 - x3) in Fp2
+        const p1 = bigint.mulMod(slope_real, dx1_real, q) catch return G2Point.infinity();
+        const p2 = bigint.mulMod(slope_imag, dx1_imag, q) catch return G2Point.infinity();
+        const p3 = bigint.mulMod(slope_real, dx1_imag, q) catch return G2Point.infinity();
+        const p4 = bigint.mulMod(slope_imag, dx1_real, q) catch return G2Point.infinity();
+
+        const prod_real = bigint.subMod(p1, p2, q) catch return G2Point.infinity();
+        const prod_imag = bigint.addMod(p3, p4, q) catch return G2Point.infinity();
+
+        const y3_real = bigint.subMod(prod_real, y1_0, q) catch return G2Point.infinity();
+        const y3_imag = bigint.subMod(prod_imag, y1_1, q) catch return G2Point.infinity();
+
+        // Build result point
+        var result_x: [64]u8 = undefined;
+        var result_y: [64]u8 = undefined;
+        @memcpy(result_x[0..32], &x3_real);
+        @memcpy(result_x[32..64], &x3_imag);
+        @memcpy(result_y[0..32], &y3_real);
+        @memcpy(result_y[32..64], &y3_imag);
+
+        return G2Point.affine(result_x, result_y);
     }
 
-    /// Scalar multiplication: [k]P
     /// Uses proper elliptic curve scalar multiplication
     pub fn mul(self: G2Point, scalar: [32]u8, curve_params: params.SystemParams) G2Point {
         return CurveUtils.scalarMultiplyG2(self, scalar, curve_params);
