@@ -121,7 +121,7 @@ pub fn benchSm4CbcEncrypt1K(allocator: std.mem.Allocator) void {
     const size: usize = 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
-    const ciphertext = allocator.alloc(u8, size + 16) catch return;
+    const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
     var prng = std.Random.DefaultPrng.init(0);
     prng.random().bytes(plaintext);
@@ -134,14 +134,14 @@ pub fn benchSm4CbcDecrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
     const iv = [_]u8{0x00} ** 16;
     const size: usize = 1024;
-    const ciphertext = allocator.alloc(u8, size + 16) catch return;
+    const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
     var prng = std.Random.DefaultPrng.init(0);
-    prng.random().bytes(ciphertext[0..size]);
+    prng.random().bytes(ciphertext);
     var ctx = sm4.SM4_CBC.init(&key, &iv);
-    ctx.decrypt(ciphertext[0..size], plaintext);
+    ctx.decrypt(ciphertext, plaintext);
 }
 
 /// SM4 CTR encryption benchmark (1 KB)
