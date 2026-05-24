@@ -13,52 +13,53 @@ const SM4_KEY_SIZE = 16;
 const ROUNDS = 32;
 
 // ============================================================
-// SM4 S-Box 比特切片布尔表达式
+// SM4 S-Box 比特切片实现
 //
-// 这些表达式来自密码学文献，经过验证正确。
-// 参考: "Efficient Bitslice Implementation of SM4"
-//       及开源实现 (如 libgmlib, GmSSL 等)
-//
-// SM4 S(x) = A * inv(x ⊕ 0xd3) ⊕ 0x7a
-// 其中 inv 是 GF(2^8) 上的乘法逆元
-//
-// 我们使用 tower field 方法实现 GF(2^8) 求逆，
-// 然后应用 SM4 的仿射变换。
+// 使用预计算的查找表方法。
+// 对于每个输出比特位，使用一个 256-entry 的 LUT。
 // ============================================================
 
 /// 比特切片 S 盒 - 对 8 个输入位向量应用 S 盒变换
 /// T 是 SIMD 向量类型 (如 @Vector(8, u32))
 /// x[0] = LSB, x[7] = MSB
 /// 返回 y[0..7], y[0] = LSB, y[7] = MSB
-fn sm4_sbox_bitslice(comptime T: type, x: *const [8]T) [8]T {
-    const ones: T = @splat(@as(u32, 0xFFFFFFFF));
+pub fn sm4_sbox_bitslice(comptime T: type, x: *const [8]T) [8]T {
+    const N = @typeInfo(T).vector.len;
 
-    // 第1步: 应用常数 XOR (x ^ 0xd3)
-    // 0xd3 = 0b11010011 (MSB first)
-    // 按 LSB first: bit0=1, bit1=1, bit2=0, bit3=0, bit4=1, bit5=0, bit6=1, bit7=1
-    const a = x[0] ^ ones; // bit0 ^ 1
-    const b = x[1] ^ ones; // bit1 ^ 1
-    const c = x[2]; // bit2 ^ 0
-    const d = x[3]; // bit3 ^ 0
-    const e = x[4] ^ ones; // bit4 ^ 1
-    const f = x[5]; // bit5 ^ 0
-    const g = x[6] ^ ones; // bit6 ^ 1
-    const h = x[7] ^ ones; // bit7 ^ 1
+    // 将 8 个输入位向量转换为 N 个字节值
+    var bytes: [N]u8 = undefined;
+    {
+        var bit_arrays: [8][N]u32 = undefined;
+        for (0..8) |bit| {
+            bit_arrays[bit] = @as([N]u32, x[bit]);
+        }
+        for (0..N) |elem| {
+            var byte: u8 = 0;
+            for (0..8) |bit| {
+                const bit_val = @as(u8, @intCast(bit_arrays[bit][elem] & 1));
+                byte |= bit_val << @intCast(bit);
+            }
+            bytes[elem] = byte;
+        }
+    }
 
-    // 第2组: 非线性变换 (AND)
-    const t09 = a & b;
-    const t10 = c & d;
-    const t11 = e & f;
-    const t12 = g & h;
+    // 查表
+    var sbox_out: [N]u8 = undefined;
+    for (0..N) |elem| {
+        sbox_out[elem] = SBOX[bytes[elem]];
+    }
 
-    // 第3组: 线性组合
-    const t17 = t09 ^ t10;
-    const t18 = t11 ^ t12;
-    const t21 = t17 ^ t18;
+    // 将输出字节拆分为 8 个位向量
+    var result: [8]T = undefined;
+    for (0..8) |bit| {
+        var arr: [N]u32 = undefined;
+        for (0..N) |elem| {
+            arr[elem] = @as(u32, (sbox_out[elem] >> @intCast(bit)) & 1);
+        }
+        result[bit] = @as(T, arr);
+    }
 
-    // 返回结果 (占位 - 需要实现完整的比特切片 S 盒)
-    _ = &t21;
-    return [8]T{ a, b, c, d, e, f, g, h };
+    return result;
 }
 
 /// 比特切片 SM4 上下文
@@ -67,17 +68,13 @@ pub const SM4_Bitslice = struct {
 
     pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4_Bitslice {
         var ctx: SM4_Bitslice = undefined;
-        // 使用标准密钥扩展
-        // (与原始 SM4 相同的密钥扩展)
         ctx.rk = expandKey(key);
         return ctx;
     }
 
     /// 加密多个块 (并行)
-    /// blocks 数量必须是 VEC_LEN 的倍数
     pub fn encryptBlocks(ctx: *const SM4_Bitslice, input: []const u8, output: []u8) void {
         const block_count = input.len / SM4_BLOCK_SIZE;
-        // 使用建议的向量长度
         const vec_len = getVectorLen();
         var i: usize = 0;
         while (i < block_count) {
@@ -101,7 +98,6 @@ pub const SM4_Bitslice = struct {
 
     /// 加密单个块 (兼容接口)
     pub fn encryptBlock(ctx: *const SM4_Bitslice, input: *const [SM4_BLOCK_SIZE]u8, output: *[SM4_BLOCK_SIZE]u8) void {
-        // 退化为标准实现
         encryptSingle(ctx, input, output);
     }
 
@@ -113,28 +109,272 @@ pub const SM4_Bitslice = struct {
 
 /// 获取建议的向量长度
 fn getVectorLen() usize {
-    // 使用 std.simd.suggestVectorLength 获取最佳向量长度
-    // 对于 u32 类型，通常返回 4 (SSE), 8 (AVX2), 16 (AVX-512)
     if (std.simd.suggestVectorLength(u32)) |len| {
         return len;
     }
-    return 8; // 默认使用 8 (256-bit SIMD)
+    return 8;
 }
 
-/// 加密 N 个块 (比特切片) - 临时退化为单块加密循环
+/// 将 N 个 128-bit 块转换为比特切片表示
+fn blocks_to_bitslice(comptime T: type, comptime N: usize, input: []const u8) [128]T {
+    var result: [128]T = undefined;
+    for (&result) |*v| {
+        v.* = @splat(@as(u32, 0));
+    }
+
+    for (0..N) |block_idx| {
+        const block_offset = block_idx * SM4_BLOCK_SIZE;
+        for (0..4) |word_idx| {
+            const word_offset = block_offset + word_idx * 4;
+            const word = std.mem.readInt(u32, input[word_offset..][0..4], .big);
+            for (0..32) |bit_idx| {
+                const bit = @as(u32, (word >> @intCast(bit_idx)) & 1);
+                const vec_idx = word_idx * 32 + bit_idx;
+                if (bit == 1) {
+                    var arr: [N]u32 = @as([N]u32, result[vec_idx]);
+                    arr[block_idx] = 1;
+                    result[vec_idx] = @as(T, arr);
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
+/// 将比特切片表示转换回 N 个 128-bit 块
+/// 注意: SM4 输出顺序是 (x3, x2, x1, x0)，需要反转
+fn bitslice_to_blocks(comptime T: type, comptime N: usize, bitslice: *const [128]T, output: []u8) void {
+    for (0..N) |block_idx| {
+        const block_offset = block_idx * SM4_BLOCK_SIZE;
+        // SM4 输出顺序: x3, x2, x1, x0 (逆序)
+        const word_order = [4]usize{ 3, 2, 1, 0 };
+        for (0..4) |out_idx| {
+            const word_idx = word_order[out_idx];
+            var word: u32 = 0;
+            for (0..32) |bit_idx| {
+                const vec_idx = word_idx * 32 + bit_idx;
+                const arr: [N]u32 = @as([N]u32, bitslice[vec_idx]);
+                const bit_val = arr[block_idx] & 1;
+                word |= bit_val << @intCast(bit_idx);
+            }
+            std.mem.writeInt(u32, output[block_offset + out_idx * 4 ..][0..4], word, .big);
+        }
+    }
+}
+
+/// 加密 N 个块
 fn encryptBlocksN(ctx: *const SM4_Bitslice, input: []const u8, output: []u8, n: usize) void {
-    for (0..n) |i| {
-        const offset = i * SM4_BLOCK_SIZE;
-        encryptSingle(ctx, input[offset..][0..SM4_BLOCK_SIZE], output[offset..][0..SM4_BLOCK_SIZE]);
+    if (n < 4) {
+        for (0..n) |i| {
+            const offset = i * SM4_BLOCK_SIZE;
+            encryptSingle(ctx, input[offset..][0..SM4_BLOCK_SIZE], output[offset..][0..SM4_BLOCK_SIZE]);
+        }
+        return;
+    }
+
+    switch (n) {
+        4 => encryptBlocksN_impl(u32, 4, ctx, input, output),
+        8 => encryptBlocksN_impl(u32, 8, ctx, input, output),
+        16 => encryptBlocksN_impl(u32, 16, ctx, input, output),
+        else => {
+            var i: usize = 0;
+            while (i < n) {
+                const remaining = n - i;
+                if (remaining >= 16) {
+                    encryptBlocksN_impl(u32, 16, ctx, input[i * SM4_BLOCK_SIZE ..], output[i * SM4_BLOCK_SIZE ..]);
+                    i += 16;
+                } else if (remaining >= 8) {
+                    encryptBlocksN_impl(u32, 8, ctx, input[i * SM4_BLOCK_SIZE ..], output[i * SM4_BLOCK_SIZE ..]);
+                    i += 8;
+                } else if (remaining >= 4) {
+                    encryptBlocksN_impl(u32, 4, ctx, input[i * SM4_BLOCK_SIZE ..], output[i * SM4_BLOCK_SIZE ..]);
+                    i += 4;
+                } else {
+                    for (0..remaining) |j| {
+                        const offset = (i + j) * SM4_BLOCK_SIZE;
+                        encryptSingle(ctx, input[offset..][0..SM4_BLOCK_SIZE], output[offset..][0..SM4_BLOCK_SIZE]);
+                    }
+                    i += remaining;
+                }
+            }
+        },
     }
 }
 
-/// 解密 N 个块 (比特切片) - 临时退化为单块解密循环
+/// 解密 N 个块
 fn decryptBlocksN(ctx: *const SM4_Bitslice, input: []const u8, output: []u8, n: usize) void {
-    for (0..n) |i| {
-        const offset = i * SM4_BLOCK_SIZE;
-        decryptSingle(ctx, input[offset..][0..SM4_BLOCK_SIZE], output[offset..][0..SM4_BLOCK_SIZE]);
+    if (n < 4) {
+        for (0..n) |i| {
+            const offset = i * SM4_BLOCK_SIZE;
+            decryptSingle(ctx, input[offset..][0..SM4_BLOCK_SIZE], output[offset..][0..SM4_BLOCK_SIZE]);
+        }
+        return;
     }
+
+    switch (n) {
+        4 => decryptBlocksN_impl(u32, 4, ctx, input, output),
+        8 => decryptBlocksN_impl(u32, 8, ctx, input, output),
+        16 => decryptBlocksN_impl(u32, 16, ctx, input, output),
+        else => {
+            var i: usize = 0;
+            while (i < n) {
+                const remaining = n - i;
+                if (remaining >= 16) {
+                    decryptBlocksN_impl(u32, 16, ctx, input[i * SM4_BLOCK_SIZE ..], output[i * SM4_BLOCK_SIZE ..]);
+                    i += 16;
+                } else if (remaining >= 8) {
+                    decryptBlocksN_impl(u32, 8, ctx, input[i * SM4_BLOCK_SIZE ..], output[i * SM4_BLOCK_SIZE ..]);
+                    i += 8;
+                } else if (remaining >= 4) {
+                    decryptBlocksN_impl(u32, 4, ctx, input[i * SM4_BLOCK_SIZE ..], output[i * SM4_BLOCK_SIZE ..]);
+                    i += 4;
+                } else {
+                    for (0..remaining) |j| {
+                        const offset = (i + j) * SM4_BLOCK_SIZE;
+                        decryptSingle(ctx, input[offset..][0..SM4_BLOCK_SIZE], output[offset..][0..SM4_BLOCK_SIZE]);
+                    }
+                    i += remaining;
+                }
+            }
+        },
+    }
+}
+
+/// 比特切片加密实现 (泛型版本)
+fn encryptBlocksN_impl(comptime T: type, comptime N: usize, ctx: *const SM4_Bitslice, input: []const u8, output: []u8) void {
+    const Vec = @Vector(N, T);
+
+    // 将输入转换为比特切片表示
+    var bitslice = blocks_to_bitslice(Vec, N, input);
+
+    // 执行 32 轮加密
+    for (0..ROUNDS) |round| {
+        const rk = ctx.rk[round];
+
+        // 计算 t = x1 ^ x2 ^ x3 ^ rk
+        var t_bitslice: [32]Vec = undefined;
+        for (0..32) |bit| {
+            t_bitslice[bit] = bitslice[32 + bit] ^ bitslice[64 + bit] ^ bitslice[96 + bit];
+        }
+        // XOR with rk
+        for (0..32) |bit| {
+            const rk_bit = @as(u32, (rk >> @intCast(bit)) & 1);
+            if (rk_bit == 1) {
+                t_bitslice[bit] ^= @splat(@as(u32, 0xFFFFFFFF));
+            }
+        }
+
+        // 对 t 的每个字节应用 S 盒
+        // 注意: SM4 中字节顺序是大端，byte_idx=0 是最高字节 (bit 24-31)
+        for (0..4) |byte_idx| {
+            const bit_offset = (3 - byte_idx) * 8; // 最高字节对应 bit 24-31
+            var sbox_input: [8]Vec = undefined;
+            for (0..8) |bit| {
+                sbox_input[bit] = t_bitslice[bit_offset + bit];
+            }
+
+            const sbox_output = sm4_sbox_bitslice(Vec, &sbox_input);
+
+            for (0..8) |bit| {
+                t_bitslice[bit_offset + bit] = sbox_output[bit];
+            }
+        }
+
+        // 应用线性变换 L: t ^ rotl(t,2) ^ rotl(t,10) ^ rotl(t,18) ^ rotl(t,24)
+        var l_bitslice: [32]Vec = undefined;
+        for (0..32) |bit| {
+            const b0 = t_bitslice[bit];
+            const b1 = t_bitslice[(bit + 32 - 2) % 32];
+            const b2 = t_bitslice[(bit + 32 - 10) % 32];
+            const b3 = t_bitslice[(bit + 32 - 18) % 32];
+            const b4 = t_bitslice[(bit + 32 - 24) % 32];
+            l_bitslice[bit] = b0 ^ b1 ^ b2 ^ b3 ^ b4;
+        }
+
+        // x0 ^= L(t)
+        for (0..32) |bit| {
+            bitslice[0 * 32 + bit] ^= l_bitslice[bit];
+        }
+
+        // 循环移位: (x0, x1, x2, x3) = (x1, x2, x3, x0)
+        var old_x0: [32]Vec = undefined;
+        for (0..32) |bit| {
+            old_x0[bit] = bitslice[0 * 32 + bit];
+        }
+        for (0..32) |bit| {
+            bitslice[0 * 32 + bit] = bitslice[1 * 32 + bit];
+            bitslice[1 * 32 + bit] = bitslice[2 * 32 + bit];
+            bitslice[2 * 32 + bit] = bitslice[3 * 32 + bit];
+            bitslice[3 * 32 + bit] = old_x0[bit];
+        }
+    }
+
+    // 将比特切片表示转换回字节
+    bitslice_to_blocks(Vec, N, &bitslice, output);
+}
+
+/// 比特切片解密实现 (泛型版本)
+fn decryptBlocksN_impl(comptime T: type, comptime N: usize, ctx: *const SM4_Bitslice, input: []const u8, output: []u8) void {
+    const Vec = @Vector(N, T);
+
+    var bitslice = blocks_to_bitslice(Vec, N, input);
+
+    for (0..ROUNDS) |round| {
+        const rk = ctx.rk[ROUNDS - 1 - round];
+
+        var t_bitslice: [32]Vec = undefined;
+        for (0..32) |bit| {
+            t_bitslice[bit] = bitslice[32 + bit] ^ bitslice[64 + bit] ^ bitslice[96 + bit];
+        }
+        for (0..32) |bit| {
+            const rk_bit = @as(u32, (rk >> @intCast(bit)) & 1);
+            if (rk_bit == 1) {
+                t_bitslice[bit] ^= @splat(@as(u32, 0xFFFFFFFF));
+            }
+        }
+
+        for (0..4) |byte_idx| {
+            const bit_offset = (3 - byte_idx) * 8;
+            var sbox_input: [8]Vec = undefined;
+            for (0..8) |bit| {
+                sbox_input[bit] = t_bitslice[bit_offset + bit];
+            }
+
+            const sbox_output = sm4_sbox_bitslice(Vec, &sbox_input);
+
+            for (0..8) |bit| {
+                t_bitslice[bit_offset + bit] = sbox_output[bit];
+            }
+        }
+
+        var l_bitslice: [32]Vec = undefined;
+        for (0..32) |bit| {
+            const b0 = t_bitslice[bit];
+            const b1 = t_bitslice[(bit + 32 - 2) % 32];
+            const b2 = t_bitslice[(bit + 32 - 10) % 32];
+            const b3 = t_bitslice[(bit + 32 - 18) % 32];
+            const b4 = t_bitslice[(bit + 32 - 24) % 32];
+            l_bitslice[bit] = b0 ^ b1 ^ b2 ^ b3 ^ b4;
+        }
+
+        for (0..32) |bit| {
+            bitslice[0 * 32 + bit] ^= l_bitslice[bit];
+        }
+
+        var old_x0: [32]Vec = undefined;
+        for (0..32) |bit| {
+            old_x0[bit] = bitslice[0 * 32 + bit];
+        }
+        for (0..32) |bit| {
+            bitslice[0 * 32 + bit] = bitslice[1 * 32 + bit];
+            bitslice[1 * 32 + bit] = bitslice[2 * 32 + bit];
+            bitslice[2 * 32 + bit] = bitslice[3 * 32 + bit];
+            bitslice[3 * 32 + bit] = old_x0[bit];
+        }
+    }
+
+    bitslice_to_blocks(Vec, N, &bitslice, output);
 }
 
 /// 加密单个块 (标准实现，作为后备)
@@ -182,12 +422,10 @@ fn decryptSingle(ctx: *const SM4_Bitslice, input: *const [SM4_BLOCK_SIZE]u8, out
 /// SM4 轮函数 (标准实现)
 fn sm4_round(x0: u32, x1: u32, x2: u32, x3: u32, rk: u32) u32 {
     const t = x1 ^ x2 ^ x3 ^ rk;
-    // 使用 S 盒
     const b0 = @as(u8, @truncate(t >> 24));
     const b1 = @as(u8, @truncate(t >> 16));
     const b2 = @as(u8, @truncate(t >> 8));
     const b3 = @as(u8, @truncate(t));
-    // 使用 T 表
     return x0 ^ (T0[b0] ^ T1[b1] ^ T2[b2] ^ T3[b3]);
 }
 
@@ -313,7 +551,6 @@ test "SM4 Bitslice - basic encrypt/decrypt" {
 
     const ctx = SM4_Bitslice.init(&key);
 
-    // Test single block
     var ciphertext: [16]u8 = undefined;
     ctx.encryptBlock(&plaintext, &ciphertext);
     try std.testing.expectEqualSlices(u8, &expected, &ciphertext);
@@ -329,7 +566,6 @@ test "SM4 Bitslice - multi-block encrypt/decrypt" {
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
     };
 
-    // 创建 8 个块的数据
     var plaintext: [128]u8 = undefined;
     for (0..8) |i| {
         for (0..16) |j| {
