@@ -247,6 +247,234 @@ fn benchZucMac4K(allocator: std.mem.Allocator) void {
     std.mem.doNotOptimizeAway(mac);
 }
 
+/// ZUC-AEAD seal benchmark (1 KB)
+fn benchZucAeadSeal1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{0x01} ** 16;
+    const iv = [_]u8{0x02} ** 16;
+    const aad = "additional authenticated data";
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var tag: [4]u8 = undefined;
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var aead = zuc.ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, ciphertext, &tag);
+    std.mem.doNotOptimizeAway(tag);
+}
+
+/// ZUC-AEAD seal benchmark (64 KB)
+fn benchZucAeadSeal64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{0x01} ** 16;
+    const iv = [_]u8{0x02} ** 16;
+    const aad = "additional authenticated data";
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var tag: [4]u8 = undefined;
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var aead = zuc.ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, ciphertext, &tag);
+    std.mem.doNotOptimizeAway(tag);
+}
+
+/// SM4 CBC encryption benchmark (1 KB)
+fn benchSm4CbcEncrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const iv = [_]u8{0x00} ** 16;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size + 16) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_CBC.init(&key, &iv);
+    ctx.encrypt(plaintext, ciphertext);
+}
+
+/// SM4 CBC decryption benchmark (1 KB)
+fn benchSm4CbcDecrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const iv = [_]u8{0x00} ** 16;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size + 16) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var enc_ctx = sm4.SM4_CBC.init(&key, &iv);
+    enc_ctx.encrypt(plaintext, ciphertext);
+    var dec_ctx = sm4.SM4_CBC.init(&key, &iv);
+    dec_ctx.decrypt(ciphertext[0..size], plaintext);
+}
+
+/// SM4 CTR encryption benchmark (1 KB)
+fn benchSm4CtrEncrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const nonce = [_]u8{0x00} ** 16;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_CTR.init(&key, &nonce);
+    ctx.encrypt(plaintext, ciphertext);
+}
+
+/// SM4 CTR encryption benchmark (64 KB)
+fn benchSm4CtrEncrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const nonce = [_]u8{0x00} ** 16;
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_CTR.init(&key, &nonce);
+    ctx.encrypt(plaintext, ciphertext);
+}
+
+/// SM4 CTR decryption benchmark (1 KB)
+fn benchSm4CtrDecrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const nonce = [_]u8{0x00} ** 16;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var enc_ctx = sm4.SM4_CTR.init(&key, &nonce);
+    enc_ctx.encrypt(plaintext, ciphertext);
+    var dec_ctx = sm4.SM4_CTR.init(&key, &nonce);
+    dec_ctx.decrypt(ciphertext, plaintext);
+}
+
+/// SM4 CTR decryption benchmark (64 KB)
+fn benchSm4CtrDecrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const nonce = [_]u8{0x00} ** 16;
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var enc_ctx = sm4.SM4_CTR.init(&key, &nonce);
+    enc_ctx.encrypt(plaintext, ciphertext);
+    var dec_ctx = sm4.SM4_CTR.init(&key, &nonce);
+    dec_ctx.decrypt(ciphertext, plaintext);
+}
+
+/// SM4 GCM seal benchmark (1 KB)
+fn benchSm4GcmSeal1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const nonce = [_]u8{0x00} ** 12;
+    const aad = "additional data";
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var tag: [16]u8 = undefined;
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_GCM.init(&key);
+    ctx.encrypt(&nonce, plaintext, aad, ciphertext, &tag);
+    std.mem.doNotOptimizeAway(tag);
+}
+
+/// SM4 GCM seal benchmark (64 KB)
+fn benchSm4GcmSeal64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
+    const nonce = [_]u8{0x00} ** 12;
+    const aad = "additional data";
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var tag: [16]u8 = undefined;
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_GCM.init(&key);
+    ctx.encrypt(&nonce, plaintext, aad, ciphertext, &tag);
+    std.mem.doNotOptimizeAway(tag);
+}
+
+/// SM4 XTS decryption benchmark (1 KB)
+fn benchSm4XtsDecrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{0x01} ** 32;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var enc_ctx = sm4.SM4_XTS.init(&key);
+    enc_ctx.encrypt(0, plaintext, ciphertext);
+    var dec_ctx = sm4.SM4_XTS.init(&key);
+    dec_ctx.decrypt(0, ciphertext, plaintext);
+}
+
+/// SM4 XTS decryption benchmark (64 KB)
+fn benchSm4XtsDecrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{0x01} ** 32;
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var enc_ctx = sm4.SM4_XTS.init(&key);
+    enc_ctx.encrypt(0, plaintext, ciphertext);
+    var dec_ctx = sm4.SM4_XTS.init(&key);
+    dec_ctx.decrypt(0, ciphertext, plaintext);
+}
+
+/// SM4 XTS encryption benchmark (1 KB)
+fn benchSm4XtsEncrypt1K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{0x01} ** 32;
+    const size: usize = 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_XTS.init(&key);
+    ctx.encrypt(0, plaintext, ciphertext);
+}
+
+/// SM4 XTS encryption benchmark (64 KB)
+fn benchSm4XtsEncrypt64K(allocator: std.mem.Allocator) void {
+    const key = [_]u8{0x01} ** 32;
+    const size: usize = 64 * 1024;
+    const plaintext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(plaintext);
+    const ciphertext = allocator.alloc(u8, size) catch return;
+    defer allocator.free(ciphertext);
+    var prng = std.Random.DefaultPrng.init(0);
+    prng.random().bytes(plaintext);
+    var ctx = sm4.SM4_XTS.init(&key);
+    ctx.encrypt(0, plaintext, ciphertext);
+}
+
 /// SM2 key generation benchmark
 fn benchSm2KeyGen(allocator: std.mem.Allocator) void {
     var threaded: std.Io.Threaded = .init_single_threaded;
@@ -635,6 +863,22 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     try bench.add("ZUC crypt 1M   ", benchZucCrypt1M, .{});
     try bench.add("ZUC MAC 16B    ", benchZucMac16B, .{});
     try bench.add("ZUC MAC 4K     ", benchZucMac4K, .{});
+    try bench.add("ZUC AEAD 1K    ", benchZucAeadSeal1K, .{});
+    try bench.add("ZUC AEAD 64K   ", benchZucAeadSeal64K, .{});
+
+    // SM4 additional mode benchmarks
+    try bench.add("SM4 CBC E 1K   ", benchSm4CbcEncrypt1K, .{});
+    try bench.add("SM4 CBC D 1K   ", benchSm4CbcDecrypt1K, .{});
+    try bench.add("SM4 CTR E 1K   ", benchSm4CtrEncrypt1K, .{});
+    try bench.add("SM4 CTR D 1K   ", benchSm4CtrDecrypt1K, .{});
+    try bench.add("SM4 CTR E 64K  ", benchSm4CtrEncrypt64K, .{});
+    try bench.add("SM4 CTR D 64K  ", benchSm4CtrDecrypt64K, .{});
+    try bench.add("SM4 GCM 1K     ", benchSm4GcmSeal1K, .{});
+    try bench.add("SM4 GCM 64K    ", benchSm4GcmSeal64K, .{});
+    try bench.add("SM4 XTS E 1K   ", benchSm4XtsEncrypt1K, .{});
+    try bench.add("SM4 XTS D 1K   ", benchSm4XtsDecrypt1K, .{});
+    try bench.add("SM4 XTS E 64K  ", benchSm4XtsEncrypt64K, .{});
+    try bench.add("SM4 XTS D 64K  ", benchSm4XtsDecrypt64K, .{});
 
     // SM2 benchmarks
     try bench.add("SM2 key gen    ", benchSm2KeyGen, .{});

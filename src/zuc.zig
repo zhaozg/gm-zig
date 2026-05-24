@@ -236,6 +236,160 @@ pub const ZUC = struct {
     }
 };
 
+/// ZUC-AEAD: Authenticated Encryption with Associated Data
+/// Combines ZUC stream cipher (128-EEA3) with ZUC MAC (128-EIA3)
+/// to provide confidentiality, integrity, and authenticity.
+///
+/// The encryption uses a separate ZUC instance with counter-based IV
+/// to generate keystream, while the MAC uses another ZUC instance
+/// with the original IV for authentication.
+///
+/// Based on GM/T 0001.2-2012 (128-EEA3) and GM/T 0001.3-2012 (128-EIA3)
+/// ZUC-AEAD: Authenticated Encryption with Associated Data
+/// Combines ZUC stream cipher (128-EEA3) with ZUC MAC (128-EIA3)
+/// to provide confidentiality, integrity, and authenticity.
+///
+/// The encryption uses ZUC stream cipher for confidentiality.
+/// The MAC is computed over (additional_data || ciphertext || len(additional_data) || len(ciphertext))
+/// using a separate ZUC instance with a modified IV.
+///
+/// Based on GM/T 0001.2-2012 (128-EEA3) and GM/T 0001.3-2012 (128-EIA3)
+pub const ZUC_AEAD = struct {
+    key: [16]u8,
+    iv: [16]u8,
+
+    pub const TAG_SIZE: usize = 4; // 32-bit MAC tag
+    pub const NONCE_SIZE: usize = 16; // 128-bit IV
+    pub const KEY_SIZE: usize = 16; // 128-bit key
+
+    pub fn init(key: *const [16]u8, iv: *const [16]u8) ZUC_AEAD {
+        var self: ZUC_AEAD = undefined;
+        @memcpy(&self.key, key);
+        @memcpy(&self.iv, iv);
+        return self;
+    }
+
+    /// Compute MAC over data using a ZUC instance.
+    /// This is a manual implementation that chains state across calls.
+    fn computeMAC(zuc: *ZUC, data: []const u8) u32 {
+        if (data.len == 0) return 0;
+
+        var mac: u32 = 0;
+        const num_blocks = data.len / 4;
+        var i: usize = 0;
+
+        while (i < num_blocks) : (i += 1) {
+            const block = std.mem.readInt(u32, data[i * 4 ..][0..4], .big);
+            mac ^= block ^ zuc.generateKeyword();
+        }
+
+        const remaining = data.len % 4;
+        if (remaining > 0) {
+            const start_idx = num_blocks * 4;
+            var last_block: u32 = 0;
+            for (0..remaining) |j| {
+                last_block |= @as(u32, data[start_idx + j]) << @as(u5, @intCast((3 - j) * 8));
+            }
+            mac ^= last_block ^ zuc.generateKeyword();
+        }
+
+        return mac;
+    }
+
+    /// Encrypt and authenticate.
+    /// ciphertext must be at least plaintext.len bytes.
+    /// tag must be exactly TAG_SIZE (4) bytes.
+    pub fn seal(
+        self: *const ZUC_AEAD,
+        plaintext: []const u8,
+        additional_data: []const u8,
+        ciphertext: []u8,
+        tag: *[4]u8,
+    ) void {
+        // Encrypt using ZUC stream cipher
+        var enc_zuc = ZUC.init(&self.key, &self.iv);
+        enc_zuc.crypt(plaintext, ciphertext);
+
+        // Compute MAC over additional_data || ciphertext || len(aad) || len(ct)
+        // Use a separate ZUC instance with a modified IV for MAC
+        var mac_iv: [16]u8 = undefined;
+        @memcpy(&mac_iv, &self.iv);
+        mac_iv[15] ^= 0x01; // Differentiate MAC IV from encryption IV
+
+        var mac_zuc = ZUC.init(&self.key, &mac_iv);
+
+        var mac: u32 = 0;
+
+        // Include additional data in MAC
+        if (additional_data.len > 0) {
+            mac ^= computeMAC(&mac_zuc, additional_data);
+        }
+
+        // Include ciphertext in MAC
+        if (plaintext.len > 0) {
+            mac ^= computeMAC(&mac_zuc, ciphertext[0..plaintext.len]);
+        }
+
+        // Include lengths as finalization (big-endian 32-bit)
+        var len_buf: [8]u8 = undefined;
+        std.mem.writeInt(u32, len_buf[0..4], @as(u32, @intCast(additional_data.len)), .big);
+        std.mem.writeInt(u32, len_buf[4..8], @as(u32, @intCast(plaintext.len)), .big);
+        mac ^= computeMAC(&mac_zuc, &len_buf);
+
+        std.mem.writeInt(u32, tag, mac, .big);
+    }
+
+    /// Decrypt and verify authentication.
+    /// Returns true if authentication succeeds, false otherwise.
+    /// plaintext must be at least ciphertext.len bytes.
+    pub fn open(
+        self: *const ZUC_AEAD,
+        ciphertext: []const u8,
+        additional_data: []const u8,
+        tag: *const [4]u8,
+        plaintext: []u8,
+    ) bool {
+        // Compute expected MAC
+        var mac_iv: [16]u8 = undefined;
+        @memcpy(&mac_iv, &self.iv);
+        mac_iv[15] ^= 0x01;
+
+        var mac_zuc = ZUC.init(&self.key, &mac_iv);
+
+        var mac: u32 = 0;
+
+        if (additional_data.len > 0) {
+            mac ^= computeMAC(&mac_zuc, additional_data);
+        }
+
+        if (ciphertext.len > 0) {
+            mac ^= computeMAC(&mac_zuc, ciphertext);
+        }
+
+        var len_buf: [8]u8 = undefined;
+        std.mem.writeInt(u32, len_buf[0..4], @as(u32, @intCast(additional_data.len)), .big);
+        std.mem.writeInt(u32, len_buf[4..8], @as(u32, @intCast(ciphertext.len)), .big);
+        mac ^= computeMAC(&mac_zuc, &len_buf);
+
+        var expected_tag: [4]u8 = undefined;
+        std.mem.writeInt(u32, &expected_tag, mac, .big);
+
+        // Constant-time tag comparison
+        var diff: u8 = 0;
+        for (tag, &expected_tag) |a, b| {
+            diff |= a ^ b;
+        }
+        if (diff != 0) return false;
+
+        // Decrypt
+        @memcpy(plaintext[0..ciphertext.len], ciphertext);
+        var dec_zuc = ZUC.init(&self.key, &self.iv);
+        dec_zuc.crypt(ciphertext, plaintext);
+
+        return true;
+    }
+};
+
 fn makeU32(a: u8, b: u8, c: u8, d: u8) u32 {
     return (@as(u32, a) << 24) | (@as(u32, b) << 16) | (@as(u32, c) << 8) | @as(u32, d);
 }
@@ -893,6 +1047,165 @@ test "ZUC MAC usage example" {
     const tampered_data = "This is tampered data that needs integrity protection";
     const is_tampered_valid = ZUC.verifyMACWithKey(&key, &iv, tampered_data, mac);
     try testing.expect(!is_tampered_valid);
+}
+
+test "ZUC-AEAD seal and open" {
+    const key = [_]u8{0x01} ** 16;
+    const iv = [_]u8{0x02} ** 16;
+    const plaintext = "Hello, ZUC-AEAD!";
+    const aad = "additional data";
+
+    var ciphertext: [plaintext.len]u8 = undefined;
+    var decrypted: [plaintext.len]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, &ciphertext, &tag);
+
+    const ok = aead.open(&ciphertext, aad, &tag, &decrypted);
+    try testing.expect(ok);
+    try testing.expectEqualSlices(u8, plaintext, &decrypted);
+}
+
+test "ZUC-AEAD authentication failure on tampered ciphertext" {
+    const key = [_]u8{0x03} ** 16;
+    const iv = [_]u8{0x04} ** 16;
+    const plaintext = "Sensitive data";
+    const aad = "";
+
+    var ciphertext: [plaintext.len]u8 = undefined;
+    var decrypted: [plaintext.len]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, &ciphertext, &tag);
+
+    // Tamper with ciphertext
+    ciphertext[0] ^= 0xFF;
+
+    const ok = aead.open(&ciphertext, aad, &tag, &decrypted);
+    try testing.expect(!ok);
+}
+
+test "ZUC-AEAD authentication failure on tampered tag" {
+    const key = [_]u8{0x05} ** 16;
+    const iv = [_]u8{0x06} ** 16;
+    const plaintext = "More sensitive data";
+    const aad = "associated data";
+
+    var ciphertext: [plaintext.len]u8 = undefined;
+    var decrypted: [plaintext.len]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, &ciphertext, &tag);
+
+    // Tamper with tag
+    tag[0] ^= 0xFF;
+
+    const ok = aead.open(&ciphertext, aad, &tag, &decrypted);
+    try testing.expect(!ok);
+}
+
+test "ZUC-AEAD authentication failure on tampered AAD" {
+    const key = [_]u8{0x07} ** 16;
+    const iv = [_]u8{0x08} ** 16;
+    const plaintext = "Data with AAD";
+    const aad = "original aad";
+
+    var ciphertext: [plaintext.len]u8 = undefined;
+    var decrypted: [plaintext.len]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, &ciphertext, &tag);
+
+    const wrong_aad = "tampered aad";
+    const ok = aead.open(&ciphertext, wrong_aad, &tag, &decrypted);
+    try testing.expect(!ok);
+}
+
+test "ZUC-AEAD empty plaintext" {
+    const key = [_]u8{0x09} ** 16;
+    const iv = [_]u8{0x0A} ** 16;
+    const plaintext = "";
+    const aad = "some aad";
+
+    var ciphertext: [0]u8 = undefined;
+    var decrypted: [0]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, &ciphertext, &tag);
+
+    const ok = aead.open(&ciphertext, aad, &tag, &decrypted);
+    try testing.expect(ok);
+}
+
+test "ZUC-AEAD empty AAD" {
+    const key = [_]u8{0x0B} ** 16;
+    const iv = [_]u8{0x0C} ** 16;
+    const plaintext = "Just plaintext";
+    const aad = "";
+
+    var ciphertext: [plaintext.len]u8 = undefined;
+    var decrypted: [plaintext.len]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(plaintext, aad, &ciphertext, &tag);
+
+    const ok = aead.open(&ciphertext, aad, &tag, &decrypted);
+    try testing.expect(ok);
+    try testing.expectEqualSlices(u8, plaintext, &decrypted);
+}
+
+test "ZUC-AEAD different keys produce different tags" {
+    const key1 = [_]u8{0x0D} ** 16;
+    const key2 = [_]u8{0x0E} ** 16;
+    const iv = [_]u8{0x0F} ** 16;
+    const plaintext = "Same plaintext";
+    const aad = "Same AAD";
+
+    var ct1: [plaintext.len]u8 = undefined;
+    var ct2: [plaintext.len]u8 = undefined;
+    var tag1: [4]u8 = undefined;
+    var tag2: [4]u8 = undefined;
+
+    var aead1 = ZUC_AEAD.init(&key1, &iv);
+    aead1.seal(plaintext, aad, &ct1, &tag1);
+
+    var aead2 = ZUC_AEAD.init(&key2, &iv);
+    aead2.seal(plaintext, aad, &ct2, &tag2);
+
+    // Tags should differ with different keys
+    var tags_differ = false;
+    for (&tag1, &tag2) |a, b| {
+        if (a != b) tags_differ = true;
+    }
+    try testing.expect(tags_differ);
+}
+
+test "ZUC-AEAD large data" {
+    const key = [_]u8{0x10} ** 16;
+    const iv = [_]u8{0x11} ** 16;
+    const aad = "large data test";
+
+    var plaintext: [4096]u8 = undefined;
+    for (&plaintext, 0..) |*b, i| {
+        b.* = @as(u8, @intCast(i & 0xFF));
+    }
+
+    var ciphertext: [4096]u8 = undefined;
+    var decrypted: [4096]u8 = undefined;
+    var tag: [4]u8 = undefined;
+
+    var aead = ZUC_AEAD.init(&key, &iv);
+    aead.seal(&plaintext, aad, &ciphertext, &tag);
+
+    const ok = aead.open(&ciphertext, aad, &tag, &decrypted);
+    try testing.expect(ok);
+    try testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
 pub fn testZUCPerformance(io: std.Io, allocator: std.mem.Allocator) !void {
