@@ -13,19 +13,6 @@ pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
 
     print("=== GM-Zig Cryptography Library Demo ===\n\n", .{});
-
-    print("=== ZUC Performance ===\n", .{});
-    try zuc.testZUCPerformance(io, allocator);
-
-    print("\n=== SM4 ECB Performance ===\n", .{});
-    try sm4.testPerformance(io, allocator);
-
-    print("\n=== SM4 CBC Performance ===\n", .{});
-    try sm4.testPerformance_cbc(io, allocator);
-
-    print("\n=== SM3 Hash Performance ===\n", .{});
-    try sm3.testPerformance(io, allocator);
-
     print("\n=== SM2 Digital Signature Demo ===\n", .{});
     try demonstrateSignature(io, allocator);
 

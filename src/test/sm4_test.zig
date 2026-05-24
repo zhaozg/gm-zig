@@ -194,7 +194,7 @@ test "SM4-XTS mode encryption and decryption" {
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
-// Performance comparison test
+// Optimization test
 test "SM4 optimization verification" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,

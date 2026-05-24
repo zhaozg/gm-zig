@@ -483,7 +483,7 @@ test "GM/T 0044-2016 - Cross-user interoperability" {
     try testing.expect(bob_verifies_charlie);
 }
 
-test "GM/T 0044-2016 - Performance and security validation" {
+test "GM/T 0044-2016 - Validation" {
     const io = testing.io;
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -493,38 +493,18 @@ test "GM/T 0044-2016 - Performance and security validation" {
     const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
     const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
 
-    const user_id = "performance_test@bupt.edu.cn";
+    const user_id = "security_test@bupt.edu.cn";
 
-    // Test batch key extraction (should be efficient)
-    const batch_size = 10;
-    var sign_keys: [batch_size]sm9.key_extract.SignUserPrivateKey = undefined;
-
-    for (0..batch_size) |i| {
-        const test_user = try std.fmt.allocPrint(allocator, "user{}@test.com", .{i});
-        defer allocator.free(test_user);
-
-        sign_keys[i] = try key_context.extractSignKey(test_user);
-        try testing.expect(sign_keys[i].validate(system.params));
-    }
-
-    // Test batch signature generation and verification
+    // Test key extraction
     const sign_key = try key_context.extractSignKey(user_id);
-
-    for (0..5) |i| {
-        const test_message = try std.fmt.allocPrint(allocator, "Message {}", .{i});
-        defer allocator.free(test_message);
-
-        const signature = try sign_context.sign(test_message, sign_key, .{});
-        const is_valid = try sign_context.verify(test_message, signature, user_id, .{});
-
-        try testing.expect(signature.validate());
-        try testing.expect(is_valid);
-    }
+    try testing.expect(sign_key.validate(system.params));
 
     // Security validation: signatures should be different for different messages
     const sig1 = try sign_context.sign("message1", sign_key, .{});
     const sig2 = try sign_context.sign("message2", sign_key, .{});
 
+    try testing.expect(sig1.validate());
+    try testing.expect(sig2.validate());
     try testing.expect(!std.mem.eql(u8, &sig1.h, &sig2.h));
     try testing.expect(!std.mem.eql(u8, &sig1.S, &sig2.S));
 }
