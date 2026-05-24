@@ -501,18 +501,116 @@ fn benchSm9DecryptMedium(allocator: std.mem.Allocator) void {
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
 
+    var filter: ?[]const u8 = null;
+    var list_only = false;
+
+    {
+        var args_iter = try init.minimal.args.iterateAllocator(allocator);
+        defer args_iter.deinit();
+
+        // Skip the first arg (program name)
+        _ = args_iter.next();
+
+        while (args_iter.next()) |arg| {
+            if (std.mem.eql(u8, arg, "--filter") or std.mem.eql(u8, arg, "-f")) {
+                filter = args_iter.next() orelse {
+                    std.log.err("Expected a filter pattern after --filter", .{});
+                    std.process.exit(1);
+                };
+            } else if (std.mem.eql(u8, arg, "--list") or std.mem.eql(u8, arg, "-l")) {
+                list_only = true;
+            } else if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
+                try printUsage();
+                return;
+            } else {
+                std.log.err("Unknown argument: {s}", .{arg});
+                try printUsage();
+                std.process.exit(1);
+            }
+        }
+    }
+
     var threaded: std.Io.Threaded = .init_single_threaded;
     const io = threaded.io();
     const stdout: std.Io.File = .stdout();
+
+    var bench = zbench.Benchmark.init(allocator, .{});
+    defer bench.deinit();
+
+    try addAllBenchmarks(&bench);
+
+    if (list_only) {
+        try listBenchmarks(bench, filter);
+        return;
+    }
+
+    if (filter) |f| {
+        filterBenchmarks(&bench, f);
+        if (bench.benchmarks.items.len == 0) {
+            std.log.err("No benchmarks match filter: {s}\n", .{f});
+            std.process.exit(1);
+        }
+    }
 
     // Print system information
     const sysinfo = try zbench.getSystemInfo();
     var w: std.Io.File.Writer = stdout.writerStreaming(io, &.{});
     try sysinfo.format(&w.interface);
 
-    var bench = zbench.Benchmark.init(allocator, .{});
-    defer bench.deinit();
+    try bench.run(io, stdout);
+}
 
+fn printUsage() !void {
+    var threaded: std.Io.Threaded = .init_single_threaded;
+    const io = threaded.io();
+    const stderr = std.Io.File.stderr();
+    var w = stderr.writerStreaming(io, &.{});
+    try w.interface.writeAll(
+        \\Usage: bench [options]
+        \\
+        \\Options:
+        \\  -f, --filter <pattern>    Run only benchmarks whose name contains the given pattern
+        \\  -l, --list                List all available benchmarks (optionally filtered)
+        \\  -h, --help                Show this help message
+        \\
+        \\Examples:
+        \\  bench --filter SM3        Run only SM3 benchmarks
+        \\  bench --filter SM4        Run only SM4 benchmarks
+        \\  bench --filter "SM2 sign" Run only SM2 signing benchmarks
+        \\  bench --list              List all benchmarks
+        \\  bench --list --filter ZUC List ZUC benchmarks
+        \\
+    );
+}
+
+fn listBenchmarks(bench: zbench.Benchmark, filter: ?[]const u8) !void {
+    var threaded: std.Io.Threaded = .init_single_threaded;
+    const io = threaded.io();
+    const stdout = std.Io.File.stdout();
+    var w = stdout.writerStreaming(io, &.{});
+    try w.interface.writeAll("Available benchmarks:\n");
+    try w.interface.writeAll("---------------------\n");
+    for (bench.benchmarks.items) |item| {
+        if (filter) |f| {
+            if (std.mem.indexOf(u8, item.name, f) == null) continue;
+        }
+        try w.interface.print("  {s}\n", .{item.name});
+    }
+}
+
+fn filterBenchmarks(bench: *zbench.Benchmark, filter: []const u8) void {
+    var i: usize = 0;
+    while (i < bench.benchmarks.items.len) {
+        const name = bench.benchmarks.items[i].name;
+        if (std.mem.indexOf(u8, name, filter) == null) {
+            _ = bench.benchmarks.swapRemove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
+fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     // SM3 benchmarks
     try bench.add("SM3 hash 64B  ", benchSm3Hash64B, .{});
     try bench.add("SM3 hash 1K   ", benchSm3Hash1K, .{});
@@ -560,6 +658,4 @@ pub fn main(init: std.process.Init) !void {
     try bench.add("SM9 enc med    ", benchSm9EncryptMedium, .{});
     try bench.add("SM9 dec small  ", benchSm9DecryptSmall, .{});
     try bench.add("SM9 dec med    ", benchSm9DecryptMedium, .{});
-
-    try bench.run(io, stdout);
 }

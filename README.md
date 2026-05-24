@@ -211,8 +211,22 @@ zig build test
 zig build run
 
 # Run performance benchmarks
-zig build benchmark
+zig build bench
+
+# Run specific benchmark groups (e.g., SM3 only)
+zig build bench -- --filter SM3
+
+# List all available benchmarks
+zig build bench -- --list
+
+# List benchmarks matching a filter
+zig build bench -- --list --filter ZUC
 ```
+
+> **Note:** The `bench` binary supports the following command-line options:
+> - `-f, --filter <pattern>` - Run only benchmarks whose name contains the given pattern
+> - `-l, --list` - List all available benchmarks (optionally filtered)
+> - `-h, --help` - Show help message
 
 ## 📚 API Documentation
 
