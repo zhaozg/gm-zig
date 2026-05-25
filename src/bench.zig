@@ -9,6 +9,10 @@ const sm9_bench = @import("bench/sm9.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
+    const io = init.io;
+    const stdout: std.Io.File = .stdout();
+    var stdout_w = stdout.writerStreaming(io, &.{});
+    const writer: *std.Io.Writer = &stdout_w.interface;
 
     var filter: ?[]const u8 = null;
     var list_only = false;
@@ -39,10 +43,6 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    var threaded: std.Io.Threaded = .init_single_threaded;
-    const io = threaded.io();
-    const stdout: std.Io.File = .stdout();
-
     var bench = zbench.Benchmark.init(allocator, .{});
     defer bench.deinit();
 
@@ -61,10 +61,66 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    // Print system information
-    const sysinfo = try zbench.getSystemInfo();
-    var w: std.Io.File.Writer = stdout.writerStreaming(io, &.{});
-    try sysinfo.format(&w.interface);
+    // 获取当前日期时间
+    const now_ts = std.Io.Timestamp.now(io, .real);
+    const epoch_seconds: i64 = @intCast(@divTrunc(now_ts.nanoseconds, @as(i96, @intCast(std.time.ns_per_s))));
+    const epoch_day = std.time.epoch.EpochSeconds{ .secs = @intCast(epoch_seconds) };
+    const year_and_day = epoch_day.getEpochDay().calculateYearDay();
+    const month_and_day = year_and_day.calculateMonthDay();
+    const day_seconds = epoch_day.getDaySeconds();
+
+    // 获取系统信息（CPU、OS等）
+    const sysinfo = zbench.getSystemInfo() catch |err| blk: {
+        writer.print("[警告] 无法获取系统信息: {}\n", .{err}) catch {};
+        break :blk null;
+    };
+
+    // 获取编译优化模式
+    const optimize_mode = @import("builtin").mode;
+    const mode_str = switch (optimize_mode) {
+        .Debug => "Debug",
+        .ReleaseSafe => "ReleaseSafe",
+        .ReleaseFast => "ReleaseFast",
+        .ReleaseSmall => "ReleaseSmall",
+    };
+
+    writer.print(
+        \\╔══════════════════════════════════════════╗
+        \\║       gm-zig 基准测试工具 (zbench)       ║
+        \\╚══════════════════════════════════════════╝
+
+        \\测试时间: {d:0>4}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}:{d:0>2}
+        \\优化模式: {s}
+        \\
+    , .{
+        year_and_day.year,
+        month_and_day.month.numeric(),
+        month_and_day.day_index + 1,
+        day_seconds.getHoursIntoDay(),
+        day_seconds.getMinutesIntoHour(),
+        day_seconds.getSecondsIntoMinute(),
+        mode_str,
+    }) catch {};
+
+    // 打印系统信息
+    if (sysinfo) |info| {
+        writer.print(
+            \\
+            \\系统信息:
+            \\  操作系统: {s}
+            \\  CPU:      {s}
+            \\  核心数:   {d}
+            \\  内存:     {Bi:.3}
+            \\
+            \\性能数据:
+            \\
+        , .{
+            info.platform,
+            info.cpu,
+            info.cpu_cores,
+            info.memory_total,
+        }) catch {};
+    }
 
     try bench.run(io, stdout);
 }
