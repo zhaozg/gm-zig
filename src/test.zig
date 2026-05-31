@@ -29,4 +29,5 @@ test {
     _ = @import("test/sm9_core_algorithms_test.zig");
     _ = @import("test/kdf_compliance_test.zig");
     _ = @import("test/gmt_0044_2016_compliance_test.zig");
+    _ = @import("test/sm9_reference_compliance_test.zig");
 }
