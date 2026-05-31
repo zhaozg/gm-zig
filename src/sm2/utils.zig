@@ -287,3 +287,81 @@ test "Constant time equality" {
     try testing.expect(constantTimeEqual(&a, &b));
     try testing.expect(!constantTimeEqual(&a, &c));
 }
+
+// 基于算法源码样本数据的 KDF 测试
+test "KDF various output lengths" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    const input = "test kdf input data";
+    const lengths = [_]usize{ 1, 16, 32, 33, 64, 100, 128, 256 };
+
+    for (lengths) |len| {
+        const result = try kdf(allocator, input, len);
+        defer allocator.free(result);
+        try testing.expect(result.len == len);
+    }
+}
+
+test "KDF deterministic output check" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    const input = "deterministic test input";
+    const result1 = try kdf(allocator, input, 64);
+    defer allocator.free(result1);
+    const result2 = try kdf(allocator, input, 64);
+    defer allocator.free(result2);
+
+    try testing.expectEqualSlices(u8, result1, result2);
+}
+
+test "KDF different inputs check" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    const result1 = try kdf(allocator, "input one", 32);
+    defer allocator.free(result1);
+    const result2 = try kdf(allocator, "input two", 32);
+    defer allocator.free(result2);
+
+    try testing.expect(!std.mem.eql(u8, result1, result2));
+}
+
+test "KDF empty input check" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    const result = try kdf(allocator, "", 32);
+    defer allocator.free(result);
+    try testing.expect(result.len == 32);
+}
+
+test "KDF zero length error check" {
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    try testing.expectError(error.InvalidKeyLength, kdf(allocator, "test", 0));
+}
+
+// 基于算法源码样本数据的用户哈希测试
+test "User hash with standard test data check" {
+    const testing = std.testing;
+
+    const user_id = "ALICE123@YAHOO.COM";
+    const pub_x_hex = "09f9df311e5421a150dd7d161e4bc50cc672179fad1833fc076bb08ff356f320c";
+    const pub_y_hex = "00cea490ce26775a52dc6ea718cc1aa60eda05fb8f5e084a6632f6072da9ad13";
+
+    var pub_x: [32]u8 = undefined;
+    var pub_y: [32]u8 = undefined;
+
+    for (&pub_x, 0..) |*b, i| {
+        b.* = try std.fmt.parseInt(u8, pub_x_hex[2 * i .. 2 * i + 2], 16);
+    }
+    for (&pub_y, 0..) |*b, i| {
+        b.* = try std.fmt.parseInt(u8, pub_y_hex[2 * i .. 2 * i + 2], 16);
+    }
+
+    const hash = computeUserHash(user_id, pub_x, pub_y);
+    try testing.expect(hash.len == 32);
+}

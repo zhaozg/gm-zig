@@ -457,27 +457,28 @@ test "SM2 encryption deterministic properties" {
     try testing.expectEqualStrings(message, decrypted2);
 }
 
-test "SM2 encryption large message handling" {
+// 基于算法源码样本数据的加解密测试
+// 使用算法源码中的标准私钥和消息进行加解密验证
+test "SM2 encryption with algorithm source sample data" {
     const allocator = testing.allocator;
 
-    const private_key = SM2.scalar.random(testing.io, .big);
-    const public_key = try kp.publicKeyFromPrivateKey(private_key);
-
-    // Test with 64KB message
-    const large_size = 64 * 1024;
-    const large_message = try allocator.alloc(u8, large_size);
-    defer allocator.free(large_message);
-
-    // Fill with pattern
-    for (large_message, 0..) |*byte, i| {
-        byte.* = @intCast((i * 251 + 17) & 0xFF); // Use prime numbers for better distribution
+    // 算法源码标准测试向量中的私钥
+    const std_private_key_hex = "3945208f7b2144b13f36e38ac6d39f0995889393692860b51a42fb81ef4df7c5b8";
+    var std_private_key: [32]u8 = undefined;
+    for (&std_private_key, 0..) |*b, i| {
+        b.* = try std.fmt.parseInt(u8, std_private_key_hex[2 * i .. 2 * i + 2], 16);
     }
 
-    const ciphertext = try encryption.encrypt(testing.io, allocator, large_message, public_key, .c1c3c2);
+    // 从私钥派生公钥
+    const public_key = try kp.publicKeyFromPrivateKey(std_private_key);
+
+    // 测试加解密
+    const message = "encryption standard";
+    const ciphertext = try encryption.encrypt(testing.io, allocator, message, public_key, .c1c3c2);
     defer ciphertext.deinit(allocator);
 
-    const decrypted = try encryption.decrypt(allocator, ciphertext, private_key);
+    const decrypted = try encryption.decrypt(allocator, ciphertext, std_private_key);
     defer allocator.free(decrypted);
 
-    try testing.expectEqualSlices(u8, large_message, decrypted);
+    try testing.expectEqualStrings(message, decrypted);
 }

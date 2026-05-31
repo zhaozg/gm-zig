@@ -236,3 +236,85 @@ test "SM2 signature large message handling" {
     const is_valid = try signature.verify(large_message, sig, key_pair.public_key, options);
     try testing.expect(is_valid);
 }
+
+// 基于算法源码样本数据的签名测试
+// 使用算法源码中的标准私钥和消息进行签名验证
+test "SM2 signature with algorithm source sample data" {
+    const io = testing.io;
+
+    // 算法源码标准测试向量中的私钥
+    const std_private_key_hex = "3945208f7b2144b13f36e38ac6d39f0995889393692860b51a42fb81ef4df7c5b8";
+    var std_private_key: [32]u8 = undefined;
+    for (&std_private_key, 0..) |*b, i| {
+        b.* = try std.fmt.parseInt(u8, std_private_key_hex[2 * i .. 2 * i + 2], 16);
+    }
+
+    // 从私钥派生公钥
+    const key_pair = try KeyPair.fromPrivateKey(std_private_key);
+    const message = "encryption standard";
+    const options = signature.SignatureOptions{};
+
+    // 签名
+    const sig = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
+
+    // 验证签名
+    const is_valid = try signature.verify(message, sig, key_pair.public_key, options);
+    try testing.expect(is_valid);
+
+    // 验证错误消息无法通过验证
+    const wrong_message = "wrong message";
+    const is_invalid = try signature.verify(wrong_message, sig, key_pair.public_key, options);
+    try testing.expect(!is_invalid);
+}
+
+// 测试不同用户ID的签名
+test "SM2 signature with various user IDs" {
+    const io = testing.io;
+    const key_pair = kp.generateKeyPair(io);
+    const message = "test message with user ID";
+
+    // 测试默认用户ID
+    const default_options = signature.SignatureOptions{};
+    const sig_default = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, default_options);
+    const valid_default = try signature.verify(message, sig_default, key_pair.public_key, default_options);
+    try testing.expect(valid_default);
+
+    // 测试自定义用户ID
+    const custom_options = signature.SignatureOptions{
+        .user_id = "custom_user_id_12345",
+        .hash_type = .sm3,
+    };
+    const sig_custom = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, custom_options);
+    const valid_custom = try signature.verify(message, sig_custom, key_pair.public_key, custom_options);
+    try testing.expect(valid_custom);
+
+    // 使用默认用户ID的签名不能使用自定义用户ID验证
+    const invalid_custom = try signature.verify(message, sig_default, key_pair.public_key, custom_options);
+    try testing.expect(!invalid_custom);
+}
+
+// 测试空消息签名
+test "SM2 signature with empty message" {
+    const io = testing.io;
+    const key_pair = kp.generateKeyPair(io);
+    const message = "";
+    const options = signature.SignatureOptions{};
+
+    const sig = try signature.sign(io, message, key_pair.private_key, key_pair.public_key, options);
+    const is_valid = try signature.verify(message, sig, key_pair.public_key, options);
+    try testing.expect(is_valid);
+}
+
+// 测试二进制数据签名
+test "SM2 signature with binary data" {
+    const io = testing.io;
+    const key_pair = kp.generateKeyPair(io);
+    const options = signature.SignatureOptions{};
+
+    // 二进制数据
+    const binary_data = [_]u8{ 0x00, 0xFF, 0xAA, 0x55, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0 };
+
+    const sig = try signature.sign(io, &binary_data, key_pair.private_key, key_pair.public_key, options);
+    const is_valid = try signature.verify(&binary_data, sig, key_pair.public_key, options);
+    try testing.expect(is_valid);
+}

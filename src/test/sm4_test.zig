@@ -19,18 +19,15 @@ test "SM4 Known Answer Test" {
 
     const ctx = SM4.init(&key);
 
-    // Test single block encryption
     var ciphertext: [16]u8 = undefined;
     ctx.encryptBlock(&plaintext, &ciphertext);
     try std.testing.expectEqualSlices(u8, &expected_ciphertext, &ciphertext);
 
-    // Test single block decryption
     var decrypted: [16]u8 = undefined;
     ctx.decryptBlock(&ciphertext, &decrypted);
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
-// ECB mode tests
 test "SM4-ECB mode encryption and decryption" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -55,7 +52,6 @@ test "SM4-ECB mode encryption and decryption" {
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
-// CBC mode tests
 test "SM4-CBC mode encryption and decryption" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -79,7 +75,6 @@ test "SM4-CBC mode encryption and decryption" {
     var ciphertext: [32]u8 = undefined;
     ctx.encrypt(&plaintext, &ciphertext);
 
-    // Reset IV for decryption
     ctx = sm4.SM4_CBC.init(&key, &iv);
 
     var decrypted: [32]u8 = undefined;
@@ -88,7 +83,6 @@ test "SM4-CBC mode encryption and decryption" {
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
-// CTR mode tests
 test "SM4-CTR mode encryption and decryption" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -100,7 +94,7 @@ test "SM4-CTR mode encryption and decryption" {
         0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
     };
 
-    const plaintext = [35]u8{ // Non-block-aligned length to test
+    const plaintext = [35]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
         0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11,
@@ -113,7 +107,6 @@ test "SM4-CTR mode encryption and decryption" {
     var ciphertext: [35]u8 = undefined;
     ctx.encrypt(&plaintext, &ciphertext);
 
-    // Reset counter for decryption
     ctx = sm4.SM4_CTR.init(&key, &nonce);
 
     var decrypted: [35]u8 = undefined;
@@ -122,7 +115,6 @@ test "SM4-CTR mode encryption and decryption" {
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
-// GCM mode tests
 test "SM4-GCM mode encryption and decryption" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -157,13 +149,11 @@ test "SM4-GCM mode encryption and decryption" {
     try std.testing.expect(valid);
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 
-    // Test with wrong tag
-    tag[0] ^= 1; // Corrupt tag
+    tag[0] ^= 1;
     const invalid = ctx.decrypt(&nonce, &ciphertext, &additional_data, &tag, &decrypted);
     try std.testing.expect(!invalid);
 }
 
-// XTS mode tests
 test "SM4-XTS mode encryption and decryption" {
     const key = [32]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -194,7 +184,6 @@ test "SM4-XTS mode encryption and decryption" {
     try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
 }
 
-// Optimization test
 test "SM4 optimization verification" {
     const key = [16]u8{
         0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -208,15 +197,248 @@ test "SM4 optimization verification" {
 
     const ctx = SM4.init(&key);
 
-    // Test that optimized version produces same results
     var ciphertext: [16]u8 = undefined;
     ctx.encryptBlock(&plaintext, &ciphertext);
 
-    // Expected result from standard test vector
     const expected = [16]u8{
         0x68, 0x1e, 0xdf, 0x34, 0xd2, 0x06, 0x96, 0x5e,
         0x86, 0xb3, 0xe9, 0x4f, 0x53, 0x6e, 0x42, 0x46,
     };
 
     try std.testing.expectEqualSlices(u8, &expected, &ciphertext);
+}
+
+test "SM4 algorithm source sample data" {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+    const plaintext = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+    const expected_ciphertext = [16]u8{
+        0x68, 0x1e, 0xdf, 0x34, 0xd2, 0x06, 0x96, 0x5e,
+        0x86, 0xb3, 0xe9, 0x4f, 0x53, 0x6e, 0x42, 0x46,
+    };
+
+    const ctx = SM4.init(&key);
+
+    var ciphertext: [16]u8 = undefined;
+    ctx.encryptBlock(&plaintext, &ciphertext);
+    try std.testing.expectEqualSlices(u8, &expected_ciphertext, &ciphertext);
+
+    var decrypted: [16]u8 = undefined;
+    ctx.decryptBlock(&ciphertext, &decrypted);
+    try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
+}
+
+test "SM4 various key and plaintext combinations" {
+    const key1 = [_]u8{0} ** 16;
+    const pt1 = [_]u8{0} ** 16;
+    const ctx1 = SM4.init(&key1);
+    var ct1: [16]u8 = undefined;
+    ctx1.encryptBlock(&pt1, &ct1);
+    var dt1: [16]u8 = undefined;
+    ctx1.decryptBlock(&ct1, &dt1);
+    try std.testing.expectEqualSlices(u8, &pt1, &dt1);
+
+    const key2 = [_]u8{0xFF} ** 16;
+    const pt2 = [_]u8{0xFF} ** 16;
+    const ctx2 = SM4.init(&key2);
+    var ct2: [16]u8 = undefined;
+    ctx2.encryptBlock(&pt2, &ct2);
+    var dt2: [16]u8 = undefined;
+    ctx2.decryptBlock(&ct2, &dt2);
+    try std.testing.expectEqualSlices(u8, &pt2, &dt2);
+
+    const key3 = [16]u8{
+        0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+        0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+    };
+    const pt3 = [16]u8{
+        0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
+        0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
+    };
+    const ctx3 = SM4.init(&key3);
+    var ct3: [16]u8 = undefined;
+    ctx3.encryptBlock(&pt3, &ct3);
+    var dt3: [16]u8 = undefined;
+    ctx3.decryptBlock(&ct3, &dt3);
+    try std.testing.expectEqualSlices(u8, &pt3, &dt3);
+}
+
+test "SM4 multi-block encryption and decryption" {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    var plaintext: [48]u8 = undefined;
+    for (&plaintext, 0..) |*b, i| {
+        b.* = @intCast(i & 0xFF);
+    }
+
+    const ctx = SM4.init(&key);
+
+    var ciphertext: [48]u8 = undefined;
+    for (0..3) |i| {
+        ctx.encryptBlock(plaintext[16 * i .. 16 * i + 16][0..16], ciphertext[16 * i .. 16 * i + 16][0..16]);
+    }
+
+    var decrypted: [48]u8 = undefined;
+    for (0..3) |i| {
+        ctx.decryptBlock(ciphertext[16 * i .. 16 * i + 16][0..16], decrypted[16 * i .. 16 * i + 16][0..16]);
+    }
+
+    try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
+}
+
+test "SM4-ECB consistency" {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const plaintext = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const ctx = sm4.SM4_ECB.init(&key);
+
+    var ciphertext: [16]u8 = undefined;
+    ctx.encrypt(&plaintext, &ciphertext);
+
+    var decrypted: [16]u8 = undefined;
+    ctx.decrypt(&ciphertext, &decrypted);
+
+    try std.testing.expectEqualSlices(u8, &plaintext, &decrypted);
+}
+
+test "SM4-CBC different IVs" {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const plaintext = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const iv1 = [_]u8{0x00} ** 16;
+    const iv2 = [_]u8{0xFF} ** 16;
+
+    var ctx1 = sm4.SM4_CBC.init(&key, &iv1);
+    var ctx2 = sm4.SM4_CBC.init(&key, &iv2);
+
+    var ct1: [16]u8 = undefined;
+    var ct2: [16]u8 = undefined;
+
+    ctx1.encrypt(&plaintext, &ct1);
+    ctx2.encrypt(&plaintext, &ct2);
+
+    try std.testing.expect(!std.mem.eql(u8, &ct1, &ct2));
+}
+
+test "SM4-CTR different nonces" {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const plaintext = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const nonce1 = [_]u8{0x00} ** 16;
+    const nonce2 = [_]u8{0xFF} ** 16;
+
+    var ctx1 = sm4.SM4_CTR.init(&key, &nonce1);
+    var ctx2 = sm4.SM4_CTR.init(&key, &nonce2);
+
+    var ct1: [16]u8 = undefined;
+    var ct2: [16]u8 = undefined;
+
+    ctx1.encrypt(&plaintext, &ct1);
+    ctx2.encrypt(&plaintext, &ct2);
+
+    try std.testing.expect(!std.mem.eql(u8, &ct1, &ct2));
+}
+
+test "SM4-GCM different nonces" {
+    const key = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const plaintext = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const nonce1 = [12]u8{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    const nonce2 = [12]u8{ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+    const ctx = sm4.SM4_GCM.init(&key);
+
+    var ct1: [16]u8 = undefined;
+    var ct2: [16]u8 = undefined;
+    var tag1: [16]u8 = undefined;
+    var tag2: [16]u8 = undefined;
+
+    ctx.encrypt(&nonce1, &plaintext, "", &ct1, &tag1);
+    ctx.encrypt(&nonce2, &plaintext, "", &ct2, &tag2);
+
+    try std.testing.expect(!std.mem.eql(u8, &tag1, &tag2));
+}
+
+test "SM4-XTS different tweaks" {
+    const key = [32]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
+        0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00,
+    };
+
+    const plaintext = [16]u8{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
+    };
+
+    const ctx = sm4.SM4_XTS.init(&key);
+
+    var ct1: [16]u8 = undefined;
+    var ct2: [16]u8 = undefined;
+
+    ctx.encrypt(0, &plaintext, &ct1);
+    ctx.encrypt(1, &plaintext, &ct2);
+
+    try std.testing.expect(!std.mem.eql(u8, &ct1, &ct2));
+}
+
+test "SM4-ECB empty data" {
+    const key = [_]u8{0} ** 16;
+    const ctx = sm4.SM4_ECB.init(&key);
+
+    var ciphertext: [0]u8 = undefined;
+    ctx.encrypt("", &ciphertext);
+
+    var decrypted: [0]u8 = undefined;
+    ctx.decrypt("", &decrypted);
+}
+
+test "SM4-CTR empty data" {
+    const key = [_]u8{0} ** 16;
+    const nonce = [_]u8{0} ** 16;
+    var ctx = sm4.SM4_CTR.init(&key, &nonce);
+
+    var ciphertext: [0]u8 = undefined;
+    ctx.encrypt("", &ciphertext);
+
+    ctx = sm4.SM4_CTR.init(&key, &nonce);
+    var decrypted: [0]u8 = undefined;
+    ctx.decrypt("", &decrypted);
 }
