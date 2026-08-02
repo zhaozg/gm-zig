@@ -111,7 +111,7 @@ pub const SM2 = struct {
     /// Serialize a point using the compressed SEC-1 format.
     pub fn toCompressedSec1(p: SM2) [33]u8 {
         if (p.z.isZero()) {
-            var out = [1]u8{0} ** 33;
+            var out = @as([33]u8, @splat(0));
             out[0] = 0;
             return out;
         }

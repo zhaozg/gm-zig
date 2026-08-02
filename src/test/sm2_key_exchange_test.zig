@@ -107,7 +107,7 @@ test "SM2 key exchange with confirmation" {
 
 test "SM2 ephemeral key creation" {
     // Test creation from coordinates
-    const coords = [_]u8{0x01} ++ [_]u8{0x00} ** 31;
+    const coords = [_]u8{0x01} ++ @as([31]u8, @splat(0x00));
     const ephemeral = key_exchange.ephemeralKeyFromCoordinates(coords, coords);
 
     // Should fail for invalid coordinates

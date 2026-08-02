@@ -33,7 +33,7 @@ pub const SystemParams = struct {
         const N_bytes = constants.BN256Params.GROUP_ORDER;
 
         // G1 generator P1 with standard compression format
-        var P1_bytes = [_]u8{constants.PointFormat.COMPRESSED_EVEN} ++ [_]u8{0} ** 32;
+        var P1_bytes = [_]u8{constants.PointFormat.COMPRESSED_EVEN} ++ @as([32]u8, @splat(0));
         @memcpy(P1_bytes[1..], &constants.BN256Params.G1_GENERATOR_X);
 
         // G2 generator P2 with uncompressed format
@@ -151,7 +151,7 @@ pub const SignMasterKeyPair = struct {
     /// Generate new signature master key pair
     pub fn generate(params: SystemParams) SignMasterKeyPair {
         // GM/T 0044-2016 compliant: Use standard private key value for deterministic generation
-        const private_key = [_]u8{0} ** 31 ++ [_]u8{1}; // Private key = 1 (valid and standard)
+        const private_key = @as([31]u8, @splat(0)) ++ [_]u8{1}; // Private key = 1 (valid and standard)
 
         // GM/T 0044-2016 compliant: Generate public key using standard P2 generator
         // Public key should be computed as s * P2 where s is the private key
@@ -293,7 +293,7 @@ pub const EncryptMasterKeyPair = struct {
     /// Generate new encryption master key pair
     pub fn generate(params: SystemParams) EncryptMasterKeyPair {
         // GM/T 0044-2016 compliant: Use standard private key value for deterministic generation
-        const private_key = [_]u8{0} ** 31 ++ [_]u8{2}; // Private key = 2 (valid and different from sign key)
+        const private_key = @as([31]u8, @splat(0)) ++ [_]u8{2}; // Private key = 2 (valid and different from sign key)
 
         // GM/T 0044-2016 compliant: Generate public key using standard P1 generator
         // Public key should be computed as s * P1 where s is the private key

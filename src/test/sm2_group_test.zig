@@ -64,7 +64,7 @@ const test_vectors = struct {
 test "SM2: Point doubling operation verification" {
     const base = SM2.basePoint;
     const double1 = base.dbl();
-    const k2: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{2};
+    const k2: [32]u8 = @as([31]u8, @splat(0)) ++ [_]u8{2};
     const p2 = try SM2.basePoint.mul(k2, .big);
     try testing.expect(double1.equivalent(p2));
 }
@@ -184,7 +184,7 @@ test "SM2: Invalid point encoding handling" {
     try testing.expectError(error.InvalidEncoding, SM2.fromAffineCoordinates(invalid_point.affineCoordinates()));
 
     // Test invalid SEC1 encoding (all FF)
-    const invalid_sec1 = [_]u8{0x04} ++ [_]u8{0xFF} ** 64;
+    const invalid_sec1 = [_]u8{0x04} ++ @as([64]u8, @splat(0xFF));
 
     // Expected error should be NonCanonical
     try testing.expectError(error.NonCanonical, SM2.fromSec1(&invalid_sec1));
@@ -213,7 +213,7 @@ test "SM2: Conditional selection (CMOV) verification" {
 }
 
 test "SM2: Public key scalar multiplication verification" {
-    const k = [_]u8{0x03} ** 32;
+    const k = @as([32]u8, @splat(0x03));
 
     // 常规乘法
     const p1 = try SM2.basePoint.mul(k, .big);
@@ -273,7 +273,7 @@ test "SM2: SEC1 uncompressed format encoding/decoding" {
 
 test "SM2: Zero scalar yields neutral element" {
     // 零标量
-    const zero_scalar = [_]u8{0} ** 32;
+    const zero_scalar = @as([32]u8, @splat(0));
 
     // 计算 0 * G
     const result = SM2.basePoint.mul(zero_scalar, .big);
@@ -284,7 +284,7 @@ test "SM2: Zero scalar yields neutral element" {
 
 test "SM2: Non-canonical encoding error handling" {
     // 创建非规范编码 (全FF)
-    const non_canonical = [_]u8{0xff} ** 32;
+    const non_canonical = @as([32]u8, @splat(0xff));
 
     // 尝试解码
     const result = SM2.Fe.fromBytes(non_canonical, .little);
@@ -312,8 +312,8 @@ test "SM2: Neutral element encoding/decoding" {
 
 test "SM2: Dual-base scalar multiplication" {
     // 两个标量
-    const s1 = [_]u8{0x01} ** 32;
-    const s2 = [_]u8{0x02} ** 32;
+    const s1 = @as([32]u8, @splat(0x01));
+    const s2 = @as([32]u8, @splat(0x02));
 
     // 两个点
     const p1 = SM2.basePoint;
@@ -331,8 +331,8 @@ test "SM2: Dual-base scalar multiplication" {
 
 test "SM2: Dual-base scalar multiplication (large scalars)" {
     // 两个大标量
-    const s1 = [_]u8{0xee} ** 32;
-    const s2 = [_]u8{0xdd} ** 32;
+    const s1 = @as([32]u8, @splat(0xee));
+    const s2 = @as([32]u8, @splat(0xdd));
 
     // 两个点
     const p1 = SM2.basePoint;

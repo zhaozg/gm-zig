@@ -30,17 +30,17 @@ test "SM9 Pairing Operations - Gt Element Exponentiation" {
     const base = sm9.pairing.GtElement.random("base_element");
 
     // Test exponentiation by 0 (should return identity)
-    const zero_exp = [_]u8{0} ** 32;
+    const zero_exp = @as([32]u8, @splat(0));
     const result_zero = base.pow(zero_exp);
     try testing.expect(result_zero.isIdentity());
 
     // Test exponentiation by 1
-    const one_exp = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one_exp = @as([31]u8, @splat(0)) ++ [_]u8{1};
     const result_one = base.pow(one_exp);
     try testing.expect(result_one.equal(base));
 
     // Test exponentiation by small number
-    const small_exp = [_]u8{0} ** 31 ++ [_]u8{3};
+    const small_exp = @as([31]u8, @splat(0)) ++ [_]u8{3};
     const result_small = base.pow(small_exp);
     try testing.expect(!result_small.isIdentity());
 
@@ -72,16 +72,16 @@ test "SM9 Pairing Operations - Bilinearity Properties" {
     // Use generator points from system parameters
     const P1 = sm9.curve.G1Point.fromCompressed(system_params.P1) catch blk: {
         // Fallback to a simple valid point
-        var x = [_]u8{0} ** 32;
+        var x = @as([32]u8, @splat(0));
         x[31] = 1;
-        var y = [_]u8{0} ** 32;
+        var y = @as([32]u8, @splat(0));
         y[31] = 2;
         break :blk sm9.curve.G1Point.affine(x, y);
     };
 
     // Create G2 point
-    var g2_x = [_]u8{0} ** 64;
-    var g2_y = [_]u8{0} ** 64;
+    var g2_x = @as([64]u8, @splat(0));
+    var g2_y = @as([64]u8, @splat(0));
     std.mem.copyForwards(u8, g2_x[0..32], system_params.P2[1..33]);
     std.mem.copyForwards(u8, g2_y[0..32], system_params.P2[33..65]);
     const P2 = sm9.curve.G2Point.affine(g2_x, g2_y);
@@ -101,7 +101,7 @@ test "SM9 Pairing Operations - Bilinearity Properties" {
     try testing.expect(e_inf2.isIdentity());
 
     // Test scalar multiplication properties (simplified)
-    var scalar = [_]u8{0} ** 32;
+    var scalar = @as([32]u8, @splat(0));
     scalar[31] = 2; // Test with scalar = 2
 
     const P1_scaled = sm9.curve.CurveUtils.scalarMultiplyG1(P1, scalar, system_params);
@@ -124,14 +124,14 @@ test "SM9 Pairing Operations - Miller Loop Consistency" {
     const system_params = sm9.params.SystemParams.init();
 
     // Test that multiple calls with same parameters give consistent results
-    var x1 = [_]u8{0} ** 32;
+    var x1 = @as([32]u8, @splat(0));
     x1[31] = 1;
-    var y1 = [_]u8{0} ** 32;
+    var y1 = @as([32]u8, @splat(0));
     y1[31] = 2;
     const P1 = sm9.curve.G1Point.affine(x1, y1);
 
-    var g2_x = [_]u8{0} ** 64;
-    var g2_y = [_]u8{0} ** 64;
+    var g2_x = @as([64]u8, @splat(0));
+    var g2_y = @as([64]u8, @splat(0));
     g2_x[31] = 3;
     g2_y[31] = 4;
     const P2 = sm9.curve.G2Point.affine(g2_x, g2_y);
@@ -144,9 +144,9 @@ test "SM9 Pairing Operations - Miller Loop Consistency" {
     try testing.expect(result1.equal(result2));
 
     // Test with different points should give different results
-    var x3 = [_]u8{0} ** 32;
+    var x3 = @as([32]u8, @splat(0));
     x3[31] = 5;
-    var y3 = [_]u8{0} ** 32;
+    var y3 = @as([32]u8, @splat(0));
     y3[31] = 6;
     const P3 = sm9.curve.G1Point.affine(x3, y3);
 
@@ -170,12 +170,12 @@ test "SM9 Pairing Operations - Basic Pairing Computation" {
     const params = sm9.params.SystemParams.init();
 
     // Create test points
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P = sm9.curve.G1Point.affine(x1, y1);
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const x2 = [_]u8{0x03} ++ @as([63]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([63]u8, @splat(0));
     const Q = sm9.curve.G2Point.affine(x2, y2);
 
     // Test basic pairing computation
@@ -190,12 +190,12 @@ test "SM9 Pairing Operations - Basic Pairing Computation" {
 test "SM9 Pairing Operations - Pairing with Infinity" {
     const params = sm9.params.SystemParams.init();
 
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P = sm9.curve.G1Point.affine(x1, y1);
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const x2 = [_]u8{0x03} ++ @as([63]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([63]u8, @splat(0));
     const Q = sm9.curve.G2Point.affine(x2, y2);
 
     // Test pairing with G1 infinity
@@ -217,20 +217,20 @@ test "SM9 Pairing Operations - Multi-Pairing" {
     const params = sm9.params.SystemParams.init();
 
     // Create test points
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P1 = sm9.curve.G1Point.affine(x1, y1);
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 31;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 31;
+    const x2 = [_]u8{0x03} ++ @as([31]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([31]u8, @splat(0));
     const P2 = sm9.curve.G1Point.affine(x2, y2);
 
-    const q_x1 = [_]u8{0x05} ++ [_]u8{0} ** 63;
-    const q_y1 = [_]u8{0x06} ++ [_]u8{0} ** 63;
+    const q_x1 = [_]u8{0x05} ++ @as([63]u8, @splat(0));
+    const q_y1 = [_]u8{0x06} ++ @as([63]u8, @splat(0));
     const Q1 = sm9.curve.G2Point.affine(q_x1, q_y1);
 
-    const q_x2 = [_]u8{0x07} ++ [_]u8{0} ** 63;
-    const q_y2 = [_]u8{0x08} ++ [_]u8{0} ** 63;
+    const q_x2 = [_]u8{0x07} ++ @as([63]u8, @splat(0));
+    const q_y2 = [_]u8{0x08} ++ @as([63]u8, @splat(0));
     const Q2 = sm9.curve.G2Point.affine(q_x2, q_y2);
 
     // Test multi-pairing with empty arrays
@@ -255,16 +255,16 @@ test "SM9 Pairing Operations - Multi-Pairing" {
 test "SM9 Pairing Operations - Pairing Utilities" {
     const params = sm9.params.SystemParams.init();
 
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P = sm9.curve.G1Point.affine(x1, y1);
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const x2 = [_]u8{0x03} ++ @as([63]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([63]u8, @splat(0));
     const Q = sm9.curve.G2Point.affine(x2, y2);
 
     // Test bilinearity (simplified test)
-    const scalar = [_]u8{0} ** 31 ++ [_]u8{2};
+    const scalar = @as([31]u8, @splat(0)) ++ [_]u8{2};
     const bilinearity_result = try sm9.pairing.PairingUtils.testBilinearity(P, Q, scalar, params);
 
     // Note: The actual bilinearity test might not pass with simplified implementation
@@ -282,8 +282,8 @@ test "SM9 Pairing Operations - Pairing Utilities" {
 test "SM9 Pairing Operations - Precomputation" {
     const params = sm9.params.SystemParams.init();
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const x2 = [_]u8{0x03} ++ @as([63]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([63]u8, @splat(0));
     const Q = sm9.curve.G2Point.affine(x2, y2);
 
     // Test precomputation initialization
@@ -300,8 +300,8 @@ test "SM9 Pairing Operations - Precomputation" {
     try testing.expect(std.mem.eql(u8, &stored_y, &Q.y));
 
     // Test precomputed pairing
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P = sm9.curve.G1Point.affine(x1, y1);
 
     const precomp_result = try precompute.pairingWithPrecompute(P, params);
@@ -316,12 +316,12 @@ test "SM9 Pairing Operations - Error Handling and Edge Cases" {
     const params = sm9.params.SystemParams.init();
 
     // Test multi-pairing with mismatched lengths
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P = sm9.curve.G1Point.affine(x1, y1);
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const x2 = [_]u8{0x03} ++ @as([63]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([63]u8, @splat(0));
     const Q = sm9.curve.G2Point.affine(x2, y2);
 
     const g1_points = [_]sm9.curve.G1Point{P};
@@ -332,12 +332,12 @@ test "SM9 Pairing Operations - Error Handling and Edge Cases" {
     try testing.expectError(sm9.pairing.PairingError.InvalidPoint, error_result);
 
     // Test edge case: pairing with very small coordinates
-    const small_x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const small_y1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
+    const small_x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const small_y1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
     const small_P = sm9.curve.G1Point.affine(small_x1, small_y1);
 
-    const small_x2 = [_]u8{0x01} ++ [_]u8{0} ** 63;
-    const small_y2 = [_]u8{0x01} ++ [_]u8{0} ** 63;
+    const small_x2 = [_]u8{0x01} ++ @as([63]u8, @splat(0));
+    const small_y2 = [_]u8{0x01} ++ @as([63]u8, @splat(0));
     const small_Q = sm9.curve.G2Point.affine(small_x2, small_y2);
 
     // Should not error even with small coordinates
@@ -348,12 +348,12 @@ test "SM9 Pairing Operations - Error Handling and Edge Cases" {
 test "SM9 Pairing Operations - Deterministic Results" {
     const params = sm9.params.SystemParams.init();
 
-    const x1 = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y1 = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x1 = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y1 = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const P = sm9.curve.G1Point.affine(x1, y1);
 
-    const x2 = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const y2 = [_]u8{0x04} ++ [_]u8{0} ** 63;
+    const x2 = [_]u8{0x03} ++ @as([63]u8, @splat(0));
+    const y2 = [_]u8{0x04} ++ @as([63]u8, @splat(0));
     const Q = sm9.curve.G2Point.affine(x2, y2);
 
     // Compute pairing twice with same inputs

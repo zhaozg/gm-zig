@@ -161,8 +161,8 @@ test "SM9 key agreement session ID generation" {
     const bob_id = "bob@example.com";
 
     // Generate sample ephemeral keys (just for testing)
-    const ephemeral_a = [_]u8{0x02} ++ [_]u8{0x01} ** 32;
-    const ephemeral_b = [_]u8{0x02} ++ [_]u8{0x02} ** 32;
+    const ephemeral_a = [_]u8{0x02} ++ @as([32]u8, @splat(0x01));
+    const ephemeral_b = [_]u8{0x02} ++ @as([32]u8, @splat(0x02));
 
     // Generate session ID
     const session_id1 = try sm9.key_agreement.KeyAgreementUtils.generateSessionId(
@@ -274,7 +274,7 @@ test "SM9 key agreement error handling" {
     const alice_ephemeral = try ka_context.generateEphemeralKey(alice_id);
 
     // Test with invalid peer ephemeral key (all zeros)
-    const invalid_ephemeral = [_]u8{0} ** 33;
+    const invalid_ephemeral = @as([33]u8, @splat(0));
 
     const result = ka_context.performKeyAgreement(
         alice_id,

@@ -7,8 +7,8 @@
 
     .dependencies = .{
         .zbench = .{
-            .url = "git+https://github.com/hendriknielaender/zBench#2a231fc165ab22e5ef0c2b7c8841ee86a445dffa",
-            .hash = "zbench-0.13.0-YTdc71ZAAQCUJ0w9jM6ZyLOBxDlGv2j3CqCEj49l-KcP",
+            .url = "https://github.com/hendriknielaender/zBench/archive/refs/tags/v0.14.1.tar.gz",
+            .hash = "zbench-0.14.1-YTdc781OAQCR6wxqkgAwm9bG4TnFGzm8c9aE-ZPiTAU1",
         },
     },
 

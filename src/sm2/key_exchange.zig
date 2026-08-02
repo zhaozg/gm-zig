@@ -223,14 +223,14 @@ fn computeSharedSecret(
 
     // x1_bar = 2^w + (x1 & (2^w - 1)) where w = 127
     // Create mask for lower 127 bits (15 full bytes and 7 bits)
-    var mask: [32]u8 = [_]u8{0} ** 32;
+    var mask: [32]u8 = @as([32]u8, @splat(0));
     for (0..15) |i| {
         mask[i] = 0xFF; // 15 full bytes = 120 bits
     }
     mask[15] = 0x7F; // 7 bits, total 127 bits
 
-    var x1_bar: [32]u8 = [_]u8{0} ** 32;
-    var x2_bar: [32]u8 = [_]u8{0} ** 32;
+    var x1_bar: [32]u8 = @as([32]u8, @splat(0));
+    var x2_bar: [32]u8 = @as([32]u8, @splat(0));
 
     // Apply mask
     for (0..32) |i| {

@@ -54,7 +54,7 @@ pub fn Field(comptime params: FieldParams) type {
             var s = if (endian == .little) s_ else orderSwap(s_);
             const field_order_s = comptime fos: {
                 var fos: [encoded_length]u8 = undefined;
-                mem.writeInt(std.meta.Int(.unsigned, encoded_length * 8), &fos, field_order, .little);
+                mem.writeInt(@Int(.unsigned, encoded_length * 8), &fos, field_order, .little);
                 break :fos fos;
             };
             if (crypto.timing_safe.compare(u8, &s, &field_order_s, .little) != .lt) {
@@ -90,7 +90,7 @@ pub fn Field(comptime params: FieldParams) type {
         }
 
         /// Element as an integer.
-        pub const IntRepr = meta.Int(.unsigned, params.field_bits);
+        pub const IntRepr = @Int(.unsigned, params.field_bits);
 
         /// Create a field element from an integer.
         pub fn fromInt(comptime x: IntRepr) NonCanonicalError!Fe {
@@ -271,10 +271,10 @@ pub fn Field(comptime params: FieldParams) type {
                 return ls.equivalent(Fe.one);
             } else if (field_order == 0xfffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff) {
                 // SM2 的 Legendre 符号计算
-                const ls = x2.pow(std.meta.Int(.unsigned, field_bits), (field_order - 1) / 2);
+                const ls = x2.pow(@Int(.unsigned, field_bits), (field_order - 1) / 2);
                 return ls.equivalent(Fe.one);
             } else {
-                const ls = x2.pow(std.meta.Int(.unsigned, field_bits), (field_order - 1) / 2); // Legendre symbol
+                const ls = x2.pow(@Int(.unsigned, field_bits), (field_order - 1) / 2); // Legendre symbol
                 return ls.equivalent(Fe.one);
             }
         }
@@ -314,9 +314,9 @@ pub fn Field(comptime params: FieldParams) type {
                 // SM2 的素数：p = FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF
                 // p ≡ 3 (mod 4)，所以可以使用 x^((p+1)/4) 计算平方根
                 // (p+1)/4 = 0x3FFFFFFF C0000000 10000000 00000000 00000000 00000000 00000000 00000000
-                return x2.pow(std.meta.Int(.unsigned, field_bits), (field_order + 1) / 4);
+                return x2.pow(@Int(.unsigned, field_bits), (field_order + 1) / 4);
             } else {
-                return x2.pow(std.meta.Int(.unsigned, field_bits), (field_order + 1) / 4);
+                return x2.pow(@Int(.unsigned, field_bits), (field_order + 1) / 4);
             }
         }
 

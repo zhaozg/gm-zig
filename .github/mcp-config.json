@@ -11,7 +11,7 @@
       "command": "node",
       "args": ["/usr/local/share/mcp-servers/zig-server.js"],
       "env": {
-        "ZIG_VERSION": "0.15.1",
+        "ZIG_VERSION": "0.16.0",
         "PROJECT_TYPE": "cryptographic_library"
       }
     },

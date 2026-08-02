@@ -61,7 +61,7 @@ test "finalResult" {
 }
 
 test "aligned final" {
-    var block = [_]u8{0} ** SM3.block_length;
+    var block = @as([SM3.block_length]u8, @splat(0));
     var out: [SM3.digest_length]u8 = undefined;
 
     var h = SM3.init(.{});

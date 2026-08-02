@@ -5,16 +5,16 @@ const sm9 = @import("../sm9.zig");
 // Minimal test to check if basic imports work
 test "SM9 basic import test" {
     // Test that we can access the modules
-    const zero = [_]u8{0} ** 32;
+    const zero = @as([32]u8, @splat(0));
     try testing.expect(sm9.bigint.isZero(zero));
 }
 
 // Test constant-time operations for timing attack resistance
 test "SM9 constant-time operations" {
     // Test constant-time equality
-    const a = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ [_]u8{0} ** 28;
-    const b = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ [_]u8{0} ** 28;
-    const c = [_]u8{ 0x12, 0x34, 0x56, 0x79 } ++ [_]u8{0} ** 28;
+    const a = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ @as([28]u8, @splat(0));
+    const b = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ @as([28]u8, @splat(0));
+    const c = [_]u8{ 0x12, 0x34, 0x56, 0x79 } ++ @as([28]u8, @splat(0));
 
     // Test equal values
     try testing.expect(sm9.bigint.equal(a, b));
@@ -30,7 +30,7 @@ test "SM9 constant-time operations" {
 
 // Test secure memory clearing
 test "SM9 secure memory clearing" {
-    var sensitive_data = [_]u8{ 0xDE, 0xAD, 0xBE, 0xEF } ++ [_]u8{0xFF} ** 28;
+    var sensitive_data = [_]u8{ 0xDE, 0xAD, 0xBE, 0xEF } ++ @as([28]u8, @splat(0xFF));
 
     // Verify data is not zero initially
     try testing.expect(!sm9.bigint.isZero(sensitive_data));
@@ -71,8 +71,8 @@ test "SM9 curve point validation" {
     try testing.expect(infinity.validate(params));
 
     // Test with constructed point (may or may not be on curve)
-    const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
+    const x = [_]u8{0x01} ++ @as([31]u8, @splat(0));
+    const y = [_]u8{0x02} ++ @as([31]u8, @splat(0));
     const point = sm9.curve.G1Point.affine(x, y);
 
     // Validation should complete without errors
@@ -153,8 +153,8 @@ test "SM9 G2 point validation" {
     try testing.expect(infinity.validate(params));
 
     // Test with constructed G2 point
-    const x = [_]u8{0x01} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
-    const y = [_]u8{0x02} ++ [_]u8{0} ** 63; // 64 bytes for Fp2
+    const x = [_]u8{0x01} ++ @as([63]u8, @splat(0)); // 64 bytes for Fp2
+    const y = [_]u8{0x02} ++ @as([63]u8, @splat(0)); // 64 bytes for Fp2
 
     const point = sm9.curve.G2Point.affine(x, y);
 
@@ -168,11 +168,11 @@ test "SM9 G2 point validation" {
 // Test edge cases and boundary conditions
 test "SM9 edge cases and boundary conditions" {
     // Test zero values
-    const zero = [_]u8{0} ** 32;
+    const zero = @as([32]u8, @splat(0));
     try testing.expect(sm9.bigint.isZero(zero));
 
     // Test maximum values
-    const max_val = [_]u8{0xFF} ** 32;
+    const max_val = @as([32]u8, @splat(0xFF));
     try testing.expect(!sm9.bigint.isZero(max_val));
 
     // Test comparison edge cases

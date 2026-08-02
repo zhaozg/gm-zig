@@ -244,8 +244,8 @@ fn demonstrateUtils(io: std.Io, allocator: std.mem.Allocator) !void {
     print("2. Testing user identity hash...\n", .{});
 
     const user_id = "demo@example.com";
-    const pub_x = [_]u8{ 0x12, 0x34 } ++ [_]u8{0x00} ** 30;
-    const pub_y = [_]u8{ 0x56, 0x78 } ++ [_]u8{0x00} ** 30;
+    const pub_x = [_]u8{ 0x12, 0x34 } ++ @as([30]u8, @splat(0x00));
+    const pub_y = [_]u8{ 0x56, 0x78 } ++ @as([30]u8, @splat(0x00));
 
     const user_hash = sm2.utils.computeUserHash(user_id, pub_x, pub_y);
 
@@ -255,8 +255,8 @@ fn demonstrateUtils(io: std.Io, allocator: std.mem.Allocator) !void {
 
     print("3. Testing ASN.1 DER encoding...\n", .{});
 
-    const r = [_]u8{ 0x01, 0x23, 0x45, 0x67 } ++ [_]u8{0x00} ** 28;
-    const s = [_]u8{ 0x89, 0xAB, 0xCD, 0xEF } ++ [_]u8{0x00} ** 28;
+    const r = [_]u8{ 0x01, 0x23, 0x45, 0x67 } ++ @as([28]u8, @splat(0x00));
+    const s = [_]u8{ 0x89, 0xAB, 0xCD, 0xEF } ++ @as([28]u8, @splat(0x00));
 
     print("   R: ", .{});
     printHex(&r);

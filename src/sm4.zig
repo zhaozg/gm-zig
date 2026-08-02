@@ -350,7 +350,7 @@ pub const SM4_GCM = struct {
 
     pub fn init(key: *const [SM4_KEY_SIZE]u8) SM4_GCM {
         const sm4_ctx = SM4.init(key);
-        var h: [SM4_BLOCK_SIZE]u8 = [_]u8{0} ** SM4_BLOCK_SIZE;
+        var h: [SM4_BLOCK_SIZE]u8 = @as([SM4_BLOCK_SIZE]u8, @splat(0));
         sm4_ctx.encryptBlock(&h, &h);
 
         return .{
@@ -361,7 +361,7 @@ pub const SM4_GCM = struct {
 
     // GF(2^128) multiplication
     fn gfMul(x: *const [16]u8, y: *const [16]u8) [16]u8 {
-        var z = [_]u8{0} ** 16;
+        var z = @as([16]u8, @splat(0));
         var v = y.*;
 
         for (0..16) |i| {
@@ -395,7 +395,7 @@ pub const SM4_GCM = struct {
     }
 
     fn ghash(h: *const [16]u8, data: []const u8) [16]u8 {
-        var y = [_]u8{0} ** 16;
+        var y = @as([16]u8, @splat(0));
 
         var i: usize = 0;
         while (i < data.len) {
@@ -414,7 +414,7 @@ pub const SM4_GCM = struct {
         assert(ciphertext.len >= plaintext.len);
 
         // Construct initial counter block
-        var counter: [16]u8 = [_]u8{0} ** 16;
+        var counter: [16]u8 = @as([16]u8, @splat(0));
         @memcpy(counter[0..12], nonce);
         counter[15] = 1;
 
@@ -434,12 +434,12 @@ pub const SM4_GCM = struct {
         }
 
         // Compute GHASH incrementally
-        var y = [_]u8{0} ** 16;
+        var y = @as([16]u8, @splat(0));
 
         // Process additional data
         i = 0;
         while (i < additional_data.len) : (i += 16) {
-            var block = [_]u8{0} ** 16;
+            var block = @as([16]u8, @splat(0));
             const remaining = @min(16, additional_data.len - i);
             @memcpy(block[0..remaining], additional_data[i .. i + remaining]);
             for (0..16) |j| {
@@ -451,7 +451,7 @@ pub const SM4_GCM = struct {
         // Process ciphertext
         i = 0;
         while (i < plaintext.len) : (i += 16) {
-            var block = [_]u8{0} ** 16;
+            var block = @as([16]u8, @splat(0));
             const remaining = @min(16, plaintext.len - i);
             @memcpy(block[0..remaining], ciphertext[i .. i + remaining]);
             for (0..16) |j| {
@@ -483,17 +483,17 @@ pub const SM4_GCM = struct {
         assert(plaintext.len >= ciphertext.len);
 
         // Verify tag first by computing GHASH incrementally
-        var counter: [16]u8 = [_]u8{0} ** 16;
+        var counter: [16]u8 = @as([16]u8, @splat(0));
         @memcpy(counter[0..12], nonce);
         counter[15] = 1;
 
         // Compute GHASH incrementally
-        var y = [_]u8{0} ** 16;
+        var y = @as([16]u8, @splat(0));
 
         // Process additional data
         var i: usize = 0;
         while (i < additional_data.len) : (i += 16) {
-            var block = [_]u8{0} ** 16;
+            var block = @as([16]u8, @splat(0));
             const remaining = @min(16, additional_data.len - i);
             @memcpy(block[0..remaining], additional_data[i .. i + remaining]);
             for (0..16) |j| {
@@ -505,7 +505,7 @@ pub const SM4_GCM = struct {
         // Process ciphertext
         i = 0;
         while (i < ciphertext.len) : (i += 16) {
-            var block = [_]u8{0} ** 16;
+            var block = @as([16]u8, @splat(0));
             const remaining = @min(16, ciphertext.len - i);
             @memcpy(block[0..remaining], ciphertext[i .. i + remaining]);
             for (0..16) |j| {
@@ -595,7 +595,7 @@ pub const SM4_XTS = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
 
         // Initialize tweak
-        var tweak: [16]u8 = [_]u8{0} ** 16;
+        var tweak: [16]u8 = @as([16]u8, @splat(0));
         std.mem.writeInt(u64, tweak[0..8], tweak_value, .little);
         self.sm4_1.encryptBlock(&tweak, &tweak);
 
@@ -628,7 +628,7 @@ pub const SM4_XTS = struct {
         assert(input.len % SM4_BLOCK_SIZE == 0);
 
         // Initialize tweak
-        var tweak: [16]u8 = [_]u8{0} ** 16;
+        var tweak: [16]u8 = @as([16]u8, @splat(0));
         std.mem.writeInt(u64, tweak[0..8], tweak_value, .little);
         self.sm4_1.encryptBlock(&tweak, &tweak);
 

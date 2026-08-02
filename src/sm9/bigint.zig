@@ -92,7 +92,7 @@ pub fn lessThan(a: BigInt, b: BigInt) bool {
 /// Add two big integers: result = (a + b) mod 2^256
 /// Returns carry flag
 pub fn add(a: BigInt, b: BigInt) struct { result: BigInt, carry: bool } {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     var carry: u16 = 0;
 
     var i: i32 = 31;
@@ -109,7 +109,7 @@ pub fn add(a: BigInt, b: BigInt) struct { result: BigInt, carry: bool } {
 /// Subtract two big integers: result = (a - b) mod 2^256
 /// Returns borrow flag
 pub fn sub(a: BigInt, b: BigInt) struct { result: BigInt, borrow: bool } {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     var borrow: i16 = 0;
 
     var i: i32 = 31;
@@ -176,7 +176,7 @@ pub fn subMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 
 /// Left shift by one bit
 pub fn shiftLeft(a: BigInt) BigInt {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     var carry: u8 = 0;
 
     var i: i32 = 31;
@@ -192,7 +192,7 @@ pub fn shiftLeft(a: BigInt) BigInt {
 
 /// Right shift by one bit
 pub fn shiftRightOne(a: BigInt) BigInt {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     var carry: u8 = 0;
 
     // For big-endian format, process from MSB (index 0) to LSB (index 31)
@@ -210,7 +210,7 @@ pub fn shiftRightOne(a: BigInt) BigInt {
 /// Optimized with Montgomery multiplication for SM9 prime field
 pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
-    if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
+    if (isZero(a) or isZero(b)) return @as([32]u8, @splat(0));
 
     // Fast path for small values to avoid complex u64 array operations
     // Use much more restrictive thresholds to avoid interfering with SM9 field operations
@@ -230,7 +230,7 @@ pub fn mulMod(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
 /// Prioritizes correctness over performance for debugging
 fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
-    if (isZero(a) or isZero(b)) return [_]u8{0} ** 32;
+    if (isZero(a) or isZero(b)) return @as([32]u8, @splat(0));
 
     // Simple approach: multiply then mod
     // First reduce inputs
@@ -238,10 +238,10 @@ fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const b_red = mod(b, m) catch return BigIntError.InvalidModulus;
 
     // For small numbers or when one operand is 1, use direct computation
-    if (equal(b_red, [_]u8{0} ** 31 ++ [_]u8{1})) {
+    if (equal(b_red, @as([31]u8, @splat(0)) ++ [_]u8{1})) {
         return a_red; // a * 1 = a
     }
-    if (equal(a_red, [_]u8{0} ** 31 ++ [_]u8{1})) {
+    if (equal(a_red, @as([31]u8, @splat(0)) ++ [_]u8{1})) {
         return b_red; // 1 * b = b
     }
 
@@ -250,7 +250,7 @@ fn mulModBasic(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const sm9_q = [32]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x45, 0x21, 0xF2, 0x93, 0x4B, 0x1A, 0x7A, 0xEE, 0xDB, 0xE5, 0x6F, 0x9B, 0x27, 0xE3, 0x51, 0x45, 0x7D };
     const b_small = toU32(b_red);
     if (!equal(m, sm9_q) and b_small <= 64 and equal(b_red, fromU32(b_small))) {
-        var result = [_]u8{0} ** 32;
+        var result = @as([32]u8, @splat(0));
         for (0..b_small) |_| {
             result = addMod(result, a_red, m) catch return BigIntError.Overflow;
         }
@@ -283,7 +283,7 @@ fn mulModOptimized(a: BigInt, b: BigInt, m: BigInt) BigIntError!BigInt {
     const a_mod = mod(a, m) catch return BigIntError.InvalidModulus;
     const b_mod = mod(b, m) catch return BigIntError.InvalidModulus;
 
-    if (isZero(a_mod) or isZero(b_mod)) return [_]u8{0} ** 32;
+    if (isZero(a_mod) or isZero(b_mod)) return @as([32]u8, @splat(0));
 
     // Use u64-based arithmetic for the core computation
     const a64 = toU64Array(a_mod);
@@ -380,9 +380,9 @@ fn countBits64(a: BigInt64) u32 {
 /// Left shift u64 array by specified bits
 fn shiftLeft64(a: BigInt64, shift: u32) BigInt64 {
     if (shift == 0) return a;
-    if (shift >= 256) return [_]u64{0} ** 4;
+    if (shift >= 256) return @as([4]u64, @splat(0));
 
-    var result: BigInt64 = [_]u64{0} ** 4;
+    var result: BigInt64 = @as([4]u64, @splat(0));
     const word_shift = shift / 64;
     const bit_shift = shift % 64;
 
@@ -559,8 +559,8 @@ fn modGeneral(a: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn divMod(a: BigInt, b: BigInt) BigIntError!struct { quotient: BigInt, remainder: BigInt } {
     if (isZero(b)) return BigIntError.DivisionByZero;
 
-    const zero = [_]u8{0} ** 32;
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const zero = @as([32]u8, @splat(0));
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     // Handle special cases
     if (isZero(a)) {
@@ -646,7 +646,7 @@ pub fn invMod(a: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
     if (isZero(a)) return BigIntError.NotInvertible;
 
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     // Quick return for a = 1
     if (equal(a, one)) return one;
@@ -728,8 +728,8 @@ fn fermatsLittleTheoremInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
 /// Simple and reliable binary modular exponentiation
 /// Uses right-to-left binary method which is well-tested and robust
 fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const zero = [_]u8{0} ** 32;
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
+    const zero = @as([32]u8, @splat(0));
 
     // Handle edge cases
     if (isZero(exp)) return one;
@@ -766,8 +766,8 @@ fn montgomeryLadderModPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigI
 /// Implements proper 256-bit modular inverse for SM9 prime fields
 /// Based on the binary GCD algorithm which is more efficient than classical extended GCD
 fn binaryExtendedGcd(a: BigInt, m: BigInt) BigIntError!BigInt {
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const zero = [_]u8{0} ** 32;
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
+    const zero = @as([32]u8, @splat(0));
 
     // Handle special cases
     if (equal(a, zero)) return BigIntError.NotInvertible;
@@ -883,7 +883,7 @@ fn toU32(a: BigInt) u32 {
 
 /// Convert u32 to BigInt (compatible with fromU64 format)
 fn fromU32(val: u32) BigInt {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     // Use the same format as fromU64 - put the value in the lower 32 bits
     result[28] = @truncate(val >> 24);
     result[29] = @truncate(val >> 16);
@@ -915,7 +915,7 @@ fn countSignificantBits(a: BigInt) u32 {
 /// Binary modular exponentiation optimized for SM9 prime fields
 /// Uses sliding window method for better performance and robustness
 fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     if (isZero(exp)) return one;
     if (equal(exp, one)) return mod(base, m) catch BigIntError.NotInvertible;
@@ -957,8 +957,8 @@ fn modPowBinary(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
 pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
     if (isZero(m)) return BigIntError.InvalidModulus;
 
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const two = [_]u8{0} ** 31 ++ [_]u8{2};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
+    const two = @as([31]u8, @splat(0)) ++ [_]u8{2};
 
     if (isZero(exp)) {
         return one;
@@ -980,7 +980,7 @@ pub fn modPow(base: BigInt, exp: BigInt, m: BigInt) BigIntError!BigInt {
 
 /// Convert little-endian byte array to BigInt (big-endian)
 pub fn fromLittleEndian(bytes: []const u8) BigInt {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     const len = @min(bytes.len, 32);
 
     var i: usize = 0;
@@ -1007,7 +1007,7 @@ pub fn toLittleEndian(a: BigInt, allocator: std.mem.Allocator) ![]u8 {
 pub fn fromHex(hex: []const u8) !BigInt {
     if (hex.len > 64) return error.InvalidLength;
 
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
     const hex_bytes = (hex.len + 1) / 2; // Number of bytes this hex string represents
     const start_index = 32 - hex_bytes; // Start from the end (big-endian)
 
@@ -1045,7 +1045,7 @@ fn charToNibble(c: u8) !u8 {
 
 /// Create BigInt from u64 value
 pub fn fromU64(value: u64) BigInt {
-    var result = [_]u8{0} ** 32;
+    var result = @as([32]u8, @splat(0));
 
     result[24] = @as(u8, @intCast((value >> 56) & 0xFF));
     result[25] = @as(u8, @intCast((value >> 48) & 0xFF));
@@ -1154,7 +1154,7 @@ fn sub64(a: BigInt64, b: BigInt64) struct { result: BigInt64, borrow: bool } {
 
 /// Optimized u64-based multiplication (returns 512-bit result)
 fn mul64(a: BigInt64, b: BigInt64) [8]u64 {
-    var result = [_]u64{0} ** 8;
+    var result = @as([8]u64, @splat(0));
 
     for (0..4) |i| {
         var carry: u64 = 0;
@@ -1199,7 +1199,7 @@ const SM9_Q_PRIME_U64: u64 = 0x892BC42C2F2EE42B; // -q^(-1) mod 2^64
 /// Montgomery multiplication for SM9 prime field
 /// Implements CIOS (Coarsely Integrated Operand Scanning) algorithm
 fn montgomeryMulSM9(a: BigInt64, b: BigInt64) BigInt64 {
-    var t: [5]u64 = [_]u64{0} ** 5;
+    var t: [5]u64 = @as([5]u64, @splat(0));
 
     // CIOS algorithm for 4-word Montgomery multiplication
     for (0..4) |i| {
@@ -1334,13 +1334,13 @@ pub fn shiftRight(a: *BigInt, n: u8) void {
 fn simpleExtendedGcdInverse(a: BigInt, m: BigInt) BigIntError!BigInt {
     // Use brute force search for small values (this is efficient for small a)
     // This avoids the bit-shifting issues in modular exponentiation
-    var candidate = [_]u8{0} ** 31 ++ [_]u8{1};
+    var candidate = @as([31]u8, @splat(0)) ++ [_]u8{1};
     var iterations: u32 = 0;
     const max_iterations: u32 = 10000; // Sufficient for values ≤ 1000
 
     while (iterations < max_iterations) {
         const product = mulMod(a, candidate, m) catch return BigIntError.NotInvertible;
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
         if (equal(product, one)) {
             return candidate;

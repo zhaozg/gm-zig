@@ -19,6 +19,10 @@
 
 const std = @import("std");
 const mode = @import("builtin").mode; // Checked arithmetic is disabled in non-debug modes to avoid side channels
+const builtin = @import("builtin");
+// Checked arithmetic is disabled in non-debug modes to avoid side channels
+// (enum spelling changed between Zig 0.16.x and 0.17.x)
+const mode_is_debug = if (builtin.zig_version.minor >= 17) mode == .debug else mode == .Debug;
 
 inline fn cast(comptime DestType: type, target: anytype) DestType {
     @setEvalBranchQuota(10000);
@@ -26,7 +30,7 @@ inline fn cast(comptime DestType: type, target: anytype) DestType {
         const dest = @typeInfo(DestType).int;
         const source = @typeInfo(@TypeOf(target)).int;
         if (dest.bits < source.bits) {
-            const T = std.meta.Int(source.signedness, dest.bits);
+            const T = @Int(source.signedness, dest.bits);
             return @bitCast(@as(T, @truncate(target)));
         }
     }
@@ -55,7 +59,7 @@ pub const NonMontgomeryDomainFieldElement = [4]u64;
 ///   out1: [0x0 ~> 0xffffffffffffffff]
 ///   out2: [0x0 ~> 0x1]
 inline fn addcarryxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = ((cast(u128, arg1) + cast(u128, arg2)) + cast(u128, arg3));
     const x2 = cast(u64, (x1 & cast(u128, 0xffffffffffffffff)));
@@ -78,7 +82,7 @@ inline fn addcarryxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) vo
 ///   out1: [0x0 ~> 0xffffffffffffffff]
 ///   out2: [0x0 ~> 0x1]
 inline fn subborrowxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = ((cast(i128, arg2) - cast(i128, arg1)) - cast(i128, arg3));
     const x2 = cast(i1, (x1 >> 64));
@@ -100,7 +104,7 @@ inline fn subborrowxU64(out1: *u64, out2: *u1, arg1: u1, arg2: u64, arg3: u64) v
 ///   out1: [0x0 ~> 0xffffffffffffffff]
 ///   out2: [0x0 ~> 0xffffffffffffffff]
 inline fn mulxU64(out1: *u64, out2: *u64, arg1: u64, arg2: u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (cast(u128, arg1) * cast(u128, arg2));
     const x2 = cast(u64, (x1 & cast(u128, 0xffffffffffffffff)));
@@ -121,7 +125,7 @@ inline fn mulxU64(out1: *u64, out2: *u64, arg1: u64, arg2: u64) void {
 /// Output Bounds:
 ///   out1: [0x0 ~> 0xffffffffffffffff]
 inline fn cmovznzU64(out1: *u64, arg1: u1, arg2: u64, arg3: u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (~(~arg1));
     const x2 = cast(u64, (cast(i128, cast(i1, (cast(i2, 0x0) - cast(i2, x1)))) & cast(i128, 0xffffffffffffffff)));
@@ -139,7 +143,7 @@ inline fn cmovznzU64(out1: *u64, arg1: u1, arg2: u64, arg3: u64) void {
 ///   0 ≤ eval out1 < m
 ///
 pub fn mul(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldElement, arg2: MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (arg1[1]);
     const x2 = (arg1[2]);
@@ -479,7 +483,7 @@ pub fn mul(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldEleme
 ///   0 ≤ eval out1 < m
 ///
 pub fn square(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (arg1[1]);
     const x2 = (arg1[2]);
@@ -820,7 +824,7 @@ pub fn square(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldEl
 ///   0 ≤ eval out1 < m
 ///
 pub fn add(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldElement, arg2: MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     var x1: u64 = undefined;
     var x2: u1 = undefined;
@@ -873,7 +877,7 @@ pub fn add(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldEleme
 ///   0 ≤ eval out1 < m
 ///
 pub fn sub(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldElement, arg2: MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     var x1: u64 = undefined;
     var x2: u1 = undefined;
@@ -916,7 +920,7 @@ pub fn sub(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldEleme
 ///   0 ≤ eval out1 < m
 ///
 pub fn opp(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     var x1: u64 = undefined;
     var x2: u1 = undefined;
@@ -959,7 +963,7 @@ pub fn opp(out1: *MontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldEleme
 ///   0 ≤ eval out1 < m
 ///
 pub fn fromMontgomery(out1: *NonMontgomeryDomainFieldElement, arg1: MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (arg1[0]);
     var x2: u64 = undefined;
@@ -1172,7 +1176,7 @@ pub fn fromMontgomery(out1: *NonMontgomeryDomainFieldElement, arg1: MontgomeryDo
 ///   0 ≤ eval out1 < m
 ///
 pub fn toMontgomery(out1: *MontgomeryDomainFieldElement, arg1: NonMontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (arg1[1]);
     const x2 = (arg1[2]);
@@ -1495,7 +1499,7 @@ pub fn toMontgomery(out1: *MontgomeryDomainFieldElement, arg1: NonMontgomeryDoma
 /// Output Bounds:
 ///   out1: [0x0 ~> 0xffffffffffffffff]
 pub fn nonzero(out1: *u64, arg1: [4]u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = ((arg1[0]) | ((arg1[1]) | ((arg1[2]) | (arg1[3]))));
     out1.* = x1;
@@ -1513,7 +1517,7 @@ pub fn nonzero(out1: *u64, arg1: [4]u64) void {
 /// Output Bounds:
 ///   out1: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 pub fn selectznz(out1: *[4]u64, arg1: u1, arg2: [4]u64, arg3: [4]u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     var x1: u64 = undefined;
     cmovznzU64(&x1, arg1, (arg2[0]), (arg3[0]));
@@ -1541,7 +1545,7 @@ pub fn selectznz(out1: *[4]u64, arg1: u1, arg2: [4]u64, arg3: [4]u64) void {
 /// Output Bounds:
 ///   out1: [[0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff], [0x0 ~> 0xff]]
 pub fn toBytes(out1: *[32]u8, arg1: [4]u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (arg1[3]);
     const x2 = (arg1[2]);
@@ -1650,7 +1654,7 @@ pub fn toBytes(out1: *[32]u8, arg1: [4]u64) void {
 /// Output Bounds:
 ///   out1: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 pub fn fromBytes(out1: *[4]u64, arg1: [32]u8) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     const x1 = (cast(u64, (arg1[31])) << 56);
     const x2 = (cast(u64, (arg1[30])) << 48);
@@ -1725,7 +1729,7 @@ pub fn fromBytes(out1: *[4]u64, arg1: [32]u8) void {
 ///   0 ≤ eval out1 < m
 ///
 pub fn setOne(out1: *MontgomeryDomainFieldElement) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     out1[0] = 0xac440bf6c62abedd;
     out1[1] = 0x8dfc2094de39fad4;
@@ -1742,7 +1746,7 @@ pub fn setOne(out1: *MontgomeryDomainFieldElement) void {
 /// Output Bounds:
 ///   out1: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 pub fn msat(out1: *[5]u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     out1[0] = 0x53bbf40939d54123;
     out1[1] = 0x7203df6b21c6052b;
@@ -1780,7 +1784,7 @@ pub fn msat(out1: *[5]u64) void {
 ///   out4: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 ///   out5: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 pub fn divstep(out1: *u64, out2: *[5]u64, out3: *[5]u64, out4: *[4]u64, out5: *[4]u64, arg1: u64, arg2: [5]u64, arg3: [5]u64, arg4: [4]u64, arg5: [4]u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     var x1: u64 = undefined;
     var x2: u1 = undefined;
@@ -2014,7 +2018,7 @@ pub fn divstep(out1: *u64, out2: *[5]u64, out3: *[5]u64, out4: *[4]u64, out5: *[
 /// Output Bounds:
 ///   out1: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 pub fn divstepPrecomp(out1: *[4]u64) void {
-    @setRuntimeSafety(mode == .Debug);
+    @setRuntimeSafety(mode_is_debug);
 
     out1[0] = 0x1aa32707b351756d;
     out1[1] = 0xabdd671e2a62fa;

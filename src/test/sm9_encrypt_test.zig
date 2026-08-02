@@ -8,9 +8,9 @@ test "SM9 ciphertext creation and validation" {
     const allocator = gpa.allocator();
 
     // Create valid test data for ciphertext validation
-    const c1 = [_]u8{0x02} ++ [_]u8{0x01} ** 32; // Valid compressed G1 point format
+    const c1 = [_]u8{0x02} ++ @as([32]u8, @splat(0x01)); // Valid compressed G1 point format
     const c2 = "test message";
-    const c3 = [_]u8{0x33} ** 32; // Non-zero MAC value
+    const c3 = @as([32]u8, @splat(0x33)); // Non-zero MAC value
 
     const ciphertext = try sm9.encrypt.Ciphertext.init(
         allocator,
@@ -31,9 +31,9 @@ test "SM9 ciphertext serialization" {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const c1 = [_]u8{0x11} ** 33;
+    const c1 = @as([33]u8, @splat(0x11));
     const c2 = "Hello, SM9!";
-    const c3 = [_]u8{0x33} ** 32;
+    const c3 = @as([32]u8, @splat(0x33));
 
     const ciphertext = try sm9.encrypt.Ciphertext.init(
         allocator,
@@ -211,10 +211,10 @@ test "SM9 encryption utility functions" {
     try testing.expect(h2.len == 32);
 
     // Test point validation
-    var g1_point = [_]u8{0x02} ++ [_]u8{0} ** 32; // Proper compressed G1 point format
+    var g1_point = [_]u8{0x02} ++ @as([32]u8, @splat(0)); // Proper compressed G1 point format
     g1_point[1] = 1; // Make x-coordinate non-zero
 
-    var g2_point = [_]u8{0x04} ++ [_]u8{0} ** 64; // Proper uncompressed G2 point format
+    var g2_point = [_]u8{0x04} ++ @as([64]u8, @splat(0)); // Proper uncompressed G2 point format
     g2_point[1] = 1; // Make x-coordinate non-zero
 
     try testing.expect(sm9.encrypt.EncryptionUtils.validateG1Point(g1_point, system_params));

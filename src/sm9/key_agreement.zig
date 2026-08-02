@@ -45,7 +45,7 @@ pub const EphemeralKeyPair = struct {
         _ = allocator; // Parameter kept for API compatibility but not used in current implementation
 
         // Generate proper cryptographic ephemeral key - GM/T 0044-2016 compliant
-        var private_key = [_]u8{0} ** 32;
+        var private_key = @as([32]u8, @splat(0));
 
         // Use proper cryptographic random generation - no fallback mechanisms
         const random_module = @import("random.zig");
@@ -229,7 +229,7 @@ pub const KeyAgreementContext = struct {
 
         // Step 3: Compute shared secret using COMPLETELY SYMMETRIC approach
         // Key insight: BOTH parties must compute EXACTLY the same hash from EXACTLY the same inputs
-        var shared_material = [_]u8{0} ** 128;
+        var shared_material = @as([128]u8, @splat(0));
 
         var shared_hasher = SM3.init(.{});
 

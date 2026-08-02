@@ -7,22 +7,21 @@ Always reference these instructions first and fallback to search or bash command
 ## Working Effectively
 
 ### Prerequisites and Installation
-- **CRITICAL**: Zig 0.14.1 or later is REQUIRED. The project will not build with Zig 0.13.0 or earlier.
+- **CRITICAL**: Zig 0.16.0 or later is REQUIRED (0.16.x or 0.17.x). The project will not build with Zig 0.15.x or earlier.
 - Git (for cloning the repository)
 
-### Installing Zig 0.14.1
+### Installing Zig 0.16.0
 ```bash
-# Download Zig 0.14.1 from official source
-curl -s "https://ziglang.org/download/index.json" | jq -r '.["0.14.1"]."x86_64-linux".tarball'
-wget https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz -O zig-0.14.1.tar.xz
-tar -xf zig-0.14.1.tar.xz
-sudo mv zig-x86_64-linux-0.14.1 /usr/local/zig
+# Download Zig 0.16.0 from official source (or any 0.16.x / 0.17.x)
+curl -s "https://ziglang.org/download/index.json" | jq -r '.["0.16.0"]."x86_64-linux".tarball'
+wget https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -O zig-0.16.0.tar.xz
+tar -xf zig-0.16.0.tar.xz
+sudo mv zig-x86_64-linux-0.16.0 /usr/local/zig
 sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
 
 # Verify installation
-zig version  # Should output: 0.14.1
+zig version  # Should output: 0.16.x or 0.17.x
 ```
-
 ### Building and Testing the Repository
 - Bootstrap and build the repository:
   - `zig build` -- takes ~15 seconds. NEVER CANCEL. Set timeout to 30+ minutes for safety.
@@ -135,17 +134,17 @@ gm-zig/
 ### Known Issues and Limitations
 - Code formatting: Some files have formatting issues (expected, not blocking)
 - Individual test files cannot be run directly due to import paths
-- Project requires exact Zig version 0.14.1+ (will not work with 0.13.0)
+- Project requires Zig 0.16.x or 0.17.x (will not work with 0.15.x or earlier)
 - WASM builds work but cannot interact with UI in test environments
 
 ### Troubleshooting
-- **Build fails with "Zig version 0.14 or newer is required"**: Install Zig 0.14.1+
+- **Build fails with "Zig version 0.16 or newer is required"**: Install Zig 0.16.x or 0.17.x
 - **Build fails with "expected enum literal"**: Fix build.zig.zon name field format
 - **Individual tests fail with import errors**: Use `zig build test` or test runners instead
 - **Performance seems slow**: Use optimized builds with `-Doptimize=ReleaseFast`
 
 ## Development Workflow
-1. Always verify Zig version: `zig version` (must be 0.14.1+)
+1. Always verify Zig version: `zig version` (must be 0.16.x or 0.17.x)
 2. Build: `zig build` (15 seconds, never cancel)
 3. Test: `zig build test` (7-10 seconds, never cancel) 
 4. Validate: `zig build run` (must complete successfully)

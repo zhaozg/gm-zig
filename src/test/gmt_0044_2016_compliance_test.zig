@@ -120,6 +120,6 @@ test "GM/T 0044-2016 No Fallback Mechanisms Verification" {
     };
 
     // If it succeeds, the result should not be the hardcoded MIN_FIELD_ELEMENT
-    const min_element = [_]u8{0} ** 31 ++ [_]u8{1};
+    const min_element = @as([31]u8, @splat(0)) ++ [_]u8{1};
     try testing.expect(!std.mem.eql(u8, &result, &min_element));
 }

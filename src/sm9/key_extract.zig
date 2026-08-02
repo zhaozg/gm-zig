@@ -292,7 +292,7 @@ pub const UserPublicKey = struct {
 
         // Step 2: Compute public key point using master public key
         // Public key = [H1]P_pub + P_pub = [H1+1]P_pub
-        const h1_plus_one = bigint.addMod(h1_result, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch h1_result;
+        const h1_plus_one = bigint.addMod(h1_result, @as([31]u8, @splat(0)) ++ [_]u8{1}, system_params.N) catch h1_result;
 
         // Use master public key point for computation
         const master_point = curve.G2Point.fromUncompressed(master_public_key.public_key) catch {
@@ -303,7 +303,7 @@ pub const UserPublicKey = struct {
         const public_key_point = master_point.mul(h1_plus_one, system_params);
 
         // Convert to 64-byte uncompressed format for storage
-        var point_bytes = [_]u8{0} ** 64;
+        var point_bytes = @as([64]u8, @splat(0));
         const compressed = public_key_point.compress();
 
         // Expand compressed point to uncompressed format (simplified)
@@ -341,7 +341,7 @@ pub const UserPublicKey = struct {
 
         // Step 2: Compute public key point using master public key
         // Public key = [H1]P_pub + P_pub = [H1+1]P_pub
-        const h1_plus_one = bigint.addMod(h1_result, [_]u8{0} ** 31 ++ [_]u8{1}, system_params.N) catch h1_result;
+        const h1_plus_one = bigint.addMod(h1_result, @as([31]u8, @splat(0)) ++ [_]u8{1}, system_params.N) catch h1_result;
 
         // Use master public key point for computation (G1 point)
         const master_point = curve.G1Point.fromCompressed(master_public_key.public_key) catch {
@@ -353,7 +353,7 @@ pub const UserPublicKey = struct {
 
         // Convert to 64-byte format for storage and validate the result
         const point_bytes = blk: {
-            var bytes = [_]u8{0} ** 64;
+            var bytes = @as([64]u8, @splat(0));
             @memcpy(bytes[0..32], public_key_point.x[0..32]);
             // Leave bytes[32..64] as zeros for padding
             break :blk bytes;

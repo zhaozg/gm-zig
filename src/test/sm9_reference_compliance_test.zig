@@ -116,10 +116,10 @@ test "SM9 H2 hash function reference compliance" {
         message: []const u8,
         w: [32]u8,
     }{
-        .{ .message = "Chinese IBS standard", .w = [_]u8{0x01} ** 32 },
-        .{ .message = "message digest", .w = [_]u8{0x02} ** 32 },
-        .{ .message = "Hello, SM9!", .w = [_]u8{0x03} ** 32 },
-        .{ .message = "x", .w = [_]u8{0x04} ** 32 },
+        .{ .message = "Chinese IBS standard", .w = @as([32]u8, @splat(0x01)) },
+        .{ .message = "message digest", .w = @as([32]u8, @splat(0x02)) },
+        .{ .message = "Hello, SM9!", .w = @as([32]u8, @splat(0x03)) },
+        .{ .message = "x", .w = @as([32]u8, @splat(0x04)) },
     };
 
     for (test_cases) |tc| {

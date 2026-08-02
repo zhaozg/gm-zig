@@ -225,7 +225,7 @@ pub const SignatureContext = struct {
         // Step 1: Generate deterministic r for signature reproducibility
         // In production, this should use deterministic ECDSA-style nonce generation
         // as per RFC 6979 to ensure signatures are deterministic while remaining secure
-        var r = [_]u8{0} ** 32;
+        var r = @as([32]u8, @splat(0));
         var r_hasher = SM3.init(.{});
         r_hasher.update(processed_message);
         r_hasher.update(&user_private_key.key);
@@ -242,7 +242,7 @@ pub const SignatureContext = struct {
 
         // Step 2: Compute w deterministically for consistent verification
         // Use user ID and message as basis so verification can reproduce the same w
-        var w = [_]u8{0} ** 32;
+        var w = @as([32]u8, @splat(0));
         var w_hasher = SM3.init(.{});
         w_hasher.update(user_private_key.id);
         w_hasher.update(processed_message); // Use processed message instead of r
@@ -288,7 +288,7 @@ pub const SignatureContext = struct {
 
         // Step 6: Compute S = l * ds_A (proper elliptic curve scalar multiplication)
         // This performs genuine cryptographic computation as required by GM/T 0044-2016
-        var S = [_]u8{0} ** 33;
+        var S = @as([33]u8, @splat(0));
         S[0] = 0x02; // Compressed G1 point prefix
 
         // Create user private key as G1 point for proper elliptic curve operations
@@ -362,7 +362,7 @@ pub const SignatureContext = struct {
 
         // Step 2-7: Compute w deterministically for verification
         // Use user ID and message as basis, same as signing
-        var w = [_]u8{0} ** 32;
+        var w = @as([32]u8, @splat(0));
         var w_hasher = SM3.init(.{});
         w_hasher.update(user_id);
         w_hasher.update(processed_message); // Use processed message, same as signing

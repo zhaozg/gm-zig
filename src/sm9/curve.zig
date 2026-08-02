@@ -50,9 +50,9 @@ pub const G1Point = struct {
     /// Create point at infinity
     pub fn infinity() G1Point {
         return G1Point{
-            .x = [_]u8{0} ** 32,
-            .y = [_]u8{0} ** 32,
-            .z = [_]u8{0} ** 32,
+            .x = @as([32]u8, @splat(0)),
+            .y = @as([32]u8, @splat(0)),
+            .z = @as([32]u8, @splat(0)),
             .is_infinity = true,
         };
     }
@@ -76,7 +76,7 @@ pub const G1Point = struct {
         // For x=2, calculate y such that y² = x³ + 3
         // Since 2³ + 3 = 11, we need y such that y² ≡ 11 (mod p)
         // For simplicity in this context, use y = 2 which satisfies our test curve
-        return [_]u8{0} ** 31 ++ [_]u8{2};
+        return @as([31]u8, @splat(0)) ++ [_]u8{2};
     }
 
     /// Create affine point with validation
@@ -239,9 +239,9 @@ pub const G1Point = struct {
     fn computeDoublingSlope(x: [32]u8, y: [32]u8, field_order: [32]u8) ![32]u8 {
         // Slope = (3x² + a) / (2y) where a = 0
         const x_squared = try bigint.mulMod(x, x, field_order);
-        const three_x_squared = try bigint.mulMod(x_squared, [_]u8{0} ** 31 ++ [_]u8{3}, field_order);
+        const three_x_squared = try bigint.mulMod(x_squared, @as([31]u8, @splat(0)) ++ [_]u8{3}, field_order);
 
-        const two_y = try bigint.mulMod(y, [_]u8{0} ** 31 ++ [_]u8{2}, field_order);
+        const two_y = try bigint.mulMod(y, @as([31]u8, @splat(0)) ++ [_]u8{2}, field_order);
         const denominator_inv = try bigint.invMod(two_y, field_order);
 
         return bigint.mulMod(three_x_squared, denominator_inv, field_order);
@@ -251,7 +251,7 @@ pub const G1Point = struct {
     fn computeDoubledPoint(x: [32]u8, y: [32]u8, slope: [32]u8, field_order: [32]u8) G1Point {
         // x' = slope² - 2x
         const slope_squared = bigint.mulMod(slope, slope, field_order) catch return G1Point.infinity();
-        const two_x = bigint.mulMod(x, [_]u8{0} ** 31 ++ [_]u8{2}, field_order) catch return G1Point.infinity();
+        const two_x = bigint.mulMod(x, @as([31]u8, @splat(0)) ++ [_]u8{2}, field_order) catch return G1Point.infinity();
         const new_x = bigint.subMod(slope_squared, two_x, field_order) catch return G1Point.infinity();
 
         // y' = slope * (x - x') - y
@@ -424,7 +424,7 @@ pub const G1Point = struct {
     /// Convert point to compressed format (33 bytes)
     pub fn toCompressed(self: G1Point) [33]u8 {
         if (self.isInfinity()) {
-            return [_]u8{constants.PointFormat.INFINITY} ++ [_]u8{0} ** 32;
+            return [_]u8{constants.PointFormat.INFINITY} ++ @as([32]u8, @splat(0));
         }
 
         var result: [33]u8 = undefined;
@@ -470,7 +470,7 @@ pub const G1Point = struct {
         if (self.isInfinity()) return G1Point.infinity();
 
         // If z == 1, already in affine form
-        var one = [_]u8{0} ** 32;
+        var one = @as([32]u8, @splat(0));
         one[31] = 1;
 
         if (bigint.equal(self.z, one)) {
@@ -534,7 +534,7 @@ pub const G1Point = struct {
             };
 
             // Add curve coefficient b = 3
-            var three = [_]u8{0} ** 32;
+            var three = @as([32]u8, @splat(0));
             three[31] = 3;
             const x_cubed_plus_b = bigint.addMod(x_cubed, three, curve_params.q) catch {
                 return false; // Invalid modular arithmetic
@@ -557,7 +557,7 @@ pub const G1Point = struct {
 
     /// Compress point to 33 bytes (x coordinate + y parity)
     pub fn compress(self: G1Point) [33]u8 {
-        var result = [_]u8{0} ** 33;
+        var result = @as([33]u8, @splat(0));
 
         if (self.isInfinity()) {
             result[0] = 0x00; // Point at infinity marker
@@ -598,13 +598,13 @@ pub const G1Point = struct {
 fn computeSquareRoot(a: [32]u8, modulus: [32]u8, is_odd_y: bool) MathError![32]u8 {
     // Handle special case: if a is zero, return zero
     if (bigint.isZero(a)) {
-        return [_]u8{0} ** 32;
+        return @as([32]u8, @splat(0));
     }
 
     // For BN256 curve (q ≡ 3 mod 4), we can directly use Tonelli-Shanks simplification
     // Since q ≡ 3 mod 4, square root can be computed as: sqrt(a) = a^((q+1)/4) mod q
 
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     // Compute (q+1)/4 directly without checking Legendre symbol first
     // Add 1 to modulus
@@ -709,16 +709,16 @@ pub const G2Point = struct {
     /// Create point at infinity
     pub fn infinity() G2Point {
         return G2Point{
-            .x = [_]u8{0} ** 64,
-            .y = [_]u8{0} ** 64,
-            .z = [_]u8{0} ** 64,
+            .x = @as([64]u8, @splat(0)),
+            .y = @as([64]u8, @splat(0)),
+            .z = @as([64]u8, @splat(0)),
             .is_infinity = true,
         };
     }
 
     /// Create affine point
     pub fn affine(x: [64]u8, y: [64]u8) G2Point {
-        var one = [_]u8{0} ** 64;
+        var one = @as([64]u8, @splat(0));
         one[63] = 1; // Set z = (1, 0) in Fp2
 
         return G2Point{
@@ -736,8 +736,8 @@ pub const G2Point = struct {
         // Create a valid G2 point using non-zero coordinates
         // For BN256 G2, we need valid Fp2 elements that work with the twist curve
         // Use a simple approach: create a point that's not at infinity
-        var x: [64]u8 = [_]u8{0} ** 64;
-        var y: [64]u8 = [_]u8{0} ** 64;
+        var x: [64]u8 = @as([64]u8, @splat(0));
+        var y: [64]u8 = @as([64]u8, @splat(0));
 
         // Set x = (2, 0) in Fp2 (x0 = 2, x1 = 0)
         x[31] = 2; // x0 = 2
@@ -815,7 +815,7 @@ pub const G2Point = struct {
         const x_sq_imag = bigint.addMod(x0x1, x0x1, q) catch return G2Point.infinity();
 
         // 3*x^2 = (3*x_sq_real, 3*x_sq_imag)
-        const three = [_]u8{0} ** 31 ++ [_]u8{3};
+        const three = @as([31]u8, @splat(0)) ++ [_]u8{3};
         const three_x_sq_real = bigint.mulMod(x_sq_real, three, q) catch return G2Point.infinity();
         const three_x_sq_imag = bigint.mulMod(x_sq_imag, three, q) catch return G2Point.infinity();
 
@@ -925,8 +925,8 @@ pub const G2Point = struct {
             var y1_1: [32]u8 = undefined;
             @memcpy(&y1_0, self.y[0..32]);
             @memcpy(&y1_1, self.y[32..64]);
-            y1_0_neg = bigint.subMod([_]u8{0} ** 32, y1_0, q) catch return G2Point.infinity();
-            y1_1_neg = bigint.subMod([_]u8{0} ** 32, y1_1, q) catch return G2Point.infinity();
+            y1_0_neg = bigint.subMod(@as([32]u8, @splat(0)), y1_0, q) catch return G2Point.infinity();
+            y1_1_neg = bigint.subMod(@as([32]u8, @splat(0)), y1_1, q) catch return G2Point.infinity();
             if (std.mem.eql(u8, &y1_neg, &other.y)) {
                 return G2Point.infinity();
             }
@@ -1073,7 +1073,7 @@ pub const G2Point = struct {
 
     /// Compress point to 65 bytes (both Fp2 coordinates)
     pub fn compress(self: G2Point) [65]u8 {
-        var result = [_]u8{0} ** 65;
+        var result = @as([65]u8, @splat(0));
 
         if (self.isInfinity()) {
             result[0] = 0x00; // Point at infinity marker
@@ -1291,19 +1291,19 @@ pub const CurveUtils = struct {
         }
 
         // Handle scalar = 1 case
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
         if (bigint.equal(scalar, one)) {
             return point;
         }
 
         // For scalar = 2, just double
-        const two = [_]u8{0} ** 31 ++ [_]u8{2};
+        const two = @as([31]u8, @splat(0)) ++ [_]u8{2};
         if (bigint.equal(scalar, two)) {
             return point.double(curve_params);
         }
 
         // For scalar = 3, double and add
-        const three = [_]u8{0} ** 31 ++ [_]u8{3};
+        const three = @as([31]u8, @splat(0)) ++ [_]u8{3};
         if (bigint.equal(scalar, three)) {
             const doubled = point.double(curve_params);
             return doubled.add(point, curve_params);
@@ -1325,13 +1325,13 @@ pub const CurveUtils = struct {
         }
 
         // Handle scalar = 1 case
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
         if (bigint.equal(scalar, one)) {
             return point;
         }
 
         // For small scalars, handle them efficiently
-        const two = [_]u8{0} ** 31 ++ [_]u8{2};
+        const two = @as([31]u8, @splat(0)) ++ [_]u8{2};
         if (bigint.equal(scalar, two)) {
             return point.double(curve_params);
         }
@@ -1411,7 +1411,7 @@ pub const CurveUtils = struct {
         const compressed = multiplied_point.compress();
 
         // For enhanced security, incorporate user ID into the derivation
-        var derived_key = [_]u8{0} ** 33;
+        var derived_key = @as([33]u8, @splat(0));
         derived_key[0] = 0x02; // Compressed point prefix
 
         // Use the computed point and user ID to derive final key
@@ -1440,8 +1440,8 @@ pub const CurveUtils = struct {
         // P2 is stored as [prefix][x_coord][y_coord] where prefix is 0x04
         // For G2, coordinates are 64 bytes each, but P2 stores only 32 bytes per coordinate
         // We need to expand them to 64 bytes for G2Point.affine
-        var x_coord = [_]u8{0} ** 64;
-        var y_coord = [_]u8{0} ** 64;
+        var x_coord = @as([64]u8, @splat(0));
+        var y_coord = @as([64]u8, @splat(0));
         std.mem.copyForwards(u8, x_coord[0..32], curve_params.P2[1..33]);
         std.mem.copyForwards(u8, y_coord[0..32], curve_params.P2[33..65]);
         const base_g2 = G2Point.affine(x_coord, y_coord);
@@ -1450,7 +1450,7 @@ pub const CurveUtils = struct {
         const multiplied_point = scalarMultiplyG2(base_g2, scalar, curve_params);
 
         // Convert to uncompressed format for G2 storage
-        var derived_key = [_]u8{0} ** 65;
+        var derived_key = @as([65]u8, @splat(0));
         derived_key[0] = 0x04; // Uncompressed point prefix
 
         // Use the computed point and user ID to derive final key
@@ -1503,7 +1503,7 @@ fn addMixedJacobianAffine(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [3
             // Points are equal, use doubling - proper doubling without temporary parameters
             const temp_point = G1Point{ .x = x1, .y = y1, .z = z1, .is_infinity = false };
             // Need to create proper SystemParams for doubling
-            const temp_params = params.SystemParams{ .curve = .bn256, .P1 = [_]u8{0} ** 33, .P2 = [_]u8{0} ** 65, .q = field_p, .N = field_p, .v = 256 };
+            const temp_params = params.SystemParams{ .curve = .bn256, .P1 = @as([33]u8, @splat(0)), .P2 = @as([65]u8, @splat(0)), .q = field_p, .N = field_p, .v = 256 };
             return temp_point.double(temp_params);
         } else {
             // Points are inverses, result is infinity
@@ -1569,7 +1569,7 @@ fn addJacobianJacobian(x1: [32]u8, y1: [32]u8, z1: [32]u8, x2: [32]u8, y2: [32]u
             // Points are equal, use doubling - proper doubling without temporary parameters
             const temp_point = G1Point{ .x = x1, .y = y1, .z = z1, .is_infinity = false };
             // Need to create proper SystemParams for doubling
-            const temp_params = params.SystemParams{ .curve = .bn256, .P1 = [_]u8{0} ** 33, .P2 = [_]u8{0} ** 65, .q = field_p, .N = field_p, .v = 256 };
+            const temp_params = params.SystemParams{ .curve = .bn256, .P1 = @as([33]u8, @splat(0)), .P2 = @as([65]u8, @splat(0)), .q = field_p, .N = field_p, .v = 256 };
             return temp_point.double(temp_params);
         } else {
             // Points are inverses
@@ -1673,7 +1673,7 @@ fn windowedScalarMultiply(point: G1Point, scalar: [32]u8, curve_params: params.S
 /// Compute Non-Adjacent Form (NAF) representation of scalar for optimized multiplication
 /// NAF reduces the average Hamming weight by ~1/3, reducing point additions
 fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
-    var naf: [256]i8 = [_]i8{0} ** 256;
+    var naf: [256]i8 = @as([256]i8, @splat(0));
     var scalar_copy: [32]u8 = scalar;
 
     const window_mask = (@as(u32, 1) << @intCast(window_size)) - 1;
@@ -1711,7 +1711,7 @@ fn computeNAF(scalar: [32]u8, window_size: u8) [256]i8 {
             }
 
             // Subtract the window value from scalar_copy
-            var window_bytes: [32]u8 = [_]u8{0} ** 32;
+            var window_bytes: [32]u8 = @as([32]u8, @splat(0));
             var window_temp = @as(u32, @intCast(@abs(naf[i])));
             for (0..4) |j| {
                 window_bytes[31 - j] = @as(u8, @intCast(window_temp & 0xFF));

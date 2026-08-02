@@ -521,8 +521,8 @@ test "SM9 Phase 4 - DER signature encoding and validation" {
     const allocator = gpa.allocator();
 
     // Create a test signature
-    const h = [_]u8{0x12} ** 32;
-    const S = [_]u8{0x02} ++ [_]u8{0x34} ** 32; // Valid compressed point format
+    const h = @as([32]u8, @splat(0x12));
+    const S = [_]u8{0x02} ++ @as([32]u8, @splat(0x34)); // Valid compressed point format
     const signature = sm9.sign.Signature.init(h, S);
 
     // Test signature validation

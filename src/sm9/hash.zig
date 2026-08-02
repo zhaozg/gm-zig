@@ -298,7 +298,7 @@ pub fn mac(key: []const u8, message: []const u8, allocator: std.mem.Allocator) !
 /// Compute HMAC-SM3 according to RFC 2104 pattern
 fn computeHMacSM3(key: []const u8, message: []const u8, output: *[32]u8) !void {
     const block_size = 64; // SM3 block size
-    var key_buffer: [64]u8 = [_]u8{0} ** 64;
+    var key_buffer: [64]u8 = @as([64]u8, @splat(0));
 
     // Prepare key: hash if too long, pad if too short
     if (key.len <= block_size) {

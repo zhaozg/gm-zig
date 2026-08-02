@@ -177,7 +177,7 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
     // but are mathematically correct within the SM9 implementation context
 
     // Test scalar multiplication with small scalar
-    var scalar = [_]u8{0} ** 32;
+    var scalar = @as([32]u8, @splat(0));
     scalar[31] = 2; // Multiply by 2
     const multiplied = sm9.curve.CurveUtils.scalarMultiplyG1(p1_point, scalar, system.params);
     // Accept the result as long as it's not obviously invalid
@@ -191,7 +191,7 @@ test "GM/T 0044-2016 - Elliptic curve arithmetic compliance" {
 
     // Verify that basic curve operations complete without errors
     // This ensures the implementation can handle standard elliptic curve arithmetic
-    const another_scalar = [_]u8{0} ** 31 ++ [_]u8{3};
+    const another_scalar = @as([31]u8, @splat(0)) ++ [_]u8{3};
     const result = sm9.curve.CurveUtils.scalarMultiplyG1(p1_point, another_scalar, system.params);
     _ = result.toAffine(system.params) catch |err| {
         // Handle potential conversion errors gracefully

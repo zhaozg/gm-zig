@@ -234,8 +234,8 @@ test "SM4 algorithm source sample data" {
 }
 
 test "SM4 various key and plaintext combinations" {
-    const key1 = [_]u8{0} ** 16;
-    const pt1 = [_]u8{0} ** 16;
+    const key1 = @as([16]u8, @splat(0));
+    const pt1 = @as([16]u8, @splat(0));
     const ctx1 = SM4.init(&key1);
     var ct1: [16]u8 = undefined;
     ctx1.encryptBlock(&pt1, &ct1);
@@ -243,8 +243,8 @@ test "SM4 various key and plaintext combinations" {
     ctx1.decryptBlock(&ct1, &dt1);
     try std.testing.expectEqualSlices(u8, &pt1, &dt1);
 
-    const key2 = [_]u8{0xFF} ** 16;
-    const pt2 = [_]u8{0xFF} ** 16;
+    const key2 = @as([16]u8, @splat(0xFF));
+    const pt2 = @as([16]u8, @splat(0xFF));
     const ctx2 = SM4.init(&key2);
     var ct2: [16]u8 = undefined;
     ctx2.encryptBlock(&pt2, &ct2);
@@ -327,8 +327,8 @@ test "SM4-CBC different IVs" {
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
     };
 
-    const iv1 = [_]u8{0x00} ** 16;
-    const iv2 = [_]u8{0xFF} ** 16;
+    const iv1 = @as([16]u8, @splat(0x00));
+    const iv2 = @as([16]u8, @splat(0xFF));
 
     var ctx1 = sm4.SM4_CBC.init(&key, &iv1);
     var ctx2 = sm4.SM4_CBC.init(&key, &iv2);
@@ -353,8 +353,8 @@ test "SM4-CTR different nonces" {
         0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
     };
 
-    const nonce1 = [_]u8{0x00} ** 16;
-    const nonce2 = [_]u8{0xFF} ** 16;
+    const nonce1 = @as([16]u8, @splat(0x00));
+    const nonce2 = @as([16]u8, @splat(0xFF));
 
     var ctx1 = sm4.SM4_CTR.init(&key, &nonce1);
     var ctx2 = sm4.SM4_CTR.init(&key, &nonce2);
@@ -420,7 +420,7 @@ test "SM4-XTS different tweaks" {
 }
 
 test "SM4-ECB empty data" {
-    const key = [_]u8{0} ** 16;
+    const key = @as([16]u8, @splat(0));
     const ctx = sm4.SM4_ECB.init(&key);
 
     var ciphertext: [0]u8 = undefined;
@@ -431,8 +431,8 @@ test "SM4-ECB empty data" {
 }
 
 test "SM4-CTR empty data" {
-    const key = [_]u8{0} ** 16;
-    const nonce = [_]u8{0} ** 16;
+    const key = @as([16]u8, @splat(0));
+    const nonce = @as([16]u8, @splat(0));
     var ctx = sm4.SM4_CTR.init(&key, &nonce);
 
     var ciphertext: [0]u8 = undefined;

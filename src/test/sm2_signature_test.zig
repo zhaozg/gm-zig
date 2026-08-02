@@ -25,7 +25,7 @@ test "SM2 signature creation and verification" {
 
 test "SM2 signature with precomputed hash" {
     const key_pair = kp.generateKeyPair(testing.io);
-    const message_hash = [_]u8{0x01} ** 32;
+    const message_hash = @as([32]u8, @splat(0x01));
     const options = signature.SignatureOptions{ .hash_type = .precomputed };
 
     // Create signature
@@ -118,7 +118,7 @@ test "SM2 signature comprehensive tests" {
 
     // Test 5: Precomputed hash signature
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
-    const message_hash = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ** 8; // 32 bytes
+    const message_hash = [_]u8{ 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78, 0x12, 0x34, 0x56, 0x78 }; // 32 bytes
 
     const sig_hash = try signature.sign(io, &message_hash, key_pair.private_key, key_pair.public_key, hash_options);
     const is_valid_hash = try signature.verify(&message_hash, sig_hash, key_pair.public_key, hash_options);
@@ -164,7 +164,7 @@ test "SM2 signature error handling" {
     const options = signature.SignatureOptions{};
 
     // Test invalid precomputed hash length
-    const invalid_hash = [_]u8{0x01} ** 16; // Wrong length
+    const invalid_hash = @as([16]u8, @splat(0x01)); // Wrong length
     const hash_options = signature.SignatureOptions{ .hash_type = .precomputed };
 
     try testing.expectError(error.InvalidPrecomputedHashLength, signature.sign(testing.io, &invalid_hash, key_pair.private_key, key_pair.public_key, hash_options));

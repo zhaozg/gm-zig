@@ -33,7 +33,7 @@ Run the automated setup script:
 ```
 
 This script will:
-- ✅ Verify Zig installation (0.14.1+ or 0.15.x)
+- ✅ Verify Zig installation (0.16.x or 0.17.x)
 - ✅ Check system dependencies
 - ✅ Fix common build issues (e.g., build.zig.zon enum literal)
 - ✅ Set up development aliases and git hooks
@@ -46,7 +46,7 @@ If you prefer manual setup:
 
 1. **Verify Zig Installation**:
    ```bash
-   zig version  # Should be 0.14.1+ or 0.15.x
+   zig version  # Should be 0.16.x or 0.17.x
    ```
 
 2. **Install Dependencies**:

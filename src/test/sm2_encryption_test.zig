@@ -151,7 +151,7 @@ test "SM2 encryption error cases" {
     try testing.expectError(error.EmptyMessage, encryption.encrypt(testing.io, allocator, "", public_key, .c1c3c2));
 
     // Test invalid private key (all zeros)
-    const invalid_private = [_]u8{0} ** 32;
+    const invalid_private = @as([32]u8, @splat(0));
     const message = "test";
     const ciphertext = try encryption.encrypt(io, allocator, message, public_key, .c1c3c2);
     defer ciphertext.deinit(allocator);
@@ -413,7 +413,7 @@ test "SM2 encryption ciphertext length validation" {
     const allocator = testing.allocator;
 
     // Test invalid ciphertext length
-    const too_short = [_]u8{0x04} ** 50; // Less than minimum 97 bytes
+    const too_short = @as([50]u8, @splat(0x04)); // Less than minimum 97 bytes
 
     try testing.expectError(error.InvalidCiphertextLength, encryption.Ciphertext.fromBytes(allocator, &too_short, .c1c3c2));
 }

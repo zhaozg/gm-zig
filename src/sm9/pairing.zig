@@ -30,7 +30,7 @@ pub const GtElement = struct {
 
     /// Identity element in Gt (multiplicative identity: 1 + 0*w)
     pub fn identity() GtElement {
-        var result = GtElement{ .data = [_]u8{0} ** 384 };
+        var result = GtElement{ .data = @as([384]u8, @splat(0)) };
         result.data[31] = 1; // Set the lowest 32 bytes of first Fp2 to 1
         return result;
     }
@@ -174,7 +174,7 @@ pub const GtElement = struct {
 
     /// Generate random Gt element (for testing)
     pub fn random(seed: []const u8) GtElement {
-        var result = GtElement{ .data = [_]u8{0} ** 384 };
+        var result = GtElement{ .data = @as([384]u8, @splat(0)) };
 
         var offset: usize = 0;
         var counter: u32 = 0;
@@ -729,11 +729,11 @@ fn evaluateLine(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, curve_para
     var result = GtElement.identity();
 
     // Embed P's x coordinate into Fp2: (x_P, 0)
-    var px_fp2: [64]u8 = [_]u8{0} ** 64;
+    var px_fp2: [64]u8 = @as([64]u8, @splat(0));
     @memcpy(px_fp2[0..32], &px);
 
     // Embed P's y coordinate into Fp2: (y_P, 0)
-    var py_fp2: [64]u8 = [_]u8{0} ** 64;
+    var py_fp2: [64]u8 = @as([64]u8, @splat(0));
     @memcpy(py_fp2[0..32], &py);
 
     if (is_doubling) {
@@ -780,11 +780,11 @@ fn evaluateLine(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, curve_para
         const c1_fp2 = fp2Sub(py_fp2, lambda_px);
 
         // Build Fp6 c0 = (c0_fp2, 0, 0)
-        var c0_fp6: [192]u8 = [_]u8{0} ** 192;
+        var c0_fp6: [192]u8 = @as([192]u8, @splat(0));
         @memcpy(c0_fp6[0..64], &c0_fp2);
 
         // Build Fp6 c1 = (c1_fp2, 0, 0)
-        var c1_fp6: [192]u8 = [_]u8{0} ** 192;
+        var c1_fp6: [192]u8 = @as([192]u8, @splat(0));
         @memcpy(c1_fp6[0..64], &c1_fp2);
 
         @memcpy(result.data[0..192], &c0_fp6);
@@ -814,11 +814,11 @@ fn evaluateLine(A: curve.G2Point, B: curve.G2Point, P: curve.G1Point, curve_para
         const c1_fp2 = fp2Sub(py_fp2, lambda_px);
 
         // Build Fp6 c0 = (c0_fp2, 0, 0)
-        var c0_fp6: [192]u8 = [_]u8{0} ** 192;
+        var c0_fp6: [192]u8 = @as([192]u8, @splat(0));
         @memcpy(c0_fp6[0..64], &c0_fp2);
 
         // Build Fp6 c1 = (c1_fp2, 0, 0)
-        var c1_fp6: [192]u8 = [_]u8{0} ** 192;
+        var c1_fp6: [192]u8 = @as([192]u8, @splat(0));
         @memcpy(c1_fp6[0..64], &c1_fp2);
 
         @memcpy(result.data[0..192], &c0_fp6);
@@ -979,7 +979,7 @@ pub const PairingPrecompute = struct {
 
     pub fn init(Q: curve.G2Point, curve_params: params.SystemParams) PairingPrecompute {
         _ = curve_params;
-        var result = PairingPrecompute{ .precomputed_data = [_]u8{0} ** 1024 };
+        var result = PairingPrecompute{ .precomputed_data = @as([1024]u8, @splat(0)) };
         std.mem.copyForwards(u8, result.precomputed_data[0..64], &Q.x);
         std.mem.copyForwards(u8, result.precomputed_data[64..128], &Q.y);
         std.mem.copyForwards(u8, result.precomputed_data[128..192], &Q.z);
@@ -1110,7 +1110,7 @@ pub const GtElementExtended = struct {
 
     pub fn invertFermat(self: GtElementExtended, curve_params: params.SystemParams) GtElement {
         var r_minus_1 = curve_params.N;
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
+        const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
         const sub_result = bigint.sub(r_minus_1, one);
         if (!sub_result.borrow) {
             r_minus_1 = sub_result.result;

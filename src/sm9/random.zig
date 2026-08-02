@@ -142,7 +142,7 @@ pub const SecureRandom = struct {
         // Check that value is not 0, 1, or max-1 (potential weak values)
         if (bigint.isZero(value)) return false;
 
-        var one = [_]u8{0} ** 32;
+        var one = @as([32]u8, @splat(0));
         one[31] = 1;
         if (std.mem.eql(u8, &value, &one)) return false;
 
@@ -270,7 +270,7 @@ pub const DeterministicRandom = struct {
         self.bytes(&result);
 
         // Simple modular reduction for deterministic output
-        return bigint.addMod(result, [_]u8{0} ** 32, p) catch {
+        return bigint.addMod(result, @as([32]u8, @splat(0)), p) catch {
             return RandomError.GenerationFailure;
         };
     }
@@ -338,7 +338,7 @@ pub const EntropyPool = struct {
     /// Initialize empty entropy pool
     pub fn init() EntropyPool {
         return EntropyPool{
-            .pool = [_]u8{0} ** 256,
+            .pool = @as([256]u8, @splat(0)),
             .position = 0,
         };
     }

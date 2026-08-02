@@ -2,11 +2,11 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 comptime {
-    if (builtin.zig_version.major == 0 and builtin.zig_version.minor < 14) {
-        @compileError("Zig version 0.14 or newer is required");
+    if (builtin.zig_version.major == 0 and builtin.zig_version.minor < 16) {
+        @compileError("Zig version 0.16 or newer is required");
     }
-    if (builtin.zig_version.major == 0 and builtin.zig_version.minor > 16) {
-        @compileError("Zig version 0.16 is latest supported version - use Zig 0.14.x, 0.15.x or 0.16.x");
+    if (builtin.zig_version.major == 0 and builtin.zig_version.minor > 17) {
+        @compileError("Zig version 0.17 is the latest supported version - use Zig 0.16.x or 0.17.x");
     }
 }
 
@@ -87,7 +87,10 @@ pub fn build(b: *std.Build) void {
         .name = "bench",
         .root_module = bench_mod,
     });
-    b.installArtifact(bench_exe);
+    // zbench requires Zig 0.17+; on 0.16.x only build the bench step on demand
+    if (comptime builtin.zig_version.minor >= 17) {
+        b.installArtifact(bench_exe);
+    }
 
     const bench_cmd = b.addRunArtifact(bench_exe);
     bench_cmd.step.dependOn(b.getInstallStep());

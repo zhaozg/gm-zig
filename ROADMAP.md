@@ -116,7 +116,7 @@
 
 #### 2.4 CI/CD Enhancements
 - [ ] Add multi-platform matrix: Linux x86_64, macOS arm64, Windows x86_64
-- [ ] Add Zig version matrix: 0.14.x, 0.15.x, 0.16.x
+- [ ] Add Zig version matrix: 0.16.x, 0.17.x
 - [ ] Add WASM build verification in CI
 - [ ] Add `zig fmt --check` as required CI step
 - [ ] Add performance regression detection (compare benchmark results across commits)

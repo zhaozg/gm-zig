@@ -325,7 +325,7 @@ pub const EncryptionContext = struct {
         }
 
         // Step 8: Compute C3 = MAC(C1 || M || padding)
-        var c3 = [_]u8{0} ** 32;
+        var c3 = @as([32]u8, @splat(0));
         var c3_hasher = SM3.init(.{});
         c3_hasher.update(&c1);
         c3_hasher.update(message);
@@ -390,7 +390,7 @@ pub const EncryptionContext = struct {
         u_hasher.update(&ciphertext.c1);
         u_hasher.update(plaintext);
         u_hasher.update("C3_MAC"); // Match encryption padding
-        var u = [_]u8{0} ** 32;
+        var u = @as([32]u8, @splat(0));
         u_hasher.final(&u);
 
         // Step 6: If u != C3, return error

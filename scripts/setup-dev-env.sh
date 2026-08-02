@@ -47,11 +47,11 @@ echo "----------------------------------------"
 # Check for required tools
 if command_exists zig; then
     CURRENT_ZIG=$(zig version)
-    if [[ "$CURRENT_ZIG" == "0.16."* ]]; then
+    if [[ "$CURRENT_ZIG" == "0.16."* || "$CURRENT_ZIG" == "0.17."* ]]; then
         print_status "ok" "Zig $CURRENT_ZIG is installed (compatible)"
     else
         print_status "warn" "Zig $CURRENT_ZIG detected - may have compatibility issues"
-        print_status "info" "Recommended version: 0.16.0"
+        print_status "info" "Recommended version: 0.16.x or 0.17.x"
     fi
 else
     print_status "error" "Zig not found - installing Zig $ZIG_VERSION"

@@ -72,16 +72,16 @@ pub const BN256Params = struct {
     pub const GROUP_ORDER: [32]u8 = [_]u8{ 0xB6, 0x40, 0x00, 0x00, 0x02, 0xA3, 0xA6, 0xF1, 0xD6, 0x03, 0xAB, 0x4F, 0xF5, 0x8E, 0xC7, 0x44, 0x49, 0xF2, 0x93, 0x4B, 0x18, 0xEA, 0x8B, 0xEE, 0xE5, 0x6E, 0xE1, 0x9C, 0xD6, 0x9E, 0xCF, 0x25 };
 
     /// Curve coefficient b = 3 for equation y² = x³ + b
-    pub const CURVE_B: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{3};
+    pub const CURVE_B: [32]u8 = @as([31]u8, @splat(0)) ++ [_]u8{3};
 
     /// Hash function output length (256 bits for SM3)
     pub const HASH_OUTPUT_LENGTH: u16 = 256;
 
     /// Standard G1 generator x-coordinate
-    pub const G1_GENERATOR_X: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{2};
+    pub const G1_GENERATOR_X: [32]u8 = @as([31]u8, @splat(0)) ++ [_]u8{2};
 
     /// Standard G2 generator coordinate (simplified for validation)
-    pub const G2_GENERATOR_COORD: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{1};
+    pub const G2_GENERATOR_COORD: [32]u8 = @as([31]u8, @splat(0)) ++ [_]u8{1};
 };
 
 /// Error message templates for consistent error reporting
@@ -114,7 +114,7 @@ pub const TestConstants = struct {
     /// Test message for validation
     pub const TEST_MESSAGE: []const u8 = "SM9 test message for cryptographic validation";
     /// Minimum valid field element (1) - GM/T 0044-2016 compliant
-    pub const MIN_FIELD_ELEMENT: [32]u8 = [_]u8{0} ** 31 ++ [_]u8{1};
+    pub const MIN_FIELD_ELEMENT: [32]u8 = @as([31]u8, @splat(0)) ++ [_]u8{1};
 };
 
 /// Performance and optimization constants

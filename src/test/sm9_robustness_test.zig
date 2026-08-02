@@ -119,9 +119,9 @@ test "SM9 public key derivation robustness" {
 // Test mathematical boundary conditions in bigint operations
 test "SM9 bigint mathematical boundary conditions" {
     // Test edge cases for modular inverse
-    const zero = [_]u8{0} ** 32;
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
-    const large_num = [_]u8{0xFF} ** 32;
+    const zero = @as([32]u8, @splat(0));
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
+    const large_num = @as([32]u8, @splat(0xFF));
     const modulus = sm9.params.SM9System.init().params.N;
 
     // Test zero (should fail)
@@ -287,8 +287,8 @@ test "SM9 curve operations robustness" {
     try testing.expect(infinity_g2.validate(system.params));
 
     // Test scalar multiplication with edge scalars
-    const zero_scalar = [_]u8{0} ** 32;
-    const one_scalar = [_]u8{0} ** 31 ++ [_]u8{1};
+    const zero_scalar = @as([32]u8, @splat(0));
+    const one_scalar = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     const zero_result_g1 = g1_gen.mul(zero_scalar, system.params);
     try testing.expect(zero_result_g1.isInfinity());

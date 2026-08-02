@@ -30,14 +30,14 @@ pub const Fp2Element = struct {
 
     /// Zero element in Fp2
     pub fn zero() Fp2Element {
-        return Fp2Element{ .a = [_]u8{0} ** 32, .b = [_]u8{0} ** 32 };
+        return Fp2Element{ .a = @as([32]u8, @splat(0)), .b = @as([32]u8, @splat(0)) };
     }
 
     /// Unit element in Fp2 (1 + 0*i)
     pub fn one() Fp2Element {
-        var one_elem = [_]u8{0} ** 32;
+        var one_elem = @as([32]u8, @splat(0));
         one_elem[31] = 1;
-        return Fp2Element{ .a = one_elem, .b = [_]u8{0} ** 32 };
+        return Fp2Element{ .a = one_elem, .b = @as([32]u8, @splat(0)) };
     }
 
     /// Check if Fp2 element is zero
@@ -176,7 +176,7 @@ pub fn fp2Inv(x: Fp2Element, m: FieldElement) FieldError!Fp2Element {
 
     // Compute conjugate and multiply by norm inverse
     const real_part = try bigint.mulMod(x.a, norm_inv, m);
-    const b_neg = try bigint.subMod([_]u8{0} ** 32, x.b, m);
+    const b_neg = try bigint.subMod(@as([32]u8, @splat(0)), x.b, m);
     const imag_part = try bigint.mulMod(b_neg, norm_inv, m);
 
     return Fp2Element.init(real_part, imag_part);
@@ -187,7 +187,7 @@ pub fn legendreSymbol(x: FieldElement, p: FieldElement) FieldError!i8 {
     if (bigint.isZero(x)) return 0;
 
     // Compute x^((p-1)/2) mod p
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
     const p_minus_1 = bigint.sub(p, one);
     var exponent = p_minus_1.result;
 
@@ -213,7 +213,7 @@ pub fn fieldSqrt(x: FieldElement, p: FieldElement) FieldError!FieldElement {
     // sqrt(x) = x^((p+1)/4) mod p
 
     // Compute (p+1)/4
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
     const p_plus_1 = bigint.add(p, one);
     var exponent = p_plus_1.result;
 

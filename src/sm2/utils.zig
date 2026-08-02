@@ -199,7 +199,7 @@ pub fn decodeSignatureDER(der_sig: []const u8) !struct { r: [32]u8, s: [32]u8 } 
 
             if (pos + len > data.len) return error.InvalidDERSignature;
 
-            var result: [32]u8 = [_]u8{0} ** 32;
+            var result: [32]u8 = @as([32]u8, @splat(0));
 
             // Skip leading zero padding
             var start_pos = pos;
@@ -254,8 +254,8 @@ test "User hash computation" {
     const testing = std.testing;
 
     const user_id = "ALICE123@YAHOO.COM";
-    const pub_x = [_]u8{0} ** 32;
-    const pub_y = [_]u8{0} ** 32;
+    const pub_x = @as([32]u8, @splat(0));
+    const pub_y = @as([32]u8, @splat(0));
 
     const hash = computeUserHash(user_id, pub_x, pub_y);
     try testing.expect(hash.len == 32);
@@ -265,8 +265,8 @@ test "DER signature encoding/decoding" {
     const testing = std.testing;
     const allocator = testing.allocator;
 
-    const r = [_]u8{0x01} ++ [_]u8{0x00} ** 31;
-    const s = [_]u8{0x02} ++ [_]u8{0x00} ** 31;
+    const r = [_]u8{0x01} ++ @as([31]u8, @splat(0x00));
+    const s = [_]u8{0x02} ++ @as([31]u8, @splat(0x00));
 
     const der_sig = try encodeSignatureDER(allocator, r, s);
     defer allocator.free(der_sig);

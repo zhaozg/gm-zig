@@ -6,7 +6,7 @@ test "SM9 Field Operations - Binary Extended Euclidean Algorithm" {
     const params = sm9.params.SystemParams.init();
 
     // Test modular inverse with simple values
-    const a = [_]u8{0} ** 31 ++ [_]u8{3}; // a = 3
+    const a = @as([31]u8, @splat(0)) ++ [_]u8{3}; // a = 3
     const p = params.q;
 
     // Compute inverse
@@ -20,7 +20,7 @@ test "SM9 Field Operations - Binary Extended Euclidean Algorithm" {
 
     // Verify that a * inv_a ≡ 1 (mod p)
     const product = try sm9.bigint.mulMod(a, inv_a, p);
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     try testing.expect(sm9.bigint.equal(product, one));
 }
@@ -30,8 +30,8 @@ test "SM9 Field Operations - Fp2 Arithmetic" {
     const p = params.q;
 
     // Test Fp2 element creation
-    const a_elem = [_]u8{0} ** 31 ++ [_]u8{2};
-    const b_elem = [_]u8{0} ** 31 ++ [_]u8{3};
+    const a_elem = @as([31]u8, @splat(0)) ++ [_]u8{2};
+    const b_elem = @as([31]u8, @splat(0)) ++ [_]u8{3};
 
     const x = sm9.field.Fp2Element.init(a_elem, b_elem);
     const y = sm9.field.Fp2Element.init(b_elem, a_elem);
@@ -63,14 +63,14 @@ test "SM9 Field Operations - Field Element Validation" {
     const p = params.q;
 
     // Test valid field element
-    const valid_elem = [_]u8{0} ** 31 ++ [_]u8{1};
+    const valid_elem = @as([31]u8, @splat(0)) ++ [_]u8{1};
     try testing.expect(sm9.field.validateFieldElement(valid_elem, p));
 
     // Test element equal to modulus (should be invalid)
     try testing.expect(!sm9.field.validateFieldElement(p, p));
 
     // Test zero (should be valid)
-    const zero = [_]u8{0} ** 32;
+    const zero = @as([32]u8, @splat(0));
     try testing.expect(sm9.field.validateFieldElement(zero, p));
 }
 
@@ -78,8 +78,8 @@ test "SM9 Field Operations - Modular Exponentiation" {
     const params = sm9.params.SystemParams.init();
     const p = params.q;
 
-    const base = [_]u8{0} ** 31 ++ [_]u8{2};
-    const exp = [_]u8{0} ** 31 ++ [_]u8{3};
+    const base = @as([31]u8, @splat(0)) ++ [_]u8{2};
+    const exp = @as([31]u8, @splat(0)) ++ [_]u8{3};
 
     const result = sm9.field.modularExponentiation(base, exp, p) catch |err| {
         std.debug.print("Modular exponentiation failed: {}\n", .{err});
@@ -88,13 +88,13 @@ test "SM9 Field Operations - Modular Exponentiation" {
     _ = result; // Use the result
 
     // Test that base^0 = 1
-    const zero_exp = [_]u8{0} ** 32;
+    const zero_exp = @as([32]u8, @splat(0));
     const one_result = sm9.field.modularExponentiation(base, zero_exp, p) catch |err| {
         std.debug.print("Modular exponentiation with zero exponent failed: {}\n", .{err});
         return err;
     };
 
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
     try testing.expect(sm9.bigint.equal(one_result, one));
 }
 
@@ -103,10 +103,10 @@ test "SM9 Field Operations - Fp2 Mathematical Properties" {
     const p = params.q;
 
     // Create test elements
-    const a1 = [_]u8{0} ** 31 ++ [_]u8{2};
-    const b1 = [_]u8{0} ** 31 ++ [_]u8{3};
-    const a2 = [_]u8{0} ** 31 ++ [_]u8{5};
-    const b2 = [_]u8{0} ** 31 ++ [_]u8{7};
+    const a1 = @as([31]u8, @splat(0)) ++ [_]u8{2};
+    const b1 = @as([31]u8, @splat(0)) ++ [_]u8{3};
+    const a2 = @as([31]u8, @splat(0)) ++ [_]u8{5};
+    const b2 = @as([31]u8, @splat(0)) ++ [_]u8{7};
 
     const x = sm9.field.Fp2Element.init(a1, b1); // 2 + 3i
     const y = sm9.field.Fp2Element.init(a2, b2); // 5 + 7i
@@ -153,8 +153,8 @@ test "SM9 Field Operations - Fp2 Inversion Properties" {
     try testing.expect(sm9.bigint.equal(one_inv.b, one.b));
 
     // Test non-trivial element inversion
-    const a_elem = [_]u8{0} ** 31 ++ [_]u8{3};
-    const b_elem = [_]u8{0} ** 31 ++ [_]u8{4};
+    const a_elem = @as([31]u8, @splat(0)) ++ [_]u8{3};
+    const b_elem = @as([31]u8, @splat(0)) ++ [_]u8{4};
     const x = sm9.field.Fp2Element.init(a_elem, b_elem); // 3 + 4i
 
     // Check that x is not zero (should be invertible)
@@ -185,12 +185,12 @@ test "SM9 Field Operations - Square Root Computation" {
     const p = params.q;
 
     // Test square root operations - focus on not crashing rather than correctness
-    const base = [_]u8{0} ** 31 ++ [_]u8{5};
+    const base = @as([31]u8, @splat(0)) ++ [_]u8{5};
     const square = try sm9.bigint.mulMod(base, base, p);
 
     // Note: SM9 field p ≡ 1 (mod 4), so simple sqrt formula doesn't work
     // Instead, test that modular exponentiation works
-    const exponent = [_]u8{0} ** 31 ++ [_]u8{2}; // square operation
+    const exponent = @as([31]u8, @splat(0)) ++ [_]u8{2}; // square operation
     const sqrt_result = try sm9.field.modularExponentiation(base, exponent, p);
 
     // Verify that base^2 = square (this should always work)
@@ -202,7 +202,7 @@ test "SM9 Field Operations - Square Root" {
     const p = params.q;
 
     // Test square root of 1
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
     const sqrt_result = sm9.field.fieldSqrt(one, p) catch |err| {
         std.debug.print("Square root computation failed: {}\n", .{err});
         return err;
@@ -218,7 +218,7 @@ test "SM9 Field Operations - Legendre Symbol" {
     const p = params.q;
 
     // Test Legendre symbol of 0
-    const zero = [_]u8{0} ** 32;
+    const zero = @as([32]u8, @splat(0));
     const legendre_zero = sm9.field.legendreSymbol(zero, p) catch |err| {
         std.debug.print("Legendre symbol computation failed: {}\n", .{err});
         return err;
@@ -226,7 +226,7 @@ test "SM9 Field Operations - Legendre Symbol" {
     try testing.expect(legendre_zero == 0);
 
     // Test Legendre symbol of 1
-    const one = [_]u8{0} ** 31 ++ [_]u8{1};
+    const one = @as([31]u8, @splat(0)) ++ [_]u8{1};
     const legendre_one = sm9.field.legendreSymbol(one, p) catch |err| {
         std.debug.print("Legendre symbol computation failed: {}\n", .{err});
         return err;
@@ -235,15 +235,15 @@ test "SM9 Field Operations - Legendre Symbol" {
 }
 
 test "SM9 Field Operations - Conditional Move" {
-    var dest = [_]u8{0} ** 31 ++ [_]u8{1};
-    const src = [_]u8{0} ** 31 ++ [_]u8{2};
+    var dest = @as([31]u8, @splat(0)) ++ [_]u8{1};
+    const src = @as([31]u8, @splat(0)) ++ [_]u8{2};
 
     // Test conditional move with condition = 1
     sm9.field.conditionalMove(&dest, src, 1);
     try testing.expect(sm9.bigint.equal(dest, src));
 
     // Reset dest
-    dest = [_]u8{0} ** 31 ++ [_]u8{1};
+    dest = @as([31]u8, @splat(0)) ++ [_]u8{1};
 
     // Test conditional move with condition = 0
     const original = dest;

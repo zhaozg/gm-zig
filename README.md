@@ -68,7 +68,7 @@ The library leverages Zig's compile-time safety guarantees and focuses on memory
 
 ### Prerequisites
 
-- Zig 0.16.0 or later
+- Zig 0.16.x or 0.17.x
 - Git (for cloning the repository)
 
 ### Installation

@@ -468,8 +468,8 @@ fn add31(a: u32, b: u32) u32 {
 const testing = std.testing;
 
 test "ZUC-128 standard test vector 1" {
-    const key = [_]u8{0x00} ** 16;
-    const iv = [_]u8{0x00} ** 16;
+    const key = @as([16]u8, @splat(0x00));
+    const iv = @as([16]u8, @splat(0x00));
 
     var zuc = ZUC.init(&key, &iv);
     var keystream: [10]u32 = undefined;
@@ -486,8 +486,8 @@ test "ZUC-128 standard test vector 1" {
 }
 
 test "ZUC-128 standard test vector 2" {
-    const key = [_]u8{0xff} ** 16;
-    const iv = [_]u8{0xff} ** 16;
+    const key = @as([16]u8, @splat(0xff));
+    const iv = @as([16]u8, @splat(0xff));
 
     var zuc = ZUC.init(&key, &iv);
     var keystream: [10]u32 = undefined;
@@ -528,8 +528,8 @@ test "ZUC-128 standard test vector 3" {
 }
 
 test "ZUC encryption/decryption" {
-    const key = [_]u8{0x11} ** 16;
-    const iv = [_]u8{0x22} ** 16;
+    const key = @as([16]u8, @splat(0x11));
+    const iv = @as([16]u8, @splat(0x22));
 
     const plaintext = "Hello, ZUC!";
     var ciphertext: [plaintext.len]u8 = undefined;
@@ -545,8 +545,8 @@ test "ZUC encryption/decryption" {
 }
 
 test "ZUC empty input" {
-    const key = [_]u8{0x77} ** 16;
-    const iv = [_]u8{0x88} ** 16;
+    const key = @as([16]u8, @splat(0x77));
+    const iv = @as([16]u8, @splat(0x88));
 
     var zuc = ZUC.init(&key, &iv);
     var output: [0]u8 = undefined;
@@ -556,9 +556,9 @@ test "ZUC empty input" {
 }
 
 test "ZUC different keys produce different keystreams" {
-    const key1 = [_]u8{0x01} ** 16;
-    const key2 = [_]u8{0x02} ** 16;
-    const iv = [_]u8{0x00} ** 16;
+    const key1 = @as([16]u8, @splat(0x01));
+    const key2 = @as([16]u8, @splat(0x02));
+    const iv = @as([16]u8, @splat(0x00));
 
     var zuc1 = ZUC.init(&key1, &iv);
     var zuc2 = ZUC.init(&key2, &iv);
@@ -580,9 +580,9 @@ test "ZUC different keys produce different keystreams" {
 }
 
 test "ZUC different IVs produce different keystreams" {
-    const key = [_]u8{0x00} ** 16;
-    const iv1 = [_]u8{0x01} ** 16;
-    const iv2 = [_]u8{0x02} ** 16;
+    const key = @as([16]u8, @splat(0x00));
+    const iv1 = @as([16]u8, @splat(0x01));
+    const iv2 = @as([16]u8, @splat(0x02));
 
     var zuc1 = ZUC.init(&key, &iv1);
     var zuc2 = ZUC.init(&key, &iv2);
@@ -604,8 +604,8 @@ test "ZUC different IVs produce different keystreams" {
 }
 
 test "ZUC same key and IV produce same keystream" {
-    const key = [_]u8{0x12} ** 16;
-    const iv = [_]u8{0x34} ** 16;
+    const key = @as([16]u8, @splat(0x12));
+    const iv = @as([16]u8, @splat(0x34));
 
     var zuc1 = ZUC.init(&key, &iv);
     var zuc2 = ZUC.init(&key, &iv);
@@ -622,8 +622,8 @@ test "ZUC same key and IV produce same keystream" {
 }
 
 test "ZUC encryption/decryption with 1 byte" {
-    const key = [_]u8{0x11} ** 16;
-    const iv = [_]u8{0x22} ** 16;
+    const key = @as([16]u8, @splat(0x11));
+    const iv = @as([16]u8, @splat(0x22));
 
     const plaintext = [_]u8{0xAA};
     var ciphertext: [1]u8 = undefined;
@@ -639,8 +639,8 @@ test "ZUC encryption/decryption with 1 byte" {
 }
 
 test "ZUC encryption/decryption with 3 bytes" {
-    const key = [_]u8{0x33} ** 16;
-    const iv = [_]u8{0x44} ** 16;
+    const key = @as([16]u8, @splat(0x33));
+    const iv = @as([16]u8, @splat(0x44));
 
     const plaintext = [_]u8{ 0x01, 0x02, 0x03 };
     var ciphertext: [3]u8 = undefined;
@@ -656,8 +656,8 @@ test "ZUC encryption/decryption with 3 bytes" {
 }
 
 test "ZUC encryption/decryption with 15 bytes" {
-    const key = [_]u8{0x55} ** 16;
-    const iv = [_]u8{0x66} ** 16;
+    const key = @as([16]u8, @splat(0x55));
+    const iv = @as([16]u8, @splat(0x66));
 
     const plaintext = "1234567890ABCDE";
     var ciphertext: [15]u8 = undefined;
@@ -673,8 +673,8 @@ test "ZUC encryption/decryption with 15 bytes" {
 }
 
 test "ZUC encryption/decryption with 71 bytes" {
-    const key = [_]u8{0x77} ** 16;
-    const iv = [_]u8{0x88} ** 16;
+    const key = @as([16]u8, @splat(0x77));
+    const iv = @as([16]u8, @splat(0x88));
 
     const plaintext = "This is a longer test message for ZUC encryption with 71 bytes of data!";
     var ciphertext: [71]u8 = undefined;
@@ -690,8 +690,8 @@ test "ZUC encryption/decryption with 71 bytes" {
 }
 
 test "ZUC keystream periodicity check" {
-    const key = [_]u8{0xAA} ** 16;
-    const iv = [_]u8{0xBB} ** 16;
+    const key = @as([16]u8, @splat(0xAA));
+    const iv = @as([16]u8, @splat(0xBB));
 
     var zuc = ZUC.init(&key, &iv);
 
@@ -713,8 +713,8 @@ test "ZUC keystream periodicity check" {
 }
 
 test "ZUC generateKeyword consistency" {
-    const key = [_]u8{0x11} ** 16;
-    const iv = [_]u8{0x22} ** 16;
+    const key = @as([16]u8, @splat(0x11));
+    const iv = @as([16]u8, @splat(0x22));
 
     var zuc1 = ZUC.init(&key, &iv);
     var zuc2 = ZUC.init(&key, &iv);
@@ -730,8 +730,8 @@ test "ZUC generateKeyword consistency" {
 }
 
 test "ZUC state persistence" {
-    const key = [_]u8{0x99} ** 16;
-    const iv = [_]u8{0x88} ** 16;
+    const key = @as([16]u8, @splat(0x99));
+    const iv = @as([16]u8, @splat(0x88));
 
     var zuc = ZUC.init(&key, &iv);
 
@@ -778,10 +778,10 @@ test "ZUC bit patterns" {
 }
 
 test "ZUC multiple init calls" {
-    const key1 = [_]u8{0x11} ** 16;
-    const iv1 = [_]u8{0x22} ** 16;
-    const key2 = [_]u8{0x33} ** 16;
-    const iv2 = [_]u8{0x44} ** 16;
+    const key1 = @as([16]u8, @splat(0x11));
+    const iv1 = @as([16]u8, @splat(0x22));
+    const key2 = @as([16]u8, @splat(0x33));
+    const iv2 = @as([16]u8, @splat(0x44));
 
     var zuc = ZUC.init(&key1, &iv1);
     var ks1: [2]u32 = undefined;
@@ -802,8 +802,8 @@ test "ZUC multiple init calls" {
 }
 
 test "ZUC large keystream generation" {
-    const key = [_]u8{0x55} ** 16;
-    const iv = [_]u8{0x66} ** 16;
+    const key = @as([16]u8, @splat(0x55));
+    const iv = @as([16]u8, @splat(0x66));
 
     var zuc = ZUC.init(&key, &iv);
 
@@ -821,8 +821,8 @@ test "ZUC large keystream generation" {
 }
 
 test "ZUC MAC generation - empty message" {
-    const key = [_]u8{0x11} ** 16;
-    const iv = [_]u8{0x22} ** 16;
+    const key = @as([16]u8, @splat(0x11));
+    const iv = @as([16]u8, @splat(0x22));
 
     var zuc = ZUC.init(&key, &iv);
     const mac = zuc.generateMAC("");
@@ -831,8 +831,8 @@ test "ZUC MAC generation - empty message" {
 }
 
 test "ZUC MAC generation - single byte" {
-    const key = [_]u8{0x33} ** 16;
-    const iv = [_]u8{0x44} ** 16;
+    const key = @as([16]u8, @splat(0x33));
+    const iv = @as([16]u8, @splat(0x44));
 
     var zuc = ZUC.init(&key, &iv);
     const message = [_]u8{0xAA};
@@ -842,8 +842,8 @@ test "ZUC MAC generation - single byte" {
 }
 
 test "ZUC MAC generation - full word" {
-    const key = [_]u8{0x55} ** 16;
-    const iv = [_]u8{0x66} ** 16;
+    const key = @as([16]u8, @splat(0x55));
+    const iv = @as([16]u8, @splat(0x66));
 
     var zuc = ZUC.init(&key, &iv);
     const message = [_]u8{ 0x01, 0x02, 0x03, 0x04 };
@@ -853,8 +853,8 @@ test "ZUC MAC generation - full word" {
 }
 
 test "ZUC MAC generation - multiple words" {
-    const key = [_]u8{0x77} ** 16;
-    const iv = [_]u8{0x88} ** 16;
+    const key = @as([16]u8, @splat(0x77));
+    const iv = @as([16]u8, @splat(0x88));
 
     var zuc = ZUC.init(&key, &iv);
     const message = "Hello, ZUC MAC!";
@@ -864,8 +864,8 @@ test "ZUC MAC generation - multiple words" {
 }
 
 test "ZUC MAC generation - partial word" {
-    const key = [_]u8{0x99} ** 16;
-    const iv = [_]u8{0xAA} ** 16;
+    const key = @as([16]u8, @splat(0x99));
+    const iv = @as([16]u8, @splat(0xAA));
 
     var zuc = ZUC.init(&key, &iv);
     const message = [_]u8{ 0x01, 0x02, 0x03 };
@@ -875,8 +875,8 @@ test "ZUC MAC generation - partial word" {
 }
 
 test "ZUC MAC verification - valid MAC" {
-    const key = [_]u8{0xBB} ** 16;
-    const iv = [_]u8{0xCC} ** 16;
+    const key = @as([16]u8, @splat(0xBB));
+    const iv = @as([16]u8, @splat(0xCC));
 
     const message = "Test message for MAC verification";
     const mac = ZUC.generateMACWithKey(&key, &iv, message);
@@ -886,8 +886,8 @@ test "ZUC MAC verification - valid MAC" {
 }
 
 test "ZUC MAC verification - invalid MAC" {
-    const key = [_]u8{0xDD} ** 16;
-    const iv = [_]u8{0xEE} ** 16;
+    const key = @as([16]u8, @splat(0xDD));
+    const iv = @as([16]u8, @splat(0xEE));
 
     const message = "Test message for MAC verification";
     const mac = ZUC.generateMACWithKey(&key, &iv, message);
@@ -897,8 +897,8 @@ test "ZUC MAC verification - invalid MAC" {
 }
 
 test "ZUC MAC verification - tampered message" {
-    const key = [_]u8{0xFF} ** 16;
-    const iv = [_]u8{0x00} ** 16;
+    const key = @as([16]u8, @splat(0xFF));
+    const iv = @as([16]u8, @splat(0x00));
 
     const original_message = "Original message";
     const tampered_message = "Tampered message";
@@ -910,8 +910,8 @@ test "ZUC MAC verification - tampered message" {
 }
 
 test "ZUC MAC consistency" {
-    const key = [_]u8{0x12} ** 16;
-    const iv = [_]u8{0x34} ** 16;
+    const key = @as([16]u8, @splat(0x12));
+    const iv = @as([16]u8, @splat(0x34));
 
     const message = "Consistency test message";
 
@@ -922,9 +922,9 @@ test "ZUC MAC consistency" {
 }
 
 test "ZUC MAC different keys" {
-    const key1 = [_]u8{0x11} ** 16;
-    const key2 = [_]u8{0x22} ** 16;
-    const iv = [_]u8{0x33} ** 16;
+    const key1 = @as([16]u8, @splat(0x11));
+    const key2 = @as([16]u8, @splat(0x22));
+    const iv = @as([16]u8, @splat(0x33));
 
     const message = "Same message, different keys";
 
@@ -935,9 +935,9 @@ test "ZUC MAC different keys" {
 }
 
 test "ZUC MAC different IVs" {
-    const key = [_]u8{0x44} ** 16;
-    const iv1 = [_]u8{0x55} ** 16;
-    const iv2 = [_]u8{0x66} ** 16;
+    const key = @as([16]u8, @splat(0x44));
+    const iv1 = @as([16]u8, @splat(0x55));
+    const iv2 = @as([16]u8, @splat(0x66));
 
     const message = "Same message, different IVs";
 
@@ -948,8 +948,8 @@ test "ZUC MAC different IVs" {
 }
 
 test "ZUC MAC state advancement" {
-    const key = [_]u8{0x77} ** 16;
-    const iv = [_]u8{0x88} ** 16;
+    const key = @as([16]u8, @splat(0x77));
+    const iv = @as([16]u8, @splat(0x88));
 
     var zuc = ZUC.init(&key, &iv);
 
@@ -987,8 +987,8 @@ test "ZUC MAC with special patterns" {
 }
 
 test "ZUC-128-MAC standard test vector 1" {
-    const key = [_]u8{0x00} ** 16;
-    const iv = [_]u8{0x00} ** 16;
+    const key = @as([16]u8, @splat(0x00));
+    const iv = @as([16]u8, @splat(0x00));
     const message = [_]u8{0x00};
     const expected_mac: u32 = 0x27BEDE74;
 
@@ -997,8 +997,8 @@ test "ZUC-128-MAC standard test vector 1" {
 }
 
 test "ZUC MAC with maximum length message" {
-    const key = [_]u8{0x11} ** 16;
-    const iv = [_]u8{0x22} ** 16;
+    const key = @as([16]u8, @splat(0x11));
+    const iv = @as([16]u8, @splat(0x22));
 
     var long_message: [4096]u8 = undefined;
     for (&long_message, 0..) |*byte, i| {
@@ -1010,8 +1010,8 @@ test "ZUC MAC with maximum length message" {
 }
 
 test "ZUC MAC with null pointers" {
-    const key = [_]u8{0x33} ** 16;
-    const iv = [_]u8{0x44} ** 16;
+    const key = @as([16]u8, @splat(0x33));
+    const iv = @as([16]u8, @splat(0x44));
 
     const mac1 = ZUC.generateMACWithKey(&key, &iv, &[_]u8{});
     try testing.expectEqual(@as(u32, 0), mac1);
@@ -1022,8 +1022,8 @@ test "ZUC MAC with null pointers" {
 }
 
 test "ZUC MAC thread safety" {
-    const key = [_]u8{0x77} ** 16;
-    const iv = [_]u8{0x88} ** 16;
+    const key = @as([16]u8, @splat(0x77));
+    const iv = @as([16]u8, @splat(0x88));
     const message = "Thread safety test message";
 
     const mac1 = ZUC.generateMACWithKey(&key, &iv, message);
@@ -1035,8 +1035,8 @@ test "ZUC MAC thread safety" {
 }
 
 test "ZUC MAC usage example" {
-    const key = [_]u8{0x99} ** 16;
-    const iv = [_]u8{0xAA} ** 16;
+    const key = @as([16]u8, @splat(0x99));
+    const iv = @as([16]u8, @splat(0xAA));
     const sensitive_data = "This is sensitive data that needs integrity protection";
 
     const mac = ZUC.generateMACWithKey(&key, &iv, sensitive_data);
@@ -1050,8 +1050,8 @@ test "ZUC MAC usage example" {
 }
 
 test "ZUC-AEAD seal and open" {
-    const key = [_]u8{0x01} ** 16;
-    const iv = [_]u8{0x02} ** 16;
+    const key = @as([16]u8, @splat(0x01));
+    const iv = @as([16]u8, @splat(0x02));
     const plaintext = "Hello, ZUC-AEAD!";
     const aad = "additional data";
 
@@ -1068,8 +1068,8 @@ test "ZUC-AEAD seal and open" {
 }
 
 test "ZUC-AEAD authentication failure on tampered ciphertext" {
-    const key = [_]u8{0x03} ** 16;
-    const iv = [_]u8{0x04} ** 16;
+    const key = @as([16]u8, @splat(0x03));
+    const iv = @as([16]u8, @splat(0x04));
     const plaintext = "Sensitive data";
     const aad = "";
 
@@ -1088,8 +1088,8 @@ test "ZUC-AEAD authentication failure on tampered ciphertext" {
 }
 
 test "ZUC-AEAD authentication failure on tampered tag" {
-    const key = [_]u8{0x05} ** 16;
-    const iv = [_]u8{0x06} ** 16;
+    const key = @as([16]u8, @splat(0x05));
+    const iv = @as([16]u8, @splat(0x06));
     const plaintext = "More sensitive data";
     const aad = "associated data";
 
@@ -1108,8 +1108,8 @@ test "ZUC-AEAD authentication failure on tampered tag" {
 }
 
 test "ZUC-AEAD authentication failure on tampered AAD" {
-    const key = [_]u8{0x07} ** 16;
-    const iv = [_]u8{0x08} ** 16;
+    const key = @as([16]u8, @splat(0x07));
+    const iv = @as([16]u8, @splat(0x08));
     const plaintext = "Data with AAD";
     const aad = "original aad";
 
@@ -1126,8 +1126,8 @@ test "ZUC-AEAD authentication failure on tampered AAD" {
 }
 
 test "ZUC-AEAD empty plaintext" {
-    const key = [_]u8{0x09} ** 16;
-    const iv = [_]u8{0x0A} ** 16;
+    const key = @as([16]u8, @splat(0x09));
+    const iv = @as([16]u8, @splat(0x0A));
     const plaintext = "";
     const aad = "some aad";
 
@@ -1143,8 +1143,8 @@ test "ZUC-AEAD empty plaintext" {
 }
 
 test "ZUC-AEAD empty AAD" {
-    const key = [_]u8{0x0B} ** 16;
-    const iv = [_]u8{0x0C} ** 16;
+    const key = @as([16]u8, @splat(0x0B));
+    const iv = @as([16]u8, @splat(0x0C));
     const plaintext = "Just plaintext";
     const aad = "";
 
@@ -1161,9 +1161,9 @@ test "ZUC-AEAD empty AAD" {
 }
 
 test "ZUC-AEAD different keys produce different tags" {
-    const key1 = [_]u8{0x0D} ** 16;
-    const key2 = [_]u8{0x0E} ** 16;
-    const iv = [_]u8{0x0F} ** 16;
+    const key1 = @as([16]u8, @splat(0x0D));
+    const key2 = @as([16]u8, @splat(0x0E));
+    const iv = @as([16]u8, @splat(0x0F));
     const plaintext = "Same plaintext";
     const aad = "Same AAD";
 
@@ -1187,8 +1187,8 @@ test "ZUC-AEAD different keys produce different tags" {
 }
 
 test "ZUC-AEAD large data" {
-    const key = [_]u8{0x10} ** 16;
-    const iv = [_]u8{0x11} ** 16;
+    const key = @as([16]u8, @splat(0x10));
+    const iv = @as([16]u8, @splat(0x11));
     const aad = "large data test";
 
     var plaintext: [4096]u8 = undefined;

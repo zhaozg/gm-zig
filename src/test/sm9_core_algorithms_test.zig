@@ -72,7 +72,7 @@ test "SM9 basic hash functions H1 and H2" {
 
     // Test H2 hash function
     const message = "Hello, World!";
-    const w = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ [_]u8{0} ** 28;
+    const w = [_]u8{ 0x12, 0x34, 0x56, 0x78 } ++ @as([28]u8, @splat(0));
     const h2_result = try sm9.key_extract.h2Hash(message, &w, system.params.N, allocator);
 
     // H2 result should not be zero

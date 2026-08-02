@@ -117,7 +117,7 @@ pub fn benchSm4EcbDecrypt1M(allocator: std.mem.Allocator) void {
 /// SM4 CBC encryption benchmark (1 KB)
 pub fn benchSm4CbcEncrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const iv = [_]u8{0x00} ** 16;
+    const iv = @as([16]u8, @splat(0x00));
     const size: usize = 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
@@ -132,7 +132,7 @@ pub fn benchSm4CbcEncrypt1K(allocator: std.mem.Allocator) void {
 /// SM4 CBC decryption benchmark (1 KB)
 pub fn benchSm4CbcDecrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const iv = [_]u8{0x00} ** 16;
+    const iv = @as([16]u8, @splat(0x00));
     const size: usize = 1024;
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
@@ -147,7 +147,7 @@ pub fn benchSm4CbcDecrypt1K(allocator: std.mem.Allocator) void {
 /// SM4 CTR encryption benchmark (1 KB)
 pub fn benchSm4CtrEncrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const nonce = [_]u8{0x00} ** 16;
+    const nonce = @as([16]u8, @splat(0x00));
     const size: usize = 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
@@ -162,7 +162,7 @@ pub fn benchSm4CtrEncrypt1K(allocator: std.mem.Allocator) void {
 /// SM4 CTR encryption benchmark (64 KB)
 pub fn benchSm4CtrEncrypt64K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const nonce = [_]u8{0x00} ** 16;
+    const nonce = @as([16]u8, @splat(0x00));
     const size: usize = 64 * 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
@@ -177,7 +177,7 @@ pub fn benchSm4CtrEncrypt64K(allocator: std.mem.Allocator) void {
 /// SM4 CTR decryption benchmark (1 KB)
 pub fn benchSm4CtrDecrypt1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const nonce = [_]u8{0x00} ** 16;
+    const nonce = @as([16]u8, @splat(0x00));
     const size: usize = 1024;
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
@@ -192,7 +192,7 @@ pub fn benchSm4CtrDecrypt1K(allocator: std.mem.Allocator) void {
 /// SM4 CTR decryption benchmark (64 KB)
 pub fn benchSm4CtrDecrypt64K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const nonce = [_]u8{0x00} ** 16;
+    const nonce = @as([16]u8, @splat(0x00));
     const size: usize = 64 * 1024;
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
@@ -207,7 +207,7 @@ pub fn benchSm4CtrDecrypt64K(allocator: std.mem.Allocator) void {
 /// SM4 GCM seal benchmark (1 KB)
 pub fn benchSm4GcmSeal1K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const nonce = [_]u8{0x00} ** 12;
+    const nonce = @as([12]u8, @splat(0x00));
     const aad = "additional data";
     const size: usize = 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
@@ -225,7 +225,7 @@ pub fn benchSm4GcmSeal1K(allocator: std.mem.Allocator) void {
 /// SM4 GCM seal benchmark (64 KB)
 pub fn benchSm4GcmSeal64K(allocator: std.mem.Allocator) void {
     const key = [_]u8{ 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 };
-    const nonce = [_]u8{0x00} ** 12;
+    const nonce = @as([12]u8, @splat(0x00));
     const aad = "additional data";
     const size: usize = 64 * 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
@@ -242,7 +242,7 @@ pub fn benchSm4GcmSeal64K(allocator: std.mem.Allocator) void {
 
 /// SM4 XTS encryption benchmark (1 KB)
 pub fn benchSm4XtsEncrypt1K(allocator: std.mem.Allocator) void {
-    const key = [_]u8{0x01} ** 32;
+    const key = @as([32]u8, @splat(0x01));
     const size: usize = 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
@@ -256,7 +256,7 @@ pub fn benchSm4XtsEncrypt1K(allocator: std.mem.Allocator) void {
 
 /// SM4 XTS encryption benchmark (64 KB)
 pub fn benchSm4XtsEncrypt64K(allocator: std.mem.Allocator) void {
-    const key = [_]u8{0x01} ** 32;
+    const key = @as([32]u8, @splat(0x01));
     const size: usize = 64 * 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
     defer allocator.free(plaintext);
@@ -270,7 +270,7 @@ pub fn benchSm4XtsEncrypt64K(allocator: std.mem.Allocator) void {
 
 /// SM4 XTS decryption benchmark (1 KB)
 pub fn benchSm4XtsDecrypt1K(allocator: std.mem.Allocator) void {
-    const key = [_]u8{0x01} ** 32;
+    const key = @as([32]u8, @splat(0x01));
     const size: usize = 1024;
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);
@@ -284,7 +284,7 @@ pub fn benchSm4XtsDecrypt1K(allocator: std.mem.Allocator) void {
 
 /// SM4 XTS decryption benchmark (64 KB)
 pub fn benchSm4XtsDecrypt64K(allocator: std.mem.Allocator) void {
-    const key = [_]u8{0x01} ** 32;
+    const key = @as([32]u8, @splat(0x01));
     const size: usize = 64 * 1024;
     const ciphertext = allocator.alloc(u8, size) catch return;
     defer allocator.free(ciphertext);

@@ -4,8 +4,8 @@ const sm9 = @import("../sm9.zig");
 
 test "SM9 signature creation and validation" {
     // Create signature with non-zero values for valid test
-    const h = [_]u8{0x12} ** 32;
-    var S = [_]u8{0x34} ** 33;
+    const h = @as([32]u8, @splat(0x12));
+    var S = @as([33]u8, @splat(0x34));
     S[0] = 0x02; // Set proper compressed point format
     const signature = sm9.sign.Signature.init(h, S);
 
@@ -13,8 +13,8 @@ test "SM9 signature creation and validation" {
 }
 
 test "SM9 signature serialization" {
-    const h = [_]u8{0x12} ** 32;
-    const S = [_]u8{0x34} ** 33;
+    const h = @as([32]u8, @splat(0x12));
+    const S = @as([33]u8, @splat(0x34));
     const signature = sm9.sign.Signature.init(h, S);
 
     // Test byte encoding/decoding

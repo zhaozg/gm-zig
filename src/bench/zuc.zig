@@ -88,8 +88,8 @@ pub fn benchZucMac4K(allocator: std.mem.Allocator) void {
 
 /// ZUC-AEAD seal benchmark (1 KB)
 pub fn benchZucAeadSeal1K(allocator: std.mem.Allocator) void {
-    const key = [_]u8{0x01} ** 16;
-    const iv = [_]u8{0x02} ** 16;
+    const key = @as([16]u8, @splat(0x01));
+    const iv = @as([16]u8, @splat(0x02));
     const aad = "additional authenticated data";
     const size: usize = 1024;
     const plaintext = allocator.alloc(u8, size) catch return;
@@ -106,8 +106,8 @@ pub fn benchZucAeadSeal1K(allocator: std.mem.Allocator) void {
 
 /// ZUC-AEAD seal benchmark (64 KB)
 pub fn benchZucAeadSeal64K(allocator: std.mem.Allocator) void {
-    const key = [_]u8{0x01} ** 16;
-    const iv = [_]u8{0x02} ** 16;
+    const key = @as([16]u8, @splat(0x01));
+    const iv = @as([16]u8, @splat(0x02));
     const aad = "additional authenticated data";
     const size: usize = 64 * 1024;
     const plaintext = allocator.alloc(u8, size) catch return;

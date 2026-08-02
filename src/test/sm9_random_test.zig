@@ -190,7 +190,7 @@ test "SM9 Random Number Generation - Error Handling" {
     var rng = sm9.random.SecureRandom.init(testing.io);
 
     // Test with zero max (should error)
-    const zero_max = [_]u8{0} ** 32;
+    const zero_max = @as([32]u8, @splat(0));
     const result = rng.randomBigInt(zero_max);
 
     try testing.expectError(sm9.random.RandomError.InvalidRange, result);

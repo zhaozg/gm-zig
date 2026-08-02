@@ -64,7 +64,7 @@ test "SM9 master key pair fromPrivateKey correctness" {
     const system_params = sm9.params.SystemParams.init();
 
     // 随机生成合法私钥 (限制重试次数防止无限循环)
-    var private_key = [_]u8{0} ** 32;
+    var private_key = @as([32]u8, @splat(0));
     var attempts: u32 = 0;
     while (attempts < 100) : (attempts += 1) {
         try std.Io.randomSecure(testing.io, &private_key);
@@ -72,7 +72,7 @@ test "SM9 master key pair fromPrivateKey correctness" {
     }
     // 如果100次尝试都失败，使用确定性的合法私钥
     if (attempts >= 100) {
-        private_key = [_]u8{0} ** 32;
+        private_key = @as([32]u8, @splat(0));
         private_key[31] = 1; // 使用最小的非零值
     }
 
@@ -96,8 +96,8 @@ test "SM9 master key pair fromPrivateKey correctness" {
 
 test "SM9 fromPrivateKey invalid input" {
     const params = sm9.params.SystemParams.init();
-    const zero_key = [_]u8{0} ** 32;
-    const over_key = [_]u8{0xFF} ** 32;
+    const zero_key = @as([32]u8, @splat(0));
+    const over_key = @as([32]u8, @splat(0xFF));
 
     try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey, sm9.params.SignMasterKeyPair.fromPrivateKey(params, zero_key));
     try testing.expectError(sm9.params.ParameterError.InvalidPrivateKey, sm9.params.EncryptMasterKeyPair.fromPrivateKey(params, zero_key));
