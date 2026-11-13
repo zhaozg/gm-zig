@@ -11,6 +11,9 @@ test {
     // ZUC
     _ = @import("zuc.zig");
 
+    // Standard BN254 field/curve foundation
+    _ = @import("sm9/bn.zig");
+
     // SM9 Test Suite
     _ = @import("test/sm9_key_extract_test.zig");
     _ = @import("test/sm9_params_test.zig");

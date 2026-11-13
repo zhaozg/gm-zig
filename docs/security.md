@@ -91,3 +91,14 @@ This does **not** make the legacy SM9 signature, encryption, or pairing code
 standards-compliant. Those paths still rely on the simplified
 `curve.zig`/`pairing.zig` implementation and remain on the roadmap for a full
 BN254 pairing rewrite and external cross-validation.
+
+## Standard SM9 foundation
+
+`src/sm9/bn.zig` now contains native `u256` BN254 field and group primitives:
+Fp, Fp2, Fp4, Fp12, G1, and G2. The constants and scalar multiplications are
+checked against independently generated SM9 vectors (P1, P2, 2P1, 2P2), and
+Fp12 inversion/multiplication are checked for internal consistency.
+
+This module is a foundation, not yet a replacement for the legacy SM9 code.
+The R-ate/Tate pairing, signature, encryption, and key-extraction paths still
+need to be rebuilt on top of it and cross-validated with GmSSL/gmalg.
