@@ -4,6 +4,7 @@ const mem = std.mem;
 const SM2 = @import("group.zig").SM2;
 const SM3 = @import("../sm3.zig").SM3;
 const utils = @import("utils.zig");
+const secure = @import("../secure.zig");
 
 /// SM2 Public Key Encryption implementation
 /// Based on GM/T 0003.4-2012 standard
@@ -105,8 +106,10 @@ pub fn encrypt(
 
     while (true) {
         // Step 1: Generate random k ∈ [1, n-1]
-        const k_bytes = SM2.scalar.random(io, .big);
-        const k_scalar = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
+        var k_bytes = SM2.scalar.random(io, .big);
+        defer secure.zeroValue([32]u8, &k_bytes);
+        var k_scalar = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
+        defer secure.zeroValue(@TypeOf(k_scalar), &k_scalar);
 
         if (k_scalar.isZero()) continue;
 
@@ -119,16 +122,22 @@ pub fn encrypt(
         public_key.rejectIdentity() catch continue;
 
         // Step 4: Compute k * PB = (x2, y2)
-        const kpb_point = public_key.mul(k_bytes, .big) catch continue;
-        const kpb_coords = kpb_point.affineCoordinates();
+        var kpb_point = public_key.mul(k_bytes, .big) catch continue;
+        defer secure.zeroValue(@TypeOf(kpb_point), &kpb_point);
+        var kpb_coords = kpb_point.affineCoordinates();
+        defer secure.zeroValue(@TypeOf(kpb_coords), &kpb_coords);
 
         // Step 5: Compute t = KDF(x2 || y2, klen)
         var kdf_input: [64]u8 = undefined;
+        defer secure.zero(&kdf_input);
         @memcpy(kdf_input[0..32], &kpb_coords.x.toBytes(.big));
         @memcpy(kdf_input[32..64], &kpb_coords.y.toBytes(.big));
 
         const t = utils.kdf(allocator, &kdf_input, message.len) catch continue;
-        defer allocator.free(t);
+        defer {
+            secure.zero(t);
+            allocator.free(t);
+        }
 
         // Check if t is all zeros
         var all_zero = true;
@@ -169,6 +178,9 @@ pub fn decrypt(
     ciphertext: Ciphertext,
     private_key: [32]u8,
 ) ![]u8 {
+    var private_key_copy = private_key;
+    defer secure.zeroValue([32]u8, &private_key_copy);
+
     // Step 1: Extract C1 from ciphertext and verify it's a valid point
     const c1_point = SM2.fromSec1(&ciphertext.c1) catch return error.InvalidC1Point;
     try c1_point.rejectIdentity();
@@ -177,22 +189,28 @@ pub fn decrypt(
     // h = 1 for SM2 curve, so this is just checking if C1 is the identity
 
     // Step 3: Compute d * C1 = (x2, y2)
-    const dc1_point = c1_point.mul(private_key, .big) catch |err| {
+    var dc1_point = c1_point.mul(private_key_copy, .big) catch |err| {
         // 区分错误类型
         if (err == error.IdentityElement) {
             return error.InvalidPrivateKey;
         }
         return err;
     };
-    const dc1_coords = dc1_point.affineCoordinates();
+    defer secure.zeroValue(@TypeOf(dc1_point), &dc1_point);
+    var dc1_coords = dc1_point.affineCoordinates();
+    defer secure.zeroValue(@TypeOf(dc1_coords), &dc1_coords);
 
     // Step 4: Compute t = KDF(x2 || y2, klen)
     var kdf_input: [64]u8 = undefined;
+    defer secure.zero(&kdf_input);
     @memcpy(kdf_input[0..32], &dc1_coords.x.toBytes(.big));
     @memcpy(kdf_input[32..64], &dc1_coords.y.toBytes(.big));
 
     const t = try utils.kdf(allocator, &kdf_input, ciphertext.c2.len);
-    defer allocator.free(t);
+    defer {
+        secure.zero(t);
+        allocator.free(t);
+    }
 
     // 修复：只检查 KDF 输出是否全为零，而不是是否包含零字节
     var all_zero = true;
@@ -206,6 +224,10 @@ pub fn decrypt(
 
     // Step 5: Compute M = C2 ⊕ t
     var message = try allocator.alloc(u8, ciphertext.c2.len);
+    errdefer {
+        secure.zero(message);
+        allocator.free(message);
+    }
     for (ciphertext.c2, t, 0..) |c2_byte, t_byte, i| {
         message[i] = c2_byte ^ t_byte;
     }
@@ -218,7 +240,6 @@ pub fn decrypt(
     const u = hasher.finalResult();
 
     if (!utils.constantTimeEqual(&u, &ciphertext.c3)) {
-        allocator.free(message);
         return error.InvalidMAC;
     }
 

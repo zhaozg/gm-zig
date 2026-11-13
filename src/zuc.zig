@@ -3,6 +3,7 @@ const std = @import("std");
 const mem = std.mem;
 const math = std.math;
 const builtin = @import("builtin");
+const secure = @import("secure.zig");
 
 const S0 = [256]u8{
     0x3e, 0x72, 0x5b, 0x47, 0xca, 0xe0, 0x00, 0x33, 0x04, 0xd1, 0x54, 0x98, 0x09, 0xb9, 0x6d, 0xcb,
@@ -87,6 +88,11 @@ pub const ZUC = struct {
         self.r2 = r2;
 
         return self;
+    }
+
+    /// Overwrite the LFSR and register state with zeros.
+    pub fn zeroize(self: *ZUC) void {
+        secure.zeroValue(ZUC, self);
     }
 
     pub fn generateKeyword(self: *ZUC) u32 {
@@ -267,6 +273,11 @@ pub const ZUC_AEAD = struct {
         @memcpy(&self.key, key);
         @memcpy(&self.iv, iv);
         return self;
+    }
+
+    /// Overwrite the AEAD key and IV with zeros.
+    pub fn zeroize(self: *ZUC_AEAD) void {
+        secure.zeroValue(ZUC_AEAD, self);
     }
 
     /// Compute MAC over data using a ZUC instance.

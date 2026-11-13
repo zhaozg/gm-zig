@@ -6,6 +6,7 @@ const key_extract = @import("key_extract.zig");
 const pairing = @import("pairing.zig");
 const curve = @import("curve.zig");
 const SM3 = @import("../sm3.zig").SM3;
+const secure = @import("../secure.zig");
 
 /// SM9 Key Agreement Protocol
 /// Based on GM/T 0044-2016 standard
@@ -101,6 +102,11 @@ pub const EphemeralKeyPair = struct {
             .private_key = private_key,
             .public_key = public_key,
         };
+    }
+
+    /// Overwrite the ephemeral private key with zeros.
+    pub fn zeroize(self: *EphemeralKeyPair) void {
+        secure.zeroValue([32]u8, &self.private_key);
     }
 
     /// Validate ephemeral key pair

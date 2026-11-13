@@ -4,6 +4,7 @@ const mem = std.mem;
 const SM2 = @import("group.zig").SM2;
 const SM3 = @import("../sm3.zig").SM3;
 const utils = @import("utils.zig");
+const secure = @import("../secure.zig");
 
 /// SM2 Key Exchange Protocol implementation
 /// Based on GM/T 0003.3-2012 standard
@@ -57,6 +58,12 @@ pub const KeyExchangeContext = struct {
             .y = coords.y.toBytes(.big),
         };
     }
+
+    /// Clear the long-term and ephemeral private keys held by the context.
+    pub fn deinit(self: *KeyExchangeContext) void {
+        secure.zeroValue([32]u8, &self.private_key);
+        secure.zeroValue([32]u8, &self.ephemeral_private);
+    }
 };
 
 /// Key exchange result
@@ -65,6 +72,7 @@ pub const KeyExchangeResult = struct {
     key_confirmation: ?[32]u8 = null,
 
     pub fn deinit(self: KeyExchangeResult, allocator: std.mem.Allocator) void {
+        secure.zero(self.shared_key);
         allocator.free(self.shared_key);
     }
 };
@@ -87,17 +95,20 @@ pub fn keyExchangeInitiator(
     try responder_ephemeral_key.rejectIdentity();
 
     // Step 2: Compute shared secret
-    const shared_secret = try computeSharedSecret(
+    var shared_secret = try computeSharedSecret(
         context,
         responder_public_key,
         responder_ephemeral_key,
         responder_user_id,
     );
+    defer secure.zeroValue(@TypeOf(shared_secret), &shared_secret);
 
     // Step 3: Derive keys using KDF
     const kdf_input_len = 64; // x coordinate of shared secret point
     var kdf_input: [kdf_input_len]u8 = undefined;
-    const coords = shared_secret.affineCoordinates();
+    defer secure.zero(&kdf_input);
+    var coords = shared_secret.affineCoordinates();
+    defer secure.zeroValue(@TypeOf(coords), &coords);
     @memcpy(kdf_input[0..32], &coords.x.toBytes(.big));
     @memcpy(kdf_input[32..64], &coords.y.toBytes(.big));
 
@@ -105,10 +116,18 @@ pub fn keyExchangeInitiator(
     if (with_confirmation) total_key_length += 32; // Add space for confirmation value
 
     const derived_key = try utils.kdf(allocator, &kdf_input, total_key_length);
+    defer {
+        secure.zero(derived_key);
+        allocator.free(derived_key);
+    }
 
     var result = KeyExchangeResult{
         .shared_key = try allocator.alloc(u8, key_length),
     };
+    errdefer {
+        secure.zero(result.shared_key);
+        allocator.free(result.shared_key);
+    }
 
     @memcpy(result.shared_key, derived_key[0..key_length]);
 
@@ -123,7 +142,6 @@ pub fn keyExchangeInitiator(
         );
     }
 
-    allocator.free(derived_key);
     return result;
 }
 
@@ -145,17 +163,20 @@ pub fn keyExchangeResponder(
     try initiator_ephemeral_key.rejectIdentity();
 
     // Step 2: Compute shared secret
-    const shared_secret = try computeSharedSecret(
+    var shared_secret = try computeSharedSecret(
         context,
         initiator_public_key,
         initiator_ephemeral_key,
         initiator_user_id,
     );
+    defer secure.zeroValue(@TypeOf(shared_secret), &shared_secret);
 
     // Step 3: Derive keys using KDF
     const kdf_input_len = 64; // x and y coordinates of shared secret point
     var kdf_input: [kdf_input_len]u8 = undefined;
-    const coords = shared_secret.affineCoordinates();
+    defer secure.zero(&kdf_input);
+    var coords = shared_secret.affineCoordinates();
+    defer secure.zeroValue(@TypeOf(coords), &coords);
     @memcpy(kdf_input[0..32], &coords.x.toBytes(.big));
     @memcpy(kdf_input[32..64], &coords.y.toBytes(.big));
 
@@ -163,10 +184,18 @@ pub fn keyExchangeResponder(
     if (with_confirmation) total_key_length += 32; // Add space for confirmation value
 
     const derived_key = try utils.kdf(allocator, &kdf_input, total_key_length);
+    defer {
+        secure.zero(derived_key);
+        allocator.free(derived_key);
+    }
 
     var result = KeyExchangeResult{
         .shared_key = try allocator.alloc(u8, key_length),
     };
+    errdefer {
+        secure.zero(result.shared_key);
+        allocator.free(result.shared_key);
+    }
 
     @memcpy(result.shared_key, derived_key[0..key_length]);
 
@@ -181,7 +210,6 @@ pub fn keyExchangeResponder(
         );
     }
 
-    allocator.free(derived_key);
     return result;
 }
 

@@ -4,6 +4,7 @@ const mem = std.mem;
 const fmt = std.fmt;
 const params = @import("params.zig");
 const curve = @import("curve.zig");
+const secure = @import("../secure.zig");
 
 /// SM9 User Key Extraction
 /// Based on GM/T 0044-2016 standard
@@ -53,14 +54,16 @@ pub const SignUserPrivateKey = struct {
         }
 
         // Step 1: Compute H1(ID||hid, N) where hid = 0x01 for signature
-        const h1_result = h1Hash(user_id, 0x01, system_params.N, allocator) catch {
+        var h1_result = h1Hash(user_id, 0x01, system_params.N, allocator) catch {
             return KeyExtractionError.KeyGenerationFailed;
         };
+        defer bigint.secureClear(&h1_result);
 
         // Step 2: Compute t1 = (H1 + s) mod N
-        const t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
+        var t1 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
             return KeyExtractionError.KeyGenerationFailed;
         };
+        defer bigint.secureClear(&t1);
 
         // Step 3: Handle t1 = 0 case according to GM/T 0044-2016
         if (bigint.isZero(t1)) {
@@ -70,9 +73,10 @@ pub const SignUserPrivateKey = struct {
         }
 
         // Step 4: Compute t1^(-1) mod N using proper modular inverse
-        const t1_inv = bigint.invMod(t1, system_params.N) catch {
+        var t1_inv = bigint.invMod(t1, system_params.N) catch {
             return KeyExtractionError.KeyGenerationFailed;
         };
+        defer bigint.secureClear(&t1_inv);
 
         // Step 5: Generate user private key using mathematical approach
         // GM/T 0044-2016: User private key = t1_inv * P1
@@ -86,7 +90,8 @@ pub const SignUserPrivateKey = struct {
         };
 
         // Apply the key derivation scalar
-        const g1_point = g1_base.mul(t1_inv, system_params);
+        var g1_point = g1_base.mul(t1_inv, system_params);
+        defer secure.zeroValue(curve.G1Point, &g1_point);
 
         // Step 6: Convert G1 point to compressed format (33 bytes)
         const compressed_key = g1_point.compress();
@@ -96,6 +101,11 @@ pub const SignUserPrivateKey = struct {
             .key = compressed_key,
             .hid = 0x01, // Signature hash identifier
         };
+    }
+
+    /// Overwrite the private key point with zeros.
+    pub fn zeroize(self: *SignUserPrivateKey) void {
+        secure.zeroValue([33]u8, &self.key);
     }
 
     /// Validate user private key
@@ -172,14 +182,16 @@ pub const EncryptUserPrivateKey = struct {
         }
 
         // Step 1: Compute H1(ID||hid, N) where hid = 0x03 for encryption
-        const h1_result = h1Hash(user_id, 0x03, system_params.N, allocator) catch {
+        var h1_result = h1Hash(user_id, 0x03, system_params.N, allocator) catch {
             return KeyExtractionError.KeyGenerationFailed;
         };
+        defer bigint.secureClear(&h1_result);
 
         // Step 2: Compute t2 = (H1 + s) mod N using proper modular arithmetic
-        const t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
+        var t2 = bigint.addMod(h1_result, master_key.private_key, system_params.N) catch {
             return KeyExtractionError.KeyGenerationFailed;
         };
+        defer bigint.secureClear(&t2);
 
         // Step 3: Handle t2 = 0 case according to GM/T 0044-2016
         if (bigint.isZero(t2)) {
@@ -189,9 +201,10 @@ pub const EncryptUserPrivateKey = struct {
         }
 
         // Step 4: Compute t2^(-1) mod N using proper modular inverse
-        const t2_inv = bigint.invMod(t2, system_params.N) catch {
+        var t2_inv = bigint.invMod(t2, system_params.N) catch {
             return KeyExtractionError.KeyGenerationFailed;
         };
+        defer bigint.secureClear(&t2_inv);
 
         // Step 5: Create G2 point from system parameter P2 and multiply by t2_inv
         // Use G2 generator function instead of decompression to avoid format issues
@@ -199,7 +212,8 @@ pub const EncryptUserPrivateKey = struct {
             return KeyExtractionError.InvalidMasterKey;
         };
 
-        const g2_point = g2_base.mul(t2_inv, system_params);
+        var g2_point = g2_base.mul(t2_inv, system_params);
+        defer secure.zeroValue(curve.G2Point, &g2_point);
 
         // GM/T 0044-2016 compliance: If scalar multiplication produces infinity, this indicates
         // an invalid key computation according to the standard - fail securely
@@ -215,6 +229,11 @@ pub const EncryptUserPrivateKey = struct {
             .key = uncompressed_key,
             .hid = 0x03, // Encryption hash identifier
         };
+    }
+
+    /// Overwrite the private key point with zeros.
+    pub fn zeroize(self: *EncryptUserPrivateKey) void {
+        secure.zeroValue([65]u8, &self.key);
     }
 
     /// Validate user private key

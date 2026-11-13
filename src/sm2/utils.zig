@@ -5,6 +5,7 @@ const sm3 = @import("../sm3.zig");
 const SM3 = sm3.SM3;
 
 const builtin = @import("builtin");
+const secure = @import("../secure.zig");
 
 const Buffer = std.ArrayList(u8);
 
@@ -229,14 +230,7 @@ pub fn decodeSignatureDER(der_sig: []const u8) !struct { r: [32]u8, s: [32]u8 } 
 
 /// Constant-time comparison of byte arrays
 pub fn constantTimeEqual(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) return false;
-
-    var diff: u8 = 0;
-    for (a, b) |ai, bi| {
-        diff |= ai ^ bi;
-    }
-
-    return diff == 0;
+    return secure.constantTimeEqual(a, b);
 }
 
 test "KDF basic functionality" {

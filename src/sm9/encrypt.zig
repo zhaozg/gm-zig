@@ -7,6 +7,7 @@ const random = @import("random.zig");
 const pairing = @import("pairing.zig");
 const curve = @import("curve.zig");
 const SM3 = @import("../sm3.zig").SM3;
+const secure = @import("../secure.zig");
 
 /// SM9 Public Key Encryption and Decryption
 /// Based on GM/T 0044-2016 standard
@@ -394,7 +395,7 @@ pub const EncryptionContext = struct {
         u_hasher.final(&u);
 
         // Step 6: If u != C3, return error
-        if (!std.mem.eql(u8, &u, &ciphertext.c3)) {
+        if (!secure.constantTimeEqual(&u, &ciphertext.c3)) {
             self.allocator.free(plaintext);
             return error.DecryptionFailed;
         }

@@ -1,4 +1,5 @@
 const std = @import("std");
+const secure = @import("../secure.zig");
 const crypto = std.crypto;
 const mem = std.mem;
 
@@ -248,14 +249,7 @@ pub const Utils = struct {
 
     /// Constant-time byte comparison
     pub fn constantTimeEqual(a: []const u8, b: []const u8) bool {
-        if (a.len != b.len) return false;
-
-        var result: u8 = 0;
-        for (a, b) |x, y| {
-            result |= x ^ y;
-        }
-
-        return result == 0;
+        return secure.constantTimeEqual(a, b);
     }
 };
 

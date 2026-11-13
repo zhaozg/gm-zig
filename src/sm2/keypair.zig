@@ -4,6 +4,7 @@ const mem = std.mem;
 const SM2 = @import("group.zig").SM2;
 const SM3 = @import("../sm3.zig").SM3;
 const utils = @import("utils.zig");
+const secure = @import("../secure.zig");
 
 /// SM2 Key Pair
 pub const KeyPair = struct {
@@ -48,6 +49,19 @@ pub const KeyPair = struct {
             .x = affine.x.toBytes(.big),
             .y = affine.y.toBytes(.big),
         };
+    }
+
+    /// Overwrite the private key material with zeros.
+    ///
+    /// The public key is not secret and is left untouched. Call this before
+    /// discarding a key pair that was used to handle real private keys.
+    pub fn zeroize(self: *KeyPair) void {
+        secure.zeroValue([32]u8, &self.private_key);
+    }
+
+    /// Alias for `zeroize`, for callers that use `deinit` consistently.
+    pub fn deinit(self: *KeyPair) void {
+        self.zeroize();
     }
 };
 

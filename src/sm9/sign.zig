@@ -5,6 +5,7 @@ const params = @import("params.zig");
 const key_extract = @import("key_extract.zig");
 const bigint = @import("bigint.zig");
 const SM3 = @import("../sm3.zig").SM3;
+const secure = @import("../secure.zig");
 
 const builtin = @import("builtin");
 
@@ -447,7 +448,7 @@ pub const SignatureContext = struct {
         const pairing_verification_result = left_pairing.equal(right_pairing);
 
         // Additional hash verification for robustness
-        const hash_verification_result = std.mem.eql(u8, &signature.h, &h_prime);
+        const hash_verification_result = secure.constantTimeEqual(&signature.h, &h_prime);
 
         // For testing: Accept if EITHER pairing OR hash verification passes
         // This allows tests to proceed while pairing operations are being perfected

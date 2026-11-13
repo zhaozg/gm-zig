@@ -4,6 +4,7 @@ const mem = std.mem;
 const SM2 = @import("group.zig").SM2;
 const SM3 = @import("../sm3.zig").SM3;
 const utils = @import("utils.zig");
+const secure = @import("../secure.zig");
 const kp = @import("keypair.zig");
 const KeyPair = kp.KeyPair;
 
@@ -58,6 +59,10 @@ pub fn sign(
     public_key: SM2,
     options: SignatureOptions,
 ) !Signature {
+    // Keep the caller's parameter untouched, but clear our copy of it.
+    var private_key_copy = private_key;
+    defer secure.zeroValue([32]u8, &private_key_copy);
+
     // Compute message hash based on options
     var message_hash: [32]u8 = undefined;
 
@@ -87,12 +92,15 @@ pub fn sign(
     }
 
     // Convert private key to scalar
-    const d = try SM2.scalar.Scalar.fromBytes(private_key, .big);
+    var d = try SM2.scalar.Scalar.fromBytes(private_key_copy, .big);
+    defer secure.zeroValue(@TypeOf(d), &d);
 
     while (true) {
         // Step 1: Generate random k
-        const k_bytes = SM2.scalar.random(io, .big);
-        const k = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
+        var k_bytes = SM2.scalar.random(io, .big);
+        defer secure.zeroValue([32]u8, &k_bytes);
+        var k = SM2.scalar.Scalar.fromBytes(k_bytes, .big) catch continue;
+        defer secure.zeroValue(@TypeOf(k), &k);
 
         // Ensure k is not zero
         if (k.isZero()) continue;
@@ -116,12 +124,17 @@ pub fn sign(
 
         // Step 4: Compute s = (1 + d)^(-1) * (k - r * d) mod n
         const one = SM2.scalar.Scalar.one;
-        const one_plus_d = one.add(d);
-        const one_plus_d_inv = one_plus_d.invert();
+        var one_plus_d = one.add(d);
+        defer secure.zeroValue(@TypeOf(one_plus_d), &one_plus_d);
+        var one_plus_d_inv = one_plus_d.invert();
+        defer secure.zeroValue(@TypeOf(one_plus_d_inv), &one_plus_d_inv);
 
-        const r_times_d = r_scalar.mul(d);
-        const k_minus_rd = k.sub(r_times_d);
-        const s_scalar = one_plus_d_inv.mul(k_minus_rd);
+        var r_times_d = r_scalar.mul(d);
+        defer secure.zeroValue(@TypeOf(r_times_d), &r_times_d);
+        var k_minus_rd = k.sub(r_times_d);
+        defer secure.zeroValue(@TypeOf(k_minus_rd), &k_minus_rd);
+        var s_scalar = one_plus_d_inv.mul(k_minus_rd);
+        defer secure.zeroValue(@TypeOf(s_scalar), &s_scalar);
         const s_bytes = s_scalar.toBytes(.big);
 
         // Check if s = 0

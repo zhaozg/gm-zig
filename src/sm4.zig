@@ -2,6 +2,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const print = std.debug.print;
 const builtin = @import("builtin");
+const secure = @import("secure.zig");
 
 // SM4 算法常量定义
 const SM4_BLOCK_SIZE = 16; // 128-bit blocks
@@ -140,6 +141,11 @@ pub const SM4 = struct {
         std.mem.writeInt(u32, output[4..8], x2, .big);
         std.mem.writeInt(u32, output[8..12], x1, .big);
         std.mem.writeInt(u32, output[12..16], x0, .big);
+    }
+
+    /// Overwrite the expanded round keys with zeros.
+    pub fn zeroize(self: *SM4) void {
+        secure.zeroValue([ROUNDS]u32, &self.rk);
     }
 
     // Decrypt single 128-bit block with unrolled loop
@@ -533,12 +539,7 @@ pub const SM4_GCM = struct {
         }
 
         // Constant-time comparison
-        var diff: u8 = 0;
-        for (0..16) |j| {
-            diff |= computed_tag[j] ^ tag[j];
-        }
-
-        if (diff != 0) return false;
+        if (!secure.constantTimeEqual(&computed_tag, tag)) return false;
 
         // Decrypt if tag is valid using CTR mode
         var ctr_counter = counter;

@@ -1,4 +1,5 @@
 const std = @import("std");
+const secure = @import("../secure.zig");
 const curve = @import("curve.zig");
 const bigint = @import("bigint.zig");
 const params = @import("params.zig");
@@ -156,10 +157,7 @@ pub const GtElement = struct {
 
     /// Check if two elements are equal
     pub fn equal(self: GtElement, other: GtElement) bool {
-        for (self.data, other.data) |a, b| {
-            if (a != b) return false;
-        }
-        return true;
+        return secure.constantTimeEqual(&self.data, &other.data);
     }
 
     /// Convert to bytes

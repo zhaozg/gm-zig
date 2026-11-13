@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x | **Tests:** ✅ All passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 340 passing
 
 ---
 
@@ -31,8 +31,9 @@
 
 | Category | Severity | Issue |
 |----------|----------|-------|
-| **Security** | 🔴 Critical | No secure memory zeroing for private keys / sensitive data |
-| **Security** | 🟡 High | Constant-time guarantees not verified across all code paths |
+| **Security** | 🟡 High | Secure memory zeroing covers the core SM2/SM9 key paths; remaining allocator paths still need an audit |
+| **Security** | 🟡 High | Authentication comparisons use constant-time helpers, but no automated constant-time analysis is in CI |
+| **Security** | 🔴 Critical | SM9 verification currently accepts either the pairing check or the hash check; the pairing path needs correction before requiring both |
 | **Versioning** | 🟡 High | Version is `0.0.0` — no semantic versioning or CHANGELOG |
 | **API** | 🟡 High | Inconsistent error handling and allocator patterns across modules |
 | **Testing** | 🟡 High | No fuzz testing, no property-based testing, no coverage reporting |
@@ -51,20 +52,21 @@
 > **Goal:** Address all critical security issues before any production use.
 
 #### 1.2 Secure Memory Management
-- [ ] Add `secureZero` for all sensitive data:
-  - Private keys (SM2, SM9)
-  - Shared secrets (key exchange)
-  - Intermediate computation buffers
-- [ ] Audit all `defer allocator.free()` paths for sensitive data leaks
-- [ ] Add `test "Secure memory zeroing"` — verify memory is zeroed after use
+- [x] Add `secureZero` for core sensitive data:
+  - [x] Private keys (SM2 `KeyPair`, SM9 user keys, SM4/ZUC key schedules, ZUC-AEAD key/IV)
+  - [x] Shared secrets (SM2 key exchange)
+  - [x] Intermediate computation buffers (SM2 sign/encrypt/decrypt/key exchange, SM9 key extraction)
+- [ ] Audit remaining `defer allocator.free()` paths for sensitive data leaks
+- [x] Add `test "Secure memory zeroing"` — verify memory is zeroed after use
 
 #### 1.3 Constant-Time Verification
-- [ ] Audit all comparison operations — ensure `constantTimeEqual` is used everywhere
-  - Signature verification (`src/sm2/signature.zig`)
-  - MAC verification (`src/sm4` GCM mode)
-  - SM9 pairing output comparison
+- [x] Replace authentication-relevant comparisons with constant-time helpers
+  - [x] Signature verification (`src/sm2/signature.zig`)
+  - [x] MAC verification (`src/sm4` GCM mode)
+  - [x] SM9 pairing output, signature hash, and encryption C3 comparisons
+- [ ] Audit non-authentication comparisons and document which branches are allowed to depend on public data
 - [ ] Add `ctverif` or similar constant-time analysis to CI
-- [ ] Document which operations are guaranteed constant-time
+- [x] Document which operations are guaranteed constant-time ([docs/security.md](docs/security.md))
 - [ ] Add `test "Constant-time properties"` — timing-based test for known patterns
 
 #### 1.4 Error Handling Unification
@@ -92,7 +94,7 @@
 - [ ] Generate API documentation with `zig build docs`
 - [ ] Create `docs/` directory with:
   - [ ] `docs/architecture.md` — Module structure and data flow
-  - [ ] `docs/security.md` — Security considerations, threat model, limitations
+  - [x] `docs/security.md` — Security considerations, threat model, limitations
   - [ ] `docs/performance.md` — Benchmark methodology and results
   - [ ] `docs/interop.md` — Interoperability with other GM implementations
   - [ ] `docs/standards.md` — GM/T standard compliance matrix
@@ -343,4 +345,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) (to be created in Phase 2).
 
 ---
 
-*Last updated: 2026-05-23*
+*Last updated: 2026-11-13*
