@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 180 passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 183 passing
 
 ---
 
@@ -114,6 +114,7 @@
   - [ ] `decrypt(encrypt) == plaintext` for random data
   - [ ] Key exchange shared key equality
 - [ ] Add memory leak detection (Valgrind / AddressSanitizer in CI)
+- [x] Add SM9 boundary vectors for ID length, message length, and nonce range
 - [ ] Add SM9 performance tests with timeout guards (pairing is slow)
 
 #### 2.4 CI/CD Enhancements
