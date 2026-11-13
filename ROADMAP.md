@@ -197,7 +197,7 @@
   - [ ] Tongsuo (LibreSSL fork with GM support)
   - [ ] GmSSL
   - [ ] Bouncy Castle (Java GM implementation)
-- [ ] Add benchmark results to `docs/performance.md`
+- [x] Add benchmark results to `docs/performance.md`
 - [ ] Add performance regression CI job
 
 #### 4.4 Memory Optimization

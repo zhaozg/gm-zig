@@ -5,6 +5,7 @@ const sm3_bench = @import("bench/sm3.zig");
 const sm4_bench = @import("bench/sm4.zig");
 const zuc_bench = @import("bench/zuc.zig");
 const sm2_bench = @import("bench/sm2.zig");
+const sm9_bench = @import("bench/sm9.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -214,6 +215,14 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     try bench.add("SM4 XTS D 1K   ", sm4_bench.benchSm4XtsDecrypt1K, .{});
     try bench.add("SM4 XTS E 64K  ", sm4_bench.benchSm4XtsEncrypt64K, .{});
     try bench.add("SM4 XTS D 64K  ", sm4_bench.benchSm4XtsDecrypt64K, .{});
+
+    // SM9 standard benchmarks
+    try bench.add("SM9 pairing    ", sm9_bench.benchSm9Pairing, .{});
+    try bench.add("SM9 key extract", sm9_bench.benchSm9KeyExtractSign, .{});
+    try bench.add("SM9 sign       ", sm9_bench.benchSm9Sign, .{});
+    try bench.add("SM9 verify     ", sm9_bench.benchSm9Verify, .{});
+    try bench.add("SM9 encrypt    ", sm9_bench.benchSm9Encrypt, .{});
+    try bench.add("SM9 decrypt    ", sm9_bench.benchSm9Decrypt, .{});
 
     // SM2 benchmarks
     try bench.add("SM2 key gen    ", sm2_bench.benchSm2KeyGen, .{});

@@ -54,7 +54,39 @@ pub fn pow(a: Fp, e: Fp) Fp {
     return r;
 }
 pub fn inv(a: Fp) Fp {
-    return pow(a, P - 2);
+    if (a == 0) return 0;
+    // Binary extended Euclidean inverse for an odd modulus.
+    var u: Fp = a;
+    var v: Fp = P;
+    var x1: Fp = 1;
+    var x2: Fp = 0;
+
+    while (u != 1 and v != 1) {
+        while ((u & 1) == 0) {
+            u >>= 1;
+            if ((x1 & 1) == 0) {
+                x1 >>= 1;
+            } else {
+                x1 = @intCast((@as(u512, x1) + P) >> 1);
+            }
+        }
+        while ((v & 1) == 0) {
+            v >>= 1;
+            if ((x2 & 1) == 0) {
+                x2 >>= 1;
+            } else {
+                x2 = @intCast((@as(u512, x2) + P) >> 1);
+            }
+        }
+        if (u >= v) {
+            u -= v;
+            x1 = sub(x1, x2);
+        } else {
+            v -= u;
+            x2 = sub(x2, x1);
+        }
+    }
+    return if (u == 1) x1 else x2;
 }
 
 pub fn f2Zero() Fp2 {

@@ -16,6 +16,7 @@ This is a work-in-progress implementation intended for study, prototyping, and i
 - **ZUC, SM2, SM3, SM4, SM9**: Implemented and covered by the test suite. The SM9 tests include GM/T 0044-2016 known-answer and compliance cases.
 - **Tests**: `zig build test` currently passes on Zig 0.16.0 and 0.17.1 (183 tests in this checkout). Passing tests do not imply complete standards conformance or security.
 - **Standards**: The code follows the GM/T specifications where implemented, but no third-party conformance or security certification has been performed.
+- **Performance**: See [docs/performance.md](docs/performance.md) for the current ReleaseFast SM9 measurements.
 - **Known gaps**: See [ROADMAP.md](ROADMAP.md) for open security hardening, constant-time verification, fuzzing, and API cleanup work. Current security properties and limitations are summarized in [docs/security.md](docs/security.md).
 
 Do not use this library to protect production secrets without an independent security review.
