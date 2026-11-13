@@ -75,3 +75,19 @@ the quality of the host entropy source.
 Do not open a public issue for a suspected vulnerability. Contact the
 maintainers privately first. A formal `SECURITY.md` disclosure policy is still
 on the roadmap.
+
+## SM9 correctness status
+
+The SM9 H1, H2, and KDF helpers in `src/sm9/hash.zig` now follow the
+GM/T 0044-2016 construction and are checked against independently generated
+vectors:
+
+- H1: `SM3(hid || ID || ct_be32)`, `(hash mod (N-1)) + 1`, with the G1
+  x-coordinate validity retry.
+- H2: `SM3(0x02 || Z || ct_be32)`, `(hash mod (N-1)) + 1`.
+- KDF: `SM3(Z || ct_be32)` blocks.
+
+This does **not** make the legacy SM9 signature, encryption, or pairing code
+standards-compliant. Those paths still rely on the simplified
+`curve.zig`/`pairing.zig` implementation and remain on the roadmap for a full
+BN254 pairing rewrite and external cross-validation.

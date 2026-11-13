@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 340 passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 342 passing
 
 ---
 
@@ -33,7 +33,8 @@
 |----------|----------|-------|
 | **Security** | 🟡 High | Secure memory zeroing covers the core SM2/SM9 key paths; remaining allocator paths still need an audit |
 | **Security** | 🟡 High | Authentication comparisons use constant-time helpers, but no automated constant-time analysis is in CI |
-| **Security** | 🔴 Critical | SM9 verification currently accepts either the pairing check or the hash check; the pairing path needs correction before requiring both |
+| **Security** | 🔴 Critical | SM9 signature verification still accepts either the pairing check or the hash check; the pairing path needs correction before requiring both |
+| **Correctness** | 🔴 Critical | SM9 H1/H2/KDF now follow GM/T 0044-2016 and match external vectors, but the legacy curve/pairing/sign/encrypt path is not yet standards-compliant |
 | **Versioning** | 🟡 High | Version is `0.0.0` — no semantic versioning or CHANGELOG |
 | **API** | 🟡 High | Inconsistent error handling and allocator patterns across modules |
 | **Testing** | 🟡 High | No fuzz testing, no property-based testing, no coverage reporting |
@@ -156,7 +157,7 @@
 
 #### 3.4 SM9 Enhancements
 - [ ] Add batch signature verification
-- [ ] Add key derivation (KDF with SM3)
+- [x] Add key derivation (KDF with SM3)
 - [x] Add identity-based key agreement (already implemented, verify completeness)
 - [ ] Add SM9 certificate format support
 - [ ] Optimize pairing computation (final exponentiation)

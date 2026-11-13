@@ -114,3 +114,44 @@ test "GM/T 0044-2016 KDF Standard Compliance" {
         try testing.expect(non_zero == tv.expected_non_zero);
     }
 }
+
+// Vectors generated independently with the Python pysmx/snowland-smx SM9
+// implementation (SM3-based H2 and KDF).
+test "SM9 KDF and H2 match external reference vectors" {
+    const kdf_expected = [_]u8{
+        0xfe, 0x1e, 0xa8, 0x0d, 0xac, 0x6f, 0x10, 0x0c,
+        0x33, 0x53, 0x7b, 0xd2, 0x46, 0x19, 0xec, 0x7c,
+        0x72, 0xa1, 0xe8, 0xb1, 0xff, 0xea, 0xef, 0xb1,
+        0xeb, 0x52, 0xa3, 0x77, 0x91, 0xfd, 0xaf, 0x61,
+    };
+    const kdf_out = try sm9.encrypt.EncryptionUtils.kdf("abc", 32, allocator);
+    defer allocator.free(kdf_out);
+    try testing.expectEqualSlices(u8, &kdf_expected, kdf_out);
+
+    var w: [32]u8 = undefined;
+    for (&w, 0..) |*b, i| b.* = @intCast(i);
+    const order = [_]u8{
+        0xb6, 0x40, 0x00, 0x00, 0x02, 0xa3, 0xa6, 0xf1,
+        0xd6, 0x03, 0xab, 0x4f, 0xf5, 0x8e, 0xc7, 0x44,
+        0x49, 0xf2, 0x93, 0x4b, 0x18, 0xea, 0x8b, 0xee,
+        0xe5, 0x6e, 0xe1, 0x9c, 0xd6, 0x9e, 0xcf, 0x25,
+    };
+    const h2 = try sm9.hash.h2Hash("abc", &w, order, allocator);
+    var h2_int: u256 = 0;
+    for (h2) |b| h2_int = (h2_int << 8) | b;
+    try testing.expectEqual(@as(u256, 0x355f7a88a63c64b51ba0ae82eeba68bf74af178b64d132f9c76bcd6a2e9b396b), h2_int);
+}
+
+// H1 first-block vector for ID = "Alice", hid = 0x01, computed with SM3.
+test "SM9 H1 scalar follows the GM/T 0044-2016 H1 construction" {
+    const order = [_]u8{
+        0xb6, 0x40, 0x00, 0x00, 0x02, 0xa3, 0xa6, 0xf1,
+        0xd6, 0x03, 0xab, 0x4f, 0xf5, 0x8e, 0xc7, 0x44,
+        0x49, 0xf2, 0x93, 0x4b, 0x18, 0xea, 0x8b, 0xee,
+        0xe5, 0x6e, 0xe1, 0x9c, 0xd6, 0x9e, 0xcf, 0x25,
+    };
+    const h1 = try sm9.hash.h1Hash("Alice", 0x01, order, allocator);
+    var h1_int: u256 = 0;
+    for (h1) |b| h1_int = (h1_int << 8) | b;
+    try testing.expectEqual(@as(u256, 0x9c96d18bb8cd391021ac80a7ee9d7570d1242455f74ecc369e63c84cac40629a), h1_int);
+}
