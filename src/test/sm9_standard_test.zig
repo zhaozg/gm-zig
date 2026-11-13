@@ -86,3 +86,24 @@ test "SM9 standard encryption matches external reference vector" {
     defer allocator.free(plain);
     try testing.expectEqualStrings("encryption standard", plain);
 }
+
+test "SM9 standard key agreement derives the same key" {
+    var gpa = std.heap.DebugAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const master = standard.encryptMaster(2);
+    const sk_a = try standard.encryptUserKey(allocator, master, "Alice");
+    const sk_b = try standard.encryptUserKey(allocator, master, "Bob");
+
+    const r_a: bn.Fp = 0x1111111111111111;
+    const r_b: bn.Fp = 0x2222222222222222;
+    const ra = try standard.keyExchangeBegin(allocator, master.public_key, "Bob", r_a);
+    const rb = try standard.keyExchangeBegin(allocator, master.public_key, "Alice", r_b);
+
+    const ka = try standard.keyExchangeShared(allocator, master.public_key, sk_a, "Alice", "Bob", r_a, ra, rb, .initiator, 32);
+    defer allocator.free(ka);
+    const kb = try standard.keyExchangeShared(allocator, master.public_key, sk_b, "Bob", "Alice", r_b, rb, ra, .responder, 32);
+    defer allocator.free(kb);
+    try testing.expectEqualSlices(u8, ka, kb);
+}

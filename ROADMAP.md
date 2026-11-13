@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 348 passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 349 passing
 
 ---
 
@@ -159,7 +159,8 @@
 - [x] Add a BN254 Fp/Fp2/Fp4/Fp12 and G1/G2 foundation validated against external SM9 vectors
 - [x] Replace the legacy SM9 pairing with a standard R-ate/Tate pairing
 - [x] Implement the standard SM9 sign/verify/encrypt/decrypt core on the new pairing
-- [ ] Migrate the legacy `SM9Context`/`sign`/`encrypt` public APIs to the standard core
+- [x] Implement standard SM9 key agreement on the new core
+- [ ] Remove the legacy `SM9Context`/`sign`/`encrypt` public APIs and their tests
 - [ ] Cross-validate the standard core with the local GmSSL CLI/C implementation
 - [ ] Add batch signature verification
 - [x] Add key derivation (KDF with SM3)

@@ -206,3 +206,85 @@ pub fn decrypt(
     if (!std.crypto.timing_safe.eql([32]u8, c3, ct.C3)) return Error.InvalidMac;
     return message;
 }
+
+pub const KeyExchangeRole = enum { initiator, responder };
+
+fn g1Raw(p: bn.G1) [64]u8 {
+    var out: [64]u8 = undefined;
+    std.mem.writeInt(bn.Fp, out[0..32], p.x, .big);
+    std.mem.writeInt(bn.Fp, out[32..64], p.y, .big);
+    return out;
+}
+
+/// Generate the ephemeral G1 point sent to the peer.
+pub fn keyExchangeBegin(
+    allocator: std.mem.Allocator,
+    master_public: bn.G1,
+    peer_id: []const u8,
+    r: bn.Fp,
+) !bn.G1 {
+    if (r == 0 or r >= bn.N) return Error.InvalidPrivateKey;
+    const h1x = try h1(allocator, peer_id, 0x03);
+    const q = bn.g1Add(bn.g1Mul(h1x, bn.P1), master_public);
+    return bn.g1Mul(r, q);
+}
+
+/// Derive the shared key from both ephemeral points.
+pub fn keyExchangeShared(
+    allocator: std.mem.Allocator,
+    master_public: bn.G1,
+    user_key: bn.G2,
+    own_id: []const u8,
+    peer_id: []const u8,
+    own_r: bn.Fp,
+    own_R: bn.G1,
+    peer_R: bn.G1,
+    role: KeyExchangeRole,
+    key_len: usize,
+) ![]u8 {
+    if (own_r == 0 or own_r >= bn.N) return Error.InvalidPrivateKey;
+    if (!bn.g1OnCurve(own_R) or !bn.g1OnCurve(peer_R)) return Error.InvalidCiphertext;
+
+    const g = pairing.pairing(master_public, bn.P2);
+    const g1 = pairing.f12Pow(g, own_r);
+    const g2 = pairing.pairing(peer_R, user_key);
+    const g3 = pairing.f12Pow(g2, own_r);
+    const g1_bytes = wBytes(g1);
+    const g2_bytes = wBytes(g2);
+    const g3_bytes = wBytes(g3);
+    const own_R_bytes = g1Raw(own_R);
+    const peer_R_bytes = g1Raw(peer_R);
+
+    const id_a = if (role == .initiator) own_id else peer_id;
+    const id_b = if (role == .initiator) peer_id else own_id;
+    const r_a = if (role == .initiator) own_R_bytes else peer_R_bytes;
+    const r_b = if (role == .initiator) peer_R_bytes else own_R_bytes;
+
+    const z_len = id_a.len + id_b.len + 64 + 64 + 384 * 3;
+    const z = try allocator.alloc(u8, z_len);
+    defer allocator.free(z);
+    var o: usize = 0;
+    @memcpy(z[o .. o + id_a.len], id_a);
+    o += id_a.len;
+    @memcpy(z[o .. o + id_b.len], id_b);
+    o += id_b.len;
+    @memcpy(z[o .. o + 64], &r_a);
+    o += 64;
+    @memcpy(z[o .. o + 64], &r_b);
+    o += 64;
+    if (role == .initiator) {
+        @memcpy(z[o .. o + 384], &g1_bytes);
+    } else {
+        @memcpy(z[o .. o + 384], &g2_bytes);
+    }
+    o += 384;
+    if (role == .initiator) {
+        @memcpy(z[o .. o + 384], &g2_bytes);
+    } else {
+        @memcpy(z[o .. o + 384], &g1_bytes);
+    }
+    o += 384;
+    @memcpy(z[o .. o + 384], &g3_bytes);
+
+    return hash.kdf(z, key_len, allocator);
+}

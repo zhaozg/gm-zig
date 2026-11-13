@@ -111,7 +111,8 @@ BN254 pairing:
 - master public keys: `P_pub-s = s*P2`, `P_pub-e = s*P1`;
 - user keys: `d_A = s/(H1(ID||hid)+s) * P1`, `d_B = s/(H1(ID||hid)+s) * P2`;
 - signature and verification using `e(P1, P_pub-s)`;
-- encryption/decryption using `e(P_pub-e, P2)` and `e(C1, d_B)`.
+- encryption/decryption using `e(P_pub-e, P2)` and `e(C1, d_B)`;
+- key agreement using `g1=e(P_pub-e,P2)^r`, `g2=e(R_peer,d)`, `g3=g2^r`.
 
 The signature vector (ID "Alice", message "Chinese IBS standard", nonce
 `0x0123456789abcdef`) and the encryption `C1`/`C2` vector are checked against
