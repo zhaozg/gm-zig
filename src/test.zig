@@ -13,6 +13,8 @@ test {
 
     // Standard BN254 field/curve foundation
     _ = @import("sm9/bn.zig");
+    _ = @import("sm9/pairing_bn.zig");
+    _ = @import("test/sm9_standard_test.zig");
 
     // SM9 Test Suite
     _ = @import("test/sm9_key_extract_test.zig");

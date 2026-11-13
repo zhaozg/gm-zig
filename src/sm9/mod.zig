@@ -20,6 +20,7 @@ pub const curve = @import("curve.zig");
 pub const hash = @import("hash.zig");
 pub const pairing = @import("pairing.zig");
 pub const bn = @import("bn.zig");
+pub const standard = @import("standard.zig");
 
 // Phase 3: Enhanced core operations
 pub const field = @import("field.zig");

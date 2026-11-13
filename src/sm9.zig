@@ -43,6 +43,8 @@ pub const bigint = mod.bigint;
 pub const curve = mod.curve;
 pub const hash = mod.hash;
 pub const pairing = mod.pairing;
+pub const bn = mod.bn;
+pub const standard = mod.standard;
 
 // Phase 3: Enhanced core operations
 pub const field = mod.field;

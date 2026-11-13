@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 345 passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 348 passing
 
 ---
 
@@ -34,7 +34,7 @@
 | **Security** | 🟡 High | Secure memory zeroing covers the core SM2/SM9 key paths; remaining allocator paths still need an audit |
 | **Security** | 🟡 High | Authentication comparisons use constant-time helpers, but no automated constant-time analysis is in CI |
 | **Security** | 🔴 Critical | SM9 signature verification still accepts either the pairing check or the hash check; the pairing path needs correction before requiring both |
-| **Correctness** | 🔴 Critical | SM9 H1/H2/KDF and the new BN254 field/curve foundation match external vectors, but the legacy pairing/sign/encrypt path is not yet standards-compliant |
+| **Correctness** | 🟡 High | The new `sm9.standard` core matches external gmalg vectors; the legacy `sm9.sign`/`sm9.encrypt` entry points still use the old implementation |
 | **Versioning** | 🟡 High | Version is `0.0.0` — no semantic versioning or CHANGELOG |
 | **API** | 🟡 High | Inconsistent error handling and allocator patterns across modules |
 | **Testing** | 🟡 High | No fuzz testing, no property-based testing, no coverage reporting |
@@ -157,8 +157,10 @@
 
 #### 3.4 SM9 Enhancements
 - [x] Add a BN254 Fp/Fp2/Fp4/Fp12 and G1/G2 foundation validated against external SM9 vectors
-- [ ] Replace the legacy SM9 pairing with a standard R-ate/Tate pairing
-- [ ] Rewrite SM9 signature and encryption on the standard pairing
+- [x] Replace the legacy SM9 pairing with a standard R-ate/Tate pairing
+- [x] Implement the standard SM9 sign/verify/encrypt/decrypt core on the new pairing
+- [ ] Migrate the legacy `SM9Context`/`sign`/`encrypt` public APIs to the standard core
+- [ ] Cross-validate the standard core with the local GmSSL CLI/C implementation
 - [ ] Add batch signature verification
 - [x] Add key derivation (KDF with SM3)
 - [x] Add identity-based key agreement (already implemented, verify completeness)

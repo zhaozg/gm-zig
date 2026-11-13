@@ -102,3 +102,23 @@ Fp12 inversion/multiplication are checked for internal consistency.
 This module is a foundation, not yet a replacement for the legacy SM9 code.
 The R-ate/Tate pairing, signature, encryption, and key-extraction paths still
 need to be rebuilt on top of it and cross-validated with GmSSL/gmalg.
+
+## Standard SM9 core
+
+`src/sm9/standard.zig` implements GM/T 0044-2016 SM9 on top of the standard
+BN254 pairing:
+
+- master public keys: `P_pub-s = s*P2`, `P_pub-e = s*P1`;
+- user keys: `d_A = s/(H1(ID||hid)+s) * P1`, `d_B = s/(H1(ID||hid)+s) * P2`;
+- signature and verification using `e(P1, P_pub-s)`;
+- encryption/decryption using `e(P_pub-e, P2)` and `e(C1, d_B)`.
+
+The signature vector (ID "Alice", message "Chinese IBS standard", nonce
+`0x0123456789abcdef`) and the encryption `C1`/`C2` vector are checked against
+`gmalg` in `src/test/sm9_standard_test.zig`. Encryption `C3` uses the
+HMAC-SM3 construction used by GmSSL v3.
+
+Important: this standard core is **not yet wired into** the legacy
+`SM9Context`, `sign.zig`, or `encrypt.zig` entry points. Applications that call
+the old API still get the legacy non-standard behavior; use `sm9.standard`
+directly until the migration is complete.

@@ -139,7 +139,7 @@ test "SM9 KDF and H2 match external reference vectors" {
     const h2 = try sm9.hash.h2Hash("abc", &w, order, allocator);
     var h2_int: u256 = 0;
     for (h2) |b| h2_int = (h2_int << 8) | b;
-    try testing.expectEqual(@as(u256, 0x355f7a88a63c64b51ba0ae82eeba68bf74af178b64d132f9c76bcd6a2e9b396b), h2_int);
+    try testing.expectEqual(@as(u256, 0x1f38065a441763eb1fa47ad71046972ee65f8a8ba2ecbd2d2f2236561dfcfae9), h2_int);
 }
 
 // H1 first-block vector for ID = "Alice", hid = 0x01, computed with SM3.
@@ -153,5 +153,5 @@ test "SM9 H1 scalar follows the GM/T 0044-2016 H1 construction" {
     const h1 = try sm9.hash.h1Hash("Alice", 0x01, order, allocator);
     var h1_int: u256 = 0;
     for (h1) |b| h1_int = (h1_int << 8) | b;
-    try testing.expectEqual(@as(u256, 0x9c96d18bb8cd391021ac80a7ee9d7570d1242455f74ecc369e63c84cac40629a), h1_int);
+    try testing.expectEqual(@as(u256, 0x2acc468c3926b0bdb2767e99ff26e084de9ced8dbc7d5fbf418027b667862fab), h1_int);
 }

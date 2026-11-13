@@ -6,17 +6,6 @@ const constants = @import("constants.zig");
 const helpers = @import("helpers.zig");
 const SM3 = @import("../sm3.zig").SM3;
 
-fn reduceHashToScalar(hash: [32]u8, order: [32]u8) [32]u8 {
-    const n = std.mem.readInt(u256, &order, .big);
-    const value = std.mem.readInt(u256, &hash, .big) % (n - 1);
-    var out: [32]u8 = undefined;
-    std.mem.writeInt(u256, &out, value + 1, .big);
-    return out;
-}
-
-/// SM9 Hash Functions Implementation
-/// Provides H1, H2, and KDF functions as specified in GM/T 0044-2016
-/// Based on SM3 cryptographic hash function with improved maintainability
 /// Hash function errors
 pub const HashError = error{
     InvalidInput,
@@ -28,39 +17,39 @@ pub const HashError = error{
     KDFComputationFailed,
 };
 
-const SM9_Q_U256: u256 = 0xB640000002A3A6F1D603AB4FF58EC74521F2934B1A7AEEDBE56F9B27E351457D;
-const SQRT_EXP_U256: u256 = 0x16C80000005474DE3AC07569FEB1D8E8A43E5269634F5DDB7CADF364FC6A28B0;
-const SQRT_M1_U256: u256 = 0x49DB721A269967C4E0A8DEBC0783182F82555233139E9D63EFBD7B54092C756C;
-
-fn fpPowU256(base_in: u256, exp_in: u256) u256 {
-    var base = base_in;
-    var exp = exp_in;
-    var result: u256 = 1;
-    while (exp != 0) : (exp >>= 1) {
-        if (exp & 1 != 0) result = mulModU256(result, base);
-        base = mulModU256(base, base);
-    }
-    return result;
+fn reduceHashToScalar(hash40: [40]u8, order: [32]u8) [32]u8 {
+    const n = std.mem.readInt(u256, &order, .big);
+    const value: u256 = @intCast(std.mem.readInt(u320, &hash40, .big) % (n - 1));
+    var out: [32]u8 = undefined;
+    std.mem.writeInt(u256, &out, value + 1, .big);
+    return out;
 }
 
-fn mulModU256(a: u256, b: u256) u256 {
-    return @intCast((@as(u512, a) * b) % SM9_Q_U256);
-}
+fn hashToScalar(prefix: u8, part1: []const u8, part2: []const u8, order: [32]u8) [32]u8 {
+    var block1: [32]u8 = undefined;
+    var block2: [32]u8 = undefined;
 
-/// Test whether x is the x-coordinate of a point on E(Fp): y^2 = x^3 + 5.
-fn isValidG1X(x: [32]u8) bool {
-    const xv = std.mem.readInt(u256, &x, .big);
-    const x2 = mulModU256(xv, xv);
-    const x3 = mulModU256(x2, xv);
-    const rhs = (x3 + 5) % SM9_Q_U256;
-    const y = fpPowU256(rhs, SQRT_EXP_U256);
-    const y2 = mulModU256(y, y);
-    if (y2 == rhs) return true;
-    if (y2 == (SM9_Q_U256 - rhs) % SM9_Q_U256) {
-        const y_alt = mulModU256(y, SQRT_M1_U256);
-        return mulModU256(y_alt, y_alt) == rhs;
-    }
-    return false;
+    var h1 = SM3.init(.{});
+    h1.update(&[_]u8{prefix});
+    h1.update(part1);
+    h1.update(part2);
+    var ctr: [4]u8 = undefined;
+    mem.writeInt(u32, &ctr, 1, .big);
+    h1.update(&ctr);
+    block1 = h1.finalResult();
+
+    var h2 = SM3.init(.{});
+    h2.update(&[_]u8{prefix});
+    h2.update(part1);
+    h2.update(part2);
+    mem.writeInt(u32, &ctr, 2, .big);
+    h2.update(&ctr);
+    block2 = h2.finalResult();
+
+    var hash40: [40]u8 = undefined;
+    @memcpy(hash40[0..32], &block1);
+    @memcpy(hash40[32..40], block2[0..8]);
+    return reduceHashToScalar(hash40, order);
 }
 
 /// SM9 H1 hash function for key derivation
@@ -79,22 +68,10 @@ pub fn h1Hash(data: []const u8, hid: u8, order: [32]u8, allocator: std.mem.Alloc
         return HashError.InvalidInput;
     }
 
-    // GM/T 0044-2016 H1: SM3(hid || ID || ct_be32), then
-    // h = (hash mod (N - 1)) + 1, retrying until h is a valid G1 x-coordinate.
-    var counter: u32 = 1;
-    while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
-        var hasher = SM3.init(.{});
-        hasher.update(&[_]u8{hid});
-        hasher.update(data);
-        var counter_bytes: [4]u8 = undefined;
-        mem.writeInt(u32, &counter_bytes, counter, .big);
-        hasher.update(&counter_bytes);
-        const hash_result = hasher.finalResult();
-        const h = reduceHashToScalar(hash_result, order);
-        if (isValidG1X(h)) return h;
-    }
-
-    return HashError.FieldElementGenerationFailed;
+    // GM/T 0044-2016 H1: SM3(0x01 || ID || hid || ct_be32), then
+    // h = (hash40 mod (N - 1)) + 1. The 40-byte output is required by GM/T 0044-2016.
+    // A 40-byte hash (5 * log2(N) / 8) is reduced to [1, N-1].
+    return hashToScalar(0x01, data, &[_]u8{hid}, order);
 }
 
 /// SM9 H2 hash function for signature and encryption
@@ -114,20 +91,7 @@ pub fn h2Hash(message: []const u8, additional_data: []const u8, order: [32]u8, a
 
     // GM/T 0044-2016 H2: SM3(0x02 || Z || ct_be32), then
     // h = (hash mod (N - 1)) + 1.
-    var counter: u32 = 1;
-    while (counter <= constants.Limits.MAX_HASH_COUNTER) : (counter += 1) {
-        var hasher = SM3.init(.{});
-        hasher.update(&[_]u8{0x02});
-        hasher.update(message);
-        hasher.update(additional_data);
-        var counter_bytes: [4]u8 = undefined;
-        mem.writeInt(u32, &counter_bytes, counter, .big);
-        hasher.update(&counter_bytes);
-        const hash_result = hasher.finalResult();
-        return reduceHashToScalar(hash_result, order);
-    }
-
-    return HashError.FieldElementGenerationFailed;
+    return hashToScalar(0x02, message, additional_data, order);
 }
 
 /// SM9 Key Derivation Function (KDF)

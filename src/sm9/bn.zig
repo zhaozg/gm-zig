@@ -9,7 +9,7 @@ pub const Fp4 = struct { c1: Fp2, c0: Fp2 }; // c1*v + c0, v^2 = u
 pub const Fp12 = struct { c2: Fp4, c1: Fp4, c0: Fp4 }; // c2*w^2+c1*w+c0, w^3=v
 
 pub const P: Fp = 0xB640000002A3A6F1D603AB4FF58EC74521F2934B1A7AEEDBE56F9B27E351457D;
-pub const N: Fp = 0xB640000002A3A6F1D603AB4FF58EC74449F2934B1A8EA8BEEE56EE19CD69ECF25;
+pub const N: Fp = 0xB640000002A3A6F1D603AB4FF58EC74449F2934B18EA8BEEE56EE19CD69ECF25;
 pub const T: u64 = 0x600000000058F98A;
 
 pub const G1 = struct { x: Fp, y: Fp };
@@ -257,6 +257,9 @@ fn f4ByV(a: Fp4) Fp4 {
 pub fn f4Eq(a: Fp4, b: Fp4) bool {
     return f2Eq(a.c1, b.c1) and f2Eq(a.c0, b.c0);
 }
+pub fn f4IsZero(a: Fp4) bool {
+    return a.c1.c1 == 0 and a.c1.c0 == 0 and a.c0.c1 == 0 and a.c0.c0 == 0;
+}
 
 pub fn f12Zero() Fp12 {
     return .{ .c2 = f4Zero(), .c1 = f4Zero(), .c0 = f4Zero() };
@@ -291,4 +294,8 @@ pub fn f12Inv(a: Fp12) Fp12 {
 }
 pub fn f12Eq(a: Fp12, b: Fp12) bool {
     return f4Eq(a.c2, b.c2) and f4Eq(a.c1, b.c1) and f4Eq(a.c0, b.c0);
+}
+
+pub fn g1OnCurve(p: G1) bool {
+    return mul(p.y, p.y) == add(mul(mul(p.x, p.x), p.x), 5);
 }
