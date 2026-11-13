@@ -2,30 +2,29 @@
 
 [![CI](https://github.com/zhaozg/gm-zig/workflows/CI/badge.svg)](https://github.com/zhaozg/gm-zig/actions)
 [![Zig Version](https://img.shields.io/badge/zig-0.16.0+-blue.svg)](https://ziglang.org/download/)
-[![License](https://img.shields.io/github/license/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig/blob/main/LICENSE)
 [![Repository Size](https://img.shields.io/github/repo-size/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig)
 [![Last Commit](https://img.shields.io/github/last-commit/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig/commits/main)
 [![Issues](https://img.shields.io/github/issues/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig/issues)
 [![Pull Requests](https://img.shields.io/github/issues-pr/zhaozg/gm-zig)](https://github.com/zhaozg/gm-zig/pulls)
 
-A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) algorithms in Zig programming language.
+An implementation of the Chinese National Cryptographic Standards (GM/T) algorithms in Zig.
 
 ## 📋 Implementation Status
 
-**Current Project Status:**
+This is a work-in-progress implementation intended for study, prototyping, and integration work. It has not been independently audited and is not production-ready.
 
-- **ZUC, SM2, SM3, SM4**: Implementation complete with comprehensive test coverage
-- **SM9**: Implementation complete, all standard test vectors passing
-- **Test Status**: All 276 tests passing
-- **Standards Compliance**: Implementations follow Chinese National Standards (GM/T)
+- **ZUC, SM2, SM3, SM4, SM9**: Implemented and covered by the test suite. The SM9 tests include GM/T 0044-2016 known-answer and compliance cases.
+- **Tests**: `zig build test` currently passes on Zig 0.16.0 and 0.17.1 (328 tests in this checkout). Passing tests do not imply complete standards conformance or security.
+- **Standards**: The code follows the GM/T specifications where implemented, but no third-party conformance or security certification has been performed.
+- **Known gaps**: See [ROADMAP.md](ROADMAP.md) for open security hardening, constant-time verification, fuzzing, and API cleanup work.
 
-Note: While implementations are complete and tested, users should evaluate suitability for their specific use cases and security requirements.
+Do not use this library to protect production secrets without an independent security review.
 
 ## 📖 Description
 
 GM-Zig is an implementation of the Guomi (国密) cryptographic algorithms specified in the Chinese National Standards. This library provides implementations of SM2, SM3, SM4, SM9, and ZUC algorithms based on their respective standards.
 
-The library leverages Zig's compile-time safety guarantees and focuses on memory safety and constant-time implementations where applicable to help prevent timing attacks.
+The code uses Zig's compile-time checks and, in some paths, constant-time comparison and selection helpers. Those properties are not systematically verified across the library; see [ROADMAP.md](ROADMAP.md).
 
 ## ✨ Features
 
@@ -39,11 +38,10 @@ The library leverages Zig's compile-time safety guarantees and focuses on memory
   - Key exchange protocol (GM/T 0003.3-2012)
   - Public key encryption algorithm (GM/T 0003.4-2012)
   - ASN.1 DER encoding/decoding support
-  - Comprehensive key management utilities
+  - Key pair generation and encoding helpers
 
 - **🔗 SM3 Cryptographic Hash Function**
   - 256-bit hash output (GM/T 0004-2012)
-  - High-performance implementation
   - HMAC support
   - Streaming hash computation
 
@@ -58,11 +56,12 @@ The library leverages Zig's compile-time safety guarantees and focuses on memory
   - T-table optimization
   - Performance varies by operation mode and system configuration
 
-- **⚡ Performance & Security Features**
-  - Memory-safe implementations
-  - Constant-time operations for cryptographic primitives
-  - Secure memory clearing
-  - Comprehensive test coverage
+- **⚡ Implementation and Testing Notes**
+  - Written in Zig and built with runtime safety checks in Debug and ReleaseSafe modes
+  - Benchmarks are available via `zig build bench`; no comparison against other implementations is made here
+  - Some primitives use constant-time comparison or selection; coverage is not independently verified
+  - Selective secure clearing exists (notably in SM9 helpers), but it does not yet cover all key material
+  - Test suite includes standard vectors, round trips, and negative cases
 
 ## 🚀 Quick Start
 
@@ -70,6 +69,8 @@ The library leverages Zig's compile-time safety guarantees and focuses on memory
 
 - Zig 0.16.x or 0.17.x
 - Git (for cloning the repository)
+
+Benchmarks use zBench 0.13.0 on Zig 0.16.x and zBench 0.15.0 on Zig 0.17.x; `build.zig` selects the version automatically.
 
 ### Installation
 
@@ -227,6 +228,8 @@ zig build bench -- --list --filter ZUC
 > - `-f, --filter <pattern>` - Run only benchmarks whose name contains the given pattern
 > - `-l, --list` - List all available benchmarks (optionally filtered)
 > - `-h, --help` - Show help message
+>
+> On Zig 0.16.x these can be passed through `zig build bench -- ...`. On Zig 0.17.x the build system does not forward `--` arguments to the benchmark step, so run the installed binary directly instead: `./zig-out/bin/bench --list`.
 
 ## 📚 API Documentation
 
@@ -484,14 +487,14 @@ This project builds upon the foundation of cryptographic research and standards 
 - Security researchers who emphasize the importance of constant-time implementations
 
 **Special Recognition**:
-- Glory to Copilot, Claude, DeepSeek-R1 and Qwen3 for their invaluable assistance in the development and refinement of this cryptographic library
-- This release's security enhancements were developed with a focus on timing attack prevention and secure coding practices, establishing a solid foundation for production cryptographic use
+- Glory to Copilot, Claude, DeepSeek-R1 and Qwen3 for their assistance in the development and refinement of this cryptographic library
+- The security-related work in this repository is not a substitute for independent review or certification
 
 ---
 
 ## 📜 License
 
-This project is licensed under the terms specified in the LICENSE file. Please review the license before using this library in your projects.
+No LICENSE file is currently included in this repository. Add an explicit license before redistributing or using this code in a product.
 
 ## 🔗 Links
 
@@ -499,20 +502,3 @@ This project is licensed under the terms specified in the LICENSE file. Please r
 - [Chinese Cryptographic Standards](http://www.gmbz.org.cn/)
 - [Project Issues](https://github.com/zhaozg/gm-zig/issues)
 - [Project Wiki](https://github.com/zhaozg/gm-zig/wiki)
-
----
-
-## 📈 Recent Achievements (September 2025)
-
-**Latest Achievement** - Complete GM/T Implementation:
-- ✅ **SM9 Implementation**: All cryptographic operations fully functional and tested
-- ✅ **GM/T 0044-2016 Compliance**: Full standards adherence achieved for all algorithms
-- ✅ **Production Ready**: All algorithms (SM2, SM3, SM4, SM9) ready for production deployment
-- ✅ **Standards Compliance**: Complete adherence to Chinese National Cryptographic Standards
-
-**Implementation Foundation**:
-- ✅ **Complete Test Coverage**: Comprehensive test suite with all cryptographic operations validated
-- ✅ **Code Quality**: Well-structured, maintainable codebase
-- ✅ **Documentation**: Complete technical documentation and implementation guides
-
-This release provides a complete, production-ready implementation of all Chinese National Cryptographic Standards.

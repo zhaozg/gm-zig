@@ -40,7 +40,9 @@ pub fn build(b: *std.Build) void {
 
     if (target.result.cpu.arch == .wasm32) {
         exe.rdynamic = true;
-        exe.is_linking_libc = false;
+        // `is_linking_libc` was removed from Compile in Zig 0.17; setting the
+        // module option works across 0.16 and 0.17.
+        exe.root_module.link_libc = false;
         exe.root_module.single_threaded = true;
     }
 
@@ -69,8 +71,10 @@ pub fn build(b: *std.Build) void {
     // 确保所有测试都运行
     test_step.dependOn(&run_tests.step);
 
-    // Add bench tool using zbench
-    const zbench_dep = b.dependency("zbench", .{
+    // Add bench tool using zbench.
+    // zBench 0.15 requires Zig 0.17+; 0.16.x uses the last compatible release.
+    const zbench_dep_name = if (builtin.zig_version.minor >= 17) "zbench_017" else "zbench_016";
+    const zbench_dep = b.dependency(zbench_dep_name, .{
         .target = target,
         .optimize = optimize,
     });
@@ -87,12 +91,14 @@ pub fn build(b: *std.Build) void {
         .name = "bench",
         .root_module = bench_mod,
     });
-    // zbench requires Zig 0.17+; on 0.16.x only build the bench step on demand
-    if (comptime builtin.zig_version.minor >= 17) {
-        b.installArtifact(bench_exe);
-    }
+    b.installArtifact(bench_exe);
 
     const bench_cmd = b.addRunArtifact(bench_exe);
+    // `Build.args` was removed in Zig 0.17; keep the 0.16 handoff so
+    // `zig build bench -- --filter ...` reaches the benchmark program.
+    if (comptime builtin.zig_version.minor < 17) {
+        if (b.args) |args| bench_cmd.addArgs(args);
+    }
     bench_cmd.step.dependOn(b.getInstallStep());
 
     const bench_step = b.step("bench", "Run zbench performance benchmarks");

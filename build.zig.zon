@@ -6,9 +6,15 @@
     .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
-        .zbench = .{
-            .url = "https://github.com/hendriknielaender/zBench/archive/refs/tags/v0.14.1.tar.gz",
-            .hash = "zbench-0.14.1-YTdc781OAQCR6wxqkgAwm9bG4TnFGzm8c9aE-ZPiTAU1",
+        // zBench 0.15 requires Zig 0.17+. Keep a 0.16-compatible version for
+        // the 0.16.x build matrix; build.zig selects one by Zig version.
+        .zbench_016 = .{
+            .url = "https://github.com/hendriknielaender/zBench/archive/refs/tags/v0.13.0.tar.gz",
+            .hash = "zbench-0.13.0-YTdc7xVBAQCCMC-IdLLuotBeiNNNm8k9Pi2V4VYqrwfI",
+        },
+        .zbench_017 = .{
+            .url = "https://github.com/hendriknielaender/zBench/archive/refs/tags/v0.15.0.tar.gz",
+            .hash = "zbench-0.15.0-YTdc77dOAQAb4XlsyLbAG1h5Jtcl4jtVhiTKL-16vTfo",
         },
     },
 

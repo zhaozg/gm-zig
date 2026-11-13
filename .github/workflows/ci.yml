@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        zig-version: ['0.16.0', 'master']
+        zig-version: ['0.16.0', '0.17.1']
 
     steps:
     - uses: actions/checkout@v4
