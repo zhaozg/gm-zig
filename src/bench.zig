@@ -5,7 +5,6 @@ const sm3_bench = @import("bench/sm3.zig");
 const sm4_bench = @import("bench/sm4.zig");
 const zuc_bench = @import("bench/zuc.zig");
 const sm2_bench = @import("bench/sm2.zig");
-const sm9_bench = @import("bench/sm9.zig");
 
 pub fn main(init: std.process.Init) !void {
     const allocator = init.gpa;
@@ -226,16 +225,4 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     try bench.add("SM2 enc med    ", sm2_bench.benchSm2EncryptMedium, .{});
     try bench.add("SM2 dec small  ", sm2_bench.benchSm2DecryptSmall, .{});
     try bench.add("SM2 dec med    ", sm2_bench.benchSm2DecryptMedium, .{});
-
-    // SM9 benchmarks
-    try bench.add("SM9 ext sign   ", sm9_bench.benchSm9ExtractSignKey, .{});
-    try bench.add("SM9 ext enc    ", sm9_bench.benchSm9EncryptSmall, .{});
-    try bench.add("SM9 sign small ", sm9_bench.benchSm9SignSmall, .{});
-    try bench.add("SM9 sign med   ", sm9_bench.benchSm9SignMedium, .{});
-    try bench.add("SM9 verify sml ", sm9_bench.benchSm9VerifySmall, .{});
-    try bench.add("SM9 verify med ", sm9_bench.benchSm9VerifyMedium, .{});
-    try bench.add("SM9 enc small  ", sm9_bench.benchSm9EncryptSmall, .{});
-    try bench.add("SM9 enc med    ", sm9_bench.benchSm9EncryptMedium, .{});
-    try bench.add("SM9 dec small  ", sm9_bench.benchSm9DecryptSmall, .{});
-    try bench.add("SM9 dec med    ", sm9_bench.benchSm9DecryptMedium, .{});
 }

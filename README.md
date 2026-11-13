@@ -14,7 +14,7 @@ An implementation of the Chinese National Cryptographic Standards (GM/T) algorit
 This is a work-in-progress implementation intended for study, prototyping, and integration work. It has not been independently audited and is not production-ready.
 
 - **ZUC, SM2, SM3, SM4, SM9**: Implemented and covered by the test suite. The SM9 tests include GM/T 0044-2016 known-answer and compliance cases.
-- **Tests**: `zig build test` currently passes on Zig 0.16.0 and 0.17.1 (349 tests in this checkout). Passing tests do not imply complete standards conformance or security.
+- **Tests**: `zig build test` currently passes on Zig 0.16.0 and 0.17.1 (180 tests in this checkout). Passing tests do not imply complete standards conformance or security.
 - **Standards**: The code follows the GM/T specifications where implemented, but no third-party conformance or security certification has been performed.
 - **Known gaps**: See [ROADMAP.md](ROADMAP.md) for open security hardening, constant-time verification, fuzzing, and API cleanup work. Current security properties and limitations are summarized in [docs/security.md](docs/security.md).
 
@@ -149,53 +149,39 @@ pub fn main() !void {
 ```zig
 const std = @import("std");
 const sm9 = @import("gmlib").sm9;
+const bn = sm9.bn;
 
-pub fn testSM9Implementation() !void {
+pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // SM9 Identity-Based Cryptography
-    // Implementation based on GM/T 0044-2016
+    const sign_master = sm9.standard.signMaster(1);
+    const encrypt_master = sm9.standard.encryptMaster(2);
 
-    // Initialize SM9 system
-    const params = sm9.params.SystemParams.init();
+    const alice_id = "alice@example.com";
+    const bob_id = "bob@example.com";
+    const message = "SM9 standard message";
 
-    // Core SM9 Operations
-    const a = [_]u8{0} ** 31 ++ [_]u8{3};
-    const p = params.q;
+    const alice_sign_key = try sm9.standard.signUserKey(allocator, sign_master, alice_id);
+    const bob_encrypt_key = try sm9.standard.encryptUserKey(allocator, encrypt_master, bob_id);
 
-    if (sm9.field.modularInverseBinaryEEA(a, p)) |inv_a| {
-        // Verify a * inv_a ≡ 1 (mod p)
-        const product = try sm9.bigint.mulMod(a, inv_a, p);
-        const one = [_]u8{0} ** 31 ++ [_]u8{1};
-        std.debug.print("Modular inverse correct: {}\n", .{sm9.bigint.equal(product, one)});
-    } else |_| {
-        // Handle error case
-    }
+    const nonce: bn.Fp = 0x123456789abcdef;
+    const signature = try sm9.standard.sign(
+        allocator, message, alice_sign_key, sign_master.public_key, nonce,
+    );
+    const ok = try sm9.standard.verify(
+        allocator, message, signature, alice_id, sign_master.public_key,
+    );
 
-    // Random Number Generation
-    var rng = sm9.random.SecureRandom.init();
-    const random_scalar = try rng.randomScalar(params);
-    std.debug.print("Generated random scalar\n", .{});
-
-    // Point Operations
-    const x = [_]u8{0x01} ++ [_]u8{0} ** 31;
-    const y = [_]u8{0x02} ++ [_]u8{0} ** 31;
-    const point = sm9.curve.G1Point.affine(x, y);
-
-    // Point compression/decompression
-    const compressed = point.compress();
-    const decompressed = try sm9.curve.G1Point.fromCompressed(compressed);
-    std.debug.print("Point operations successful\n", .{});
-
-    // Pairing operations
-    const q_x = [_]u8{0x03} ++ [_]u8{0} ** 63;
-    const q_y = [_]u8{0x04} ++ [_]u8{0} ** 63;
-    const Q = sm9.curve.G2Point.affine(q_x, q_y);
-
-    const pairing_result = try sm9.pairing.pairing(point, Q, params);
-    std.debug.print("Pairing computation successful\n", .{});
+    const ciphertext = try sm9.standard.encrypt(
+        allocator, message, bob_id, encrypt_master.public_key, nonce,
+    );
+    defer allocator.free(ciphertext.C2);
+    const plaintext = try sm9.standard.decrypt(
+        allocator, ciphertext, bob_id, bob_encrypt_key,
+    );
+    defer allocator.free(plaintext);
 }
 ```
 

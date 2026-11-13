@@ -302,149 +302,44 @@ fn WasmRng() void {
 }
 
 fn demonstrateSM9(io: std.Io, allocator: std.mem.Allocator) !void {
-    print("1. Initializing SM9 Complete Implementation...\n", .{});
+    _ = io;
+    const std_sm9 = sm9.standard;
+    const bn = sm9.bn;
 
-    // Initialize SM9 system with proper parameters
-    const system = sm9.params.SM9System.init();
-    print("   ✅ SM9 system initialized with GM/T 0044-2016 parameters\n", .{});
+    print("=== SM9 (GM/T 0044-2016) Standard Demo ===\n", .{});
 
-    // Initialize contexts for key extraction, signing, and encryption
-    const key_context = sm9.key_extract.KeyExtractionContext.init(system, io, allocator);
-    const sign_context = sm9.sign.SignatureContext.init(system, io, allocator);
-    const encrypt_context = sm9.encrypt.EncryptionContext.init(system, io, allocator);
+    const sign_master = std_sm9.signMaster(1);
+    const encrypt_master = std_sm9.encryptMaster(2);
+    print("SM9 master keys initialized\n", .{});
 
-    // Demo users following standard format
-    const alice_id = "Alice@bupt.edu.cn";
-    const bob_id = "Bob@bupt.edu.cn";
-    const message = "Hello from SM9 Phase 4 complete implementation!";
+    const alice_id = "Alice@example.com";
+    const bob_id = "Bob@example.com";
+    const message = "Hello from the standard SM9 implementation!";
+    const nonce: bn.Fp = 0x123456789abcdef;
 
-    print("   👥 Users: {s} and {s}\n", .{ alice_id, bob_id });
-    print("   📝 Message: {s}\n", .{message});
+    const alice_sign_key = try std_sm9.signUserKey(allocator, sign_master, alice_id);
+    const bob_encrypt_key = try std_sm9.encryptUserKey(allocator, encrypt_master, bob_id);
+    print("Extracted Alice signing key and Bob decryption key\n", .{});
 
-    print("2. Enhanced Key Extraction...\n", .{});
+    const signature = try std_sm9.sign(allocator, message, alice_sign_key, sign_master.public_key, nonce);
+    const verified = try std_sm9.verify(allocator, message, signature, alice_id, sign_master.public_key);
+    print("SM9 signature verified: {}\n", .{verified});
 
-    const alice_sign_key = try key_context.extractSignKey(alice_id);
-    const alice_encrypt_key = try key_context.extractEncryptKey(alice_id);
-    const bob_sign_key = try key_context.extractSignKey(bob_id);
-    const bob_encrypt_key = try key_context.extractEncryptKey(bob_id);
+    const ciphertext = try std_sm9.encrypt(allocator, message, bob_id, encrypt_master.public_key, nonce);
+    defer allocator.free(ciphertext.C2);
+    const decrypted = try std_sm9.decrypt(allocator, ciphertext, bob_id, bob_encrypt_key);
+    defer allocator.free(decrypted);
+    print("SM9 encryption/decryption: {s}\n", .{decrypted});
 
-    print("   ✅ Alice signing key: {} (hid={})\n", .{ alice_sign_key.key[0], alice_sign_key.hid });
-    print("   ✅ Alice encryption key: {} (hid={})\n", .{ alice_encrypt_key.key[0], alice_encrypt_key.hid });
-    print("   ✅ Bob signing key: {} (hid={})\n", .{ bob_sign_key.key[0], bob_sign_key.hid });
-    print("   ✅ Bob encryption key: {} (hid={})\n", .{ bob_encrypt_key.key[0], bob_encrypt_key.hid });
-
-    print("3. Enhanced Digital Signatures...\n", .{});
-
-    // Alice signs message with enhanced algorithm
-    const alice_signature = try sign_context.sign(message, alice_sign_key, .{});
-    print("   ✅ Alice created signature (h={x:02}, S={})\n", .{ alice_signature.h[0], alice_signature.S[0] });
-
-    // Demonstrate DER encoding
-    const der_encoded = try alice_signature.toDER(allocator);
-    defer allocator.free(der_encoded);
-    print("   ✅ DER encoded signature: {} bytes\n", .{der_encoded.len});
-
-    // Verify DER roundtrip
-    const der_decoded = try sm9.sign.Signature.fromDER(der_encoded);
-    const roundtrip_ok = std.mem.eql(u8, &alice_signature.h, &der_decoded.h) and
-        std.mem.eql(u8, &alice_signature.S, &der_decoded.S);
-    print("   ✅ DER roundtrip successful: {}\n", .{roundtrip_ok});
-
-    // Bob verifies Alice's signature
-    const alice_sig_valid = try sign_context.verify(message, alice_signature, alice_id, .{});
-    print("   ✅ Bob verified Alice's signature: {}\n", .{alice_sig_valid});
-
-    // Cross-user verification
-    const bob_signature = try sign_context.sign(message, bob_sign_key, .{});
-    const bob_sig_valid = try sign_context.verify(message, bob_signature, bob_id, .{});
-    print("   ✅ Alice verified Bob's signature: {}\n", .{bob_sig_valid});
-
-    print("4. Enhanced Public Key Encryption...\n", .{});
-
-    // Alice encrypts for Bob
-    const ciphertext_for_bob = try encrypt_context.encrypt(message, bob_id, .{});
-    defer ciphertext_for_bob.deinit();
-    print("   ✅ Alice encrypted for Bob: C1={}, C2={} bytes, C3={x:02}\n", .{ ciphertext_for_bob.c1[0], ciphertext_for_bob.c2.len, ciphertext_for_bob.c3[0] });
-
-    // Bob decrypts Alice's message
-    const decrypted_by_bob = try encrypt_context.decrypt(ciphertext_for_bob, bob_encrypt_key, .{});
-    defer allocator.free(decrypted_by_bob);
-    const decryption_success = std.mem.eql(u8, message, decrypted_by_bob);
-    print("   ✅ Bob decrypted successfully: {}\n", .{decryption_success});
-    print("   📄 Decrypted message: {s}\n", .{decrypted_by_bob});
-
-    // Test alternative ciphertext format
-    const ciphertext_alt = try encrypt_context.encrypt(message, alice_id, .{ .format = .c1_c2_c3 });
-    defer ciphertext_alt.deinit();
-    const decrypted_alt = try encrypt_context.decrypt(ciphertext_alt, alice_encrypt_key, .{});
-    defer allocator.free(decrypted_alt);
-    const alt_success = std.mem.eql(u8, message, decrypted_alt);
-    print("   ✅ Alternative format encryption: {}\n", .{alt_success});
-
-    print("5. Key Encapsulation Mechanism (KEM)...\n", .{});
-
-    const kem_context = sm9.encrypt.KEMContext.init(encrypt_context);
-    const key_encapsulation = try kem_context.encapsulate(bob_id, 32);
-    defer key_encapsulation.deinit();
-    print("   ✅ Generated encapsulated key: {} bytes\n", .{key_encapsulation.key.len});
-
-    const decapsulated_key = try kem_context.decapsulate(key_encapsulation.encapsulation, bob_encrypt_key);
-    defer allocator.free(decapsulated_key);
-    const kem_success = std.mem.eql(u8, key_encapsulation.key, decapsulated_key);
-    print("   ✅ Key decapsulation successful: {}\n", .{kem_success});
-
-    print("6. Advanced Cryptographic Features...\n", .{});
-
-    // Test enhanced hash functions
-    const h1_result = try sm9.hash.h1Hash(alice_id, 0x01, system.params.N, allocator);
-    const h2_result = try sm9.hash.h2Hash(message, "additional_data", system.params.N, allocator);
-    print("   ✅ H1 hash: {x:02}... (non-zero: {})\n", .{ h1_result[0], !sm9.bigint.isZero(h1_result) });
-    print("   ✅ H2 hash: {x:02}... (non-zero: {})\n", .{ h2_result[0], !sm9.bigint.isZero(h2_result) });
-
-    // Test secure KDF
-    const kdf_output = try sm9.hash.kdf("KDF_test_input", 64, allocator);
-    defer allocator.free(kdf_output);
-    var kdf_nonzero = false;
-    for (kdf_output) |byte| {
-        if (byte != 0) {
-            kdf_nonzero = true;
-            break;
-        }
-    }
-    print("   ✅ KDF output: {} bytes (non-zero: {})\n", .{ kdf_output.len, kdf_nonzero });
-
-    // Test enhanced curve operations
-    const test_scalar = sm9.bigint.fromU64(123456789);
-    const g1_key = sm9.curve.CurveUtils.deriveG1Key(test_scalar, alice_id, system.params.P1[1..33].*, system.params);
-    const g2_key = sm9.curve.CurveUtils.deriveG2Key(test_scalar, alice_id, system.params.P2[1..65].*, system.params);
-    print("   ✅ G1 key derivation: {} format\n", .{g1_key[0]});
-    print("   ✅ G2 key derivation: {} format\n", .{g2_key[0]});
-
-    print("7. Comprehensive Security Validation...\n", .{});
-
-    // Validate all generated keys
-    const keys_valid = alice_sign_key.validate(system.params) and
-        alice_encrypt_key.validate(system.params) and
-        bob_sign_key.validate(system.params) and
-        bob_encrypt_key.validate(system.params);
-    print("   ✅ All extracted keys valid: {}\n", .{keys_valid});
-
-    // Validate signatures
-    const sigs_valid = alice_signature.validate() and bob_signature.validate();
-    print("   ✅ All signatures valid: {}\n", .{sigs_valid});
-
-    // Validate ciphertexts
-    const ciphers_valid = ciphertext_for_bob.validate() and ciphertext_alt.validate();
-    print("   ✅ All ciphertexts valid: {}\n", .{ciphers_valid});
-
-    // System parameters validation
-    const params_valid = system.params.validate();
-    print("   ✅ System parameters valid: {}\n", .{params_valid});
-
-    print("8. SM9 Demo Summary...\n", .{});
-    print("   🎉 SM9 Phase 4 Complete Implementation Demo Successful!\n", .{});
-    print("   📋 GM/T 0044-2016 Standard Compliance: VERIFIED\n", .{});
-    print("   🔒 Security Features: ENABLED\n", .{});
-    print("   ⚡ Advanced Features: FUNCTIONAL\n", .{});
-    print("   🏭 Production Readiness: ACHIEVED\n", .{});
+    const r_a: bn.Fp = 0x1111111111111111;
+    const r_b: bn.Fp = 0x2222222222222222;
+    const sk_a = try std_sm9.encryptUserKey(allocator, encrypt_master, alice_id);
+    const sk_b = try std_sm9.encryptUserKey(allocator, encrypt_master, bob_id);
+    const ra = try std_sm9.keyExchangeBegin(allocator, encrypt_master.public_key, bob_id, r_a);
+    const rb = try std_sm9.keyExchangeBegin(allocator, encrypt_master.public_key, alice_id, r_b);
+    const ka = try std_sm9.keyExchangeShared(allocator, encrypt_master.public_key, sk_a, alice_id, bob_id, r_a, ra, rb, .initiator, 32);
+    defer allocator.free(ka);
+    const kb = try std_sm9.keyExchangeShared(allocator, encrypt_master.public_key, sk_b, bob_id, alice_id, r_b, rb, ra, .responder, 32);
+    defer allocator.free(kb);
+    print("SM9 key agreement matched: {}\n", .{std.mem.eql(u8, ka, kb)});
 }

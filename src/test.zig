@@ -8,32 +8,10 @@ test {
     _ = @import("test/sm2_key_exchange_test.zig");
     _ = @import("test/secure_test.zig");
 
-    // ZUC
     _ = @import("zuc.zig");
 
-    // Standard BN254 field/curve foundation
     _ = @import("sm9/bn.zig");
     _ = @import("sm9/pairing_bn.zig");
+    _ = @import("sm9/hash.zig");
     _ = @import("test/sm9_standard_test.zig");
-
-    // SM9 Test Suite
-    _ = @import("test/sm9_key_extract_test.zig");
-    _ = @import("test/sm9_params_test.zig");
-    _ = @import("test/sm9_field_test.zig");
-    _ = @import("test/sm9_curve_test.zig");
-    _ = @import("test/sm9_random_test.zig");
-    _ = @import("test/sm9_security_test.zig");
-    _ = @import("test/sm9_sign_test.zig");
-    _ = @import("test/sm9_mod_test.zig");
-    _ = @import("test/sm9_implementation_test.zig");
-    _ = @import("test/sm9_encrypt_test.zig");
-    _ = @import("test/sm9_key_agreement_test.zig");
-    _ = @import("test/sm9_pairing_test.zig");
-    _ = @import("test/sm9_standard_vectors_test.zig");
-    _ = @import("test/sm9_robustness_test.zig");
-    _ = @import("test/sm9_standard_compliance_test.zig");
-    _ = @import("test/sm9_core_algorithms_test.zig");
-    _ = @import("test/kdf_compliance_test.zig");
-    _ = @import("test/gmt_0044_2016_compliance_test.zig");
-    _ = @import("test/sm9_reference_compliance_test.zig");
 }

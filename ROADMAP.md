@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 349 passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 180 passing
 
 ---
 
@@ -33,8 +33,7 @@
 |----------|----------|-------|
 | **Security** | 🟡 High | Secure memory zeroing covers the core SM2/SM9 key paths; remaining allocator paths still need an audit |
 | **Security** | 🟡 High | Authentication comparisons use constant-time helpers, but no automated constant-time analysis is in CI |
-| **Security** | 🔴 Critical | SM9 signature verification still accepts either the pairing check or the hash check; the pairing path needs correction before requiring both |
-| **Correctness** | 🟡 High | The new `sm9.standard` core matches external gmalg vectors; the legacy `sm9.sign`/`sm9.encrypt` entry points still use the old implementation |
+| **Correctness** | 🟡 High | The `sm9.standard` core matches external gmalg vectors; broader GmSSL CLI interop and more boundary vectors remain |
 | **Versioning** | 🟡 High | Version is `0.0.0` — no semantic versioning or CHANGELOG |
 | **API** | 🟡 High | Inconsistent error handling and allocator patterns across modules |
 | **Testing** | 🟡 High | No fuzz testing, no property-based testing, no coverage reporting |
@@ -160,7 +159,7 @@
 - [x] Replace the legacy SM9 pairing with a standard R-ate/Tate pairing
 - [x] Implement the standard SM9 sign/verify/encrypt/decrypt core on the new pairing
 - [x] Implement standard SM9 key agreement on the new core
-- [ ] Remove the legacy `SM9Context`/`sign`/`encrypt` public APIs and their tests
+- [x] Remove the legacy `SM9Context`/`sign`/`encrypt` public APIs and their tests
 - [ ] Cross-validate the standard core with the local GmSSL CLI/C implementation
 - [ ] Add batch signature verification
 - [x] Add key derivation (KDF with SM3)

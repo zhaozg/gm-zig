@@ -6,8 +6,6 @@ const sm4 = @import("../sm4.zig");
 const zuc = @import("../zuc.zig");
 const kp = @import("../sm2/keypair.zig");
 const key_exchange = @import("../sm2/key_exchange.zig");
-const key_extract = @import("../sm9/key_extract.zig");
-const key_agreement = @import("../sm9/key_agreement.zig");
 
 const test_key = [_]u8{
     0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
@@ -76,31 +74,4 @@ test "ZUC_AEAD.zeroize clears the stored key and IV" {
     ctx.zeroize();
     try testing.expect(std.mem.allEqual(u8, &ctx.key, 0));
     try testing.expect(std.mem.allEqual(u8, &ctx.iv, 0));
-}
-
-test "SM9 private key structures zeroize their key material" {
-    var sign_key = key_extract.SignUserPrivateKey{
-        .id = "secure-test",
-        .key = @as([33]u8, @splat(0x11)),
-        .hid = 0x01,
-    };
-    sign_key.zeroize();
-    try testing.expect(std.mem.allEqual(u8, &sign_key.key, 0));
-
-    var encrypt_key = key_extract.EncryptUserPrivateKey{
-        .id = "secure-test",
-        .key = @as([65]u8, @splat(0x22)),
-        .hid = 0x03,
-    };
-    encrypt_key.zeroize();
-    try testing.expect(std.mem.allEqual(u8, &encrypt_key.key, 0));
-}
-
-test "SM9 ephemeral key zeroize clears the private scalar" {
-    var pair = key_agreement.EphemeralKeyPair{
-        .private_key = @as([32]u8, @splat(0x33)),
-        .public_key = @as([33]u8, @splat(0x44)),
-    };
-    pair.zeroize();
-    try testing.expect(std.mem.allEqual(u8, &pair.private_key, 0));
 }

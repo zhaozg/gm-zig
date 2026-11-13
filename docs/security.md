@@ -78,48 +78,17 @@ on the roadmap.
 
 ## SM9 correctness status
 
-The SM9 H1, H2, and KDF helpers in `src/sm9/hash.zig` now follow the
-GM/T 0044-2016 construction and are checked against independently generated
-vectors:
+The SM9 implementation is now the standard BN254 implementation only; the old
+simplified curve/pairing/sign/encrypt code has been removed.
 
-- H1: `SM3(hid || ID || ct_be32)`, `(hash mod (N-1)) + 1`, with the G1
-  x-coordinate validity retry.
-- H2: `SM3(0x02 || Z || ct_be32)`, `(hash mod (N-1)) + 1`.
-- KDF: `SM3(Z || ct_be32)` blocks.
+- H1: `SM3(0x01 || ID || hid || ct)`, 40-byte reduction to `[1, N-1]`.
+- H2: `SM3(0x02 || Z || ct)`, 40-byte reduction to `[1, N-1]`.
+- KDF: `SM3(Z || ct)` blocks.
+- Pairing: R-ate on BN254, checked against `gmalg` and for bilinearity.
+- Signature, encryption/decryption, key extraction, and key agreement are
+  implemented in `src/sm9/standard.zig`.
 
-This does **not** make the legacy SM9 signature, encryption, or pairing code
-standards-compliant. Those paths still rely on the simplified
-`curve.zig`/`pairing.zig` implementation and remain on the roadmap for a full
-BN254 pairing rewrite and external cross-validation.
-
-## Standard SM9 foundation
-
-`src/sm9/bn.zig` now contains native `u256` BN254 field and group primitives:
-Fp, Fp2, Fp4, Fp12, G1, and G2. The constants and scalar multiplications are
-checked against independently generated SM9 vectors (P1, P2, 2P1, 2P2), and
-Fp12 inversion/multiplication are checked for internal consistency.
-
-This module is a foundation, not yet a replacement for the legacy SM9 code.
-The R-ate/Tate pairing, signature, encryption, and key-extraction paths still
-need to be rebuilt on top of it and cross-validated with GmSSL/gmalg.
-
-## Standard SM9 core
-
-`src/sm9/standard.zig` implements GM/T 0044-2016 SM9 on top of the standard
-BN254 pairing:
-
-- master public keys: `P_pub-s = s*P2`, `P_pub-e = s*P1`;
-- user keys: `d_A = s/(H1(ID||hid)+s) * P1`, `d_B = s/(H1(ID||hid)+s) * P2`;
-- signature and verification using `e(P1, P_pub-s)`;
-- encryption/decryption using `e(P_pub-e, P2)` and `e(C1, d_B)`;
-- key agreement using `g1=e(P_pub-e,P2)^r`, `g2=e(R_peer,d)`, `g3=g2^r`.
-
-The signature vector (ID "Alice", message "Chinese IBS standard", nonce
-`0x0123456789abcdef`) and the encryption `C1`/`C2` vector are checked against
-`gmalg` in `src/test/sm9_standard_test.zig`. Encryption `C3` uses the
-HMAC-SM3 construction used by GmSSL v3.
-
-Important: this standard core is **not yet wired into** the legacy
-`SM9Context`, `sign.zig`, or `encrypt.zig` entry points. Applications that call
-the old API still get the legacy non-standard behavior; use `sm9.standard`
-directly until the migration is complete.
+Signature, user signing key, encryption `C1`/`C2`, and the GmSSL-style
+HMAC-SM3 `C3` are checked against external vectors in
+`src/test/sm9_standard_test.zig`. Broader interop testing with the local
+GmSSL CLI and more boundary vectors remain open.
