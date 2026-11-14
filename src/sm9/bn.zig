@@ -202,6 +202,9 @@ pub fn f2Inv(a: Fp2) Fp2 {
     const d = inv(den);
     return .{ .c1 = mul(a.c1, d), .c0 = neg(mul(a.c0, d)) };
 }
+pub fn f2IsZero(a: Fp2) bool {
+    return a.c1 == 0 and a.c0 == 0;
+}
 pub fn f2Eq(a: Fp2, b: Fp2) bool {
     return a.c1 == b.c1 and a.c0 == b.c0;
 }
@@ -277,15 +280,114 @@ pub fn g1Add(p: G1, q: G1) G1 {
     return .{ .x = x3, .y = sub(mul(lam, sub(p.x, x3)), p.y) };
 }
 
-pub fn g1Mul(k: Fp, p: G1) G1 {
-    var r = G1{ .x = 0, .y = 0 };
-    var base = p;
-    var e = k;
-    while (e != 0) : (e >>= 1) {
-        if (e & 1 != 0) r = g1Add(r, base);
-        base = g1Add(base, base);
+const G1Jac = struct { x: Fp, y: Fp, z: Fp };
+const G2Jac = struct { x: Fp2, y: Fp2, z: Fp2 };
+
+fn g1JacDouble(p: G1Jac) G1Jac {
+    if (p.z == 0 or p.y == 0) return .{ .x = 0, .y = 0, .z = 0 };
+    const a = mul(p.x, p.x);
+    const b = mul(p.y, p.y);
+    const c = mul(b, b);
+    const xb = add(p.x, b);
+    const d = mul(2, sub(sub(mul(xb, xb), a), c));
+    const e = mul(3, a);
+    const f = mul(e, e);
+    const x3 = sub(f, mul(2, d));
+    const y3 = sub(mul(e, sub(d, x3)), mul(8, c));
+    const z3 = mul(2, mul(p.y, p.z));
+    return .{ .x = x3, .y = y3, .z = z3 };
+}
+
+fn g1JacAddAffine(p: G1Jac, q: G1) G1Jac {
+    if (p.z == 0) return .{ .x = q.x, .y = q.y, .z = 1 };
+    const z1z1 = mul(p.z, p.z);
+    const uu2 = mul(q.x, z1z1);
+    const s2 = mul(q.y, mul(p.z, z1z1));
+    const h = sub(uu2, p.x);
+    const hh = mul(h, h);
+    if (hh == 0) {
+        if (s2 == p.y) return g1JacDouble(p);
+        return .{ .x = 0, .y = 0, .z = 0 };
     }
-    return r;
+    const i = mul(4, hh);
+    const j = mul(h, i);
+    const r = mul(2, sub(s2, p.y));
+    const v = mul(p.x, i);
+    const x3 = sub(sub(mul(r, r), j), mul(2, v));
+    const y3 = sub(mul(r, sub(v, x3)), mul(2, mul(p.y, j)));
+    const z3 = sub(sub(mul(add(p.z, h), add(p.z, h)), z1z1), hh);
+    return .{ .x = x3, .y = y3, .z = z3 };
+}
+
+fn g1JacToAffine(p: G1Jac) G1 {
+    if (p.z == 0) return .{ .x = 0, .y = 0 };
+    const zinv = inv(p.z);
+    const zinv2 = mul(zinv, zinv);
+    return .{ .x = mul(p.x, zinv2), .y = mul(p.y, mul(zinv2, zinv)) };
+}
+
+pub fn g1Mul(k: Fp, p: G1) G1 {
+    var r = G1Jac{ .x = 0, .y = 0, .z = 0 };
+    const e = k;
+    var i: usize = 256;
+    while (i > 0) {
+        i -= 1;
+        r = g1JacDouble(r);
+        if ((e >> @intCast(i)) & 1 != 0) r = g1JacAddAffine(r, p);
+    }
+    return g1JacToAffine(r);
+}
+
+fn f2Double(a: Fp2) Fp2 {
+    return .{ .c1 = add(a.c1, a.c1), .c0 = add(a.c0, a.c0) };
+}
+fn f2Triple(a: Fp2) Fp2 {
+    return f2Add(f2Double(a), a);
+}
+fn f2Eight(a: Fp2) Fp2 {
+    return f2Double(f2Double(f2Double(a)));
+}
+
+fn g2JacDouble(p: G2Jac) G2Jac {
+    if (f2IsZero(p.z) or f2IsZero(p.y)) return .{ .x = f2Zero(), .y = f2Zero(), .z = f2Zero() };
+    const a = f2Mul(p.x, p.x);
+    const b = f2Mul(p.y, p.y);
+    const c = f2Mul(b, b);
+    const d = f2Double(f2Sub(f2Sub(f2Mul(f2Add(p.x, b), f2Add(p.x, b)), a), c));
+    const e = f2Triple(a);
+    const f = f2Mul(e, e);
+    const x3 = f2Sub(f, f2Double(d));
+    const y3 = f2Sub(f2Mul(e, f2Sub(d, x3)), f2Eight(c));
+    const z3 = f2Mul(f2Double(p.y), p.z);
+    return .{ .x = x3, .y = y3, .z = z3 };
+}
+
+fn g2JacAddAffine(p: G2Jac, q: G2) G2Jac {
+    if (f2IsZero(p.z)) return .{ .x = q.x, .y = q.y, .z = f2One() };
+    const z1z1 = f2Mul(p.z, p.z);
+    const uu2 = f2Mul(q.x, z1z1);
+    const s2 = f2Mul(q.y, f2Mul(p.z, z1z1));
+    const h = f2Sub(uu2, p.x);
+    const hh = f2Mul(h, h);
+    if (f2IsZero(hh)) {
+        if (f2Eq(s2, p.y)) return g2JacDouble(p);
+        return .{ .x = f2Zero(), .y = f2Zero(), .z = f2Zero() };
+    }
+    const i = f2Double(f2Double(hh));
+    const j = f2Mul(h, i);
+    const r = f2Double(f2Sub(s2, p.y));
+    const v = f2Mul(p.x, i);
+    const x3 = f2Sub(f2Sub(f2Mul(r, r), j), f2Double(v));
+    const y3 = f2Sub(f2Mul(r, f2Sub(v, x3)), f2Double(f2Mul(p.y, j)));
+    const z3 = f2Sub(f2Sub(f2Mul(f2Add(p.z, h), f2Add(p.z, h)), z1z1), hh);
+    return .{ .x = x3, .y = y3, .z = z3 };
+}
+
+fn g2JacToAffine(p: G2Jac) G2 {
+    if (f2IsZero(p.z)) return .{ .x = f2Zero(), .y = f2Zero() };
+    const zinv = f2Inv(p.z);
+    const zinv2 = f2Mul(zinv, zinv);
+    return .{ .x = f2Mul(p.x, zinv2), .y = f2Mul(p.y, f2Mul(zinv2, zinv)) };
 }
 
 pub fn g2OnCurve(p: G2) bool {

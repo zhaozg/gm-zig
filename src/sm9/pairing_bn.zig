@@ -43,9 +43,38 @@ pub fn f12Pow(a: Fp12, e: Fp) Fp12 {
     return r;
 }
 
+const FROB_FACTORS = [12]Fp{
+    0x88ff5c730c0b73a064e54bb6a38b7f78ca1b1aa1217ba25198dafea840a7def7,
+    0x2d40a38cf6983351711e5f99520347cc57d778a9f8ff4c8a4c949c7fa2a96686,
+    0xb640000002a3a6f0e303ab4ff2eb2052a9f02115caef75e70f738991676af249,
+    0xf300000002a3a6f2780272354f8b78f4d5fc11967be65334,
+    0xb640000002a3a6f0e303ab4ff2eb2052a9f02115caef75e70f738991676af24a,
+    0xf300000002a3a6f2780272354f8b78f4d5fc11967be65333,
+    0x771c15a71d319b1651c73e5559865ffbda2ccadd0c9de9ee3c5217d3abd5dbf2,
+    0x3f23ea58e5720bdb843c6cfA9c08674947c5c86e0ddd04eda91d8354377b698b,
+    0x49db721a269967c4e0a8debc0783182f82555233139e9d63efbd7b54092c756c,
+    0x6c648de5dc0a3f2cf55acc93ee0baf159f9d411806dc5177f5b21fd3da24d011,
+    0xb640000002a3a6f1d603ab4ff58ec74521f2934b1a7aeedbe56f9b27e351457c,
+    1,
+};
+
 pub fn frob1(x: Fp12) Fp12 {
-    return f12Pow(x, bn.P);
+    var out = bn.f12Zero();
+    out.c2.c1.c1 = bn.mul(x.c2.c1.c1, FROB_FACTORS[0]);
+    out.c2.c1.c0 = bn.mul(x.c2.c1.c0, FROB_FACTORS[1]);
+    out.c2.c0.c1 = bn.mul(x.c2.c0.c1, FROB_FACTORS[2]);
+    out.c2.c0.c0 = bn.mul(x.c2.c0.c0, FROB_FACTORS[3]);
+    out.c1.c1.c1 = bn.mul(x.c1.c1.c1, FROB_FACTORS[4]);
+    out.c1.c1.c0 = bn.mul(x.c1.c1.c0, FROB_FACTORS[5]);
+    out.c1.c0.c1 = bn.mul(x.c1.c0.c1, FROB_FACTORS[6]);
+    out.c1.c0.c0 = bn.mul(x.c1.c0.c0, FROB_FACTORS[7]);
+    out.c0.c1.c1 = bn.mul(x.c0.c1.c1, FROB_FACTORS[8]);
+    out.c0.c1.c0 = bn.mul(x.c0.c1.c0, FROB_FACTORS[9]);
+    out.c0.c0.c1 = bn.mul(x.c0.c0.c1, FROB_FACTORS[10]);
+    out.c0.c0.c0 = bn.mul(x.c0.c0.c0, FROB_FACTORS[11]);
+    return out;
 }
+
 fn frob2(x: Fp12) Fp12 {
     return frob1(frob1(x));
 }
