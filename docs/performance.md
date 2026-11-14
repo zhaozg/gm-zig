@@ -160,11 +160,11 @@ no direct GmSSL equivalent in this build.
 
 | Operation | GmSSL | gm-zig | gm-zig / GmSSL |
 |---|---:|---:|---:|
-| key generation | 7.86 µs | 38.0 µs | 4.8x |
-| sign | 85.0 µs | 124.3 µs | 1.46x |
-| verify | 66.9 µs | 400.9 µs | 6.0x |
-| encrypt (32 B) | 72.4 µs | 368.1 µs | 5.1x |
-| decrypt (32 B) | 60.3 µs | 301.9 µs | 5.0x |
+| key generation | 7.86 µs | 37.7 µs | 4.8x |
+| sign | 85.0 µs | 122.8 µs | 1.44x |
+| verify | 66.9 µs | 365.3 µs | 5.5x |
+| encrypt (32 B) | 72.4 µs | 364.2 µs | 5.0x |
+| decrypt (32 B) | 60.3 µs | 300.0 µs | 5.0x |
 
 SM2 is still the largest remaining gap among the non-SM9 algorithms, but it
 improved substantially after adding a fixed-base comb table for `G` and a
@@ -174,11 +174,12 @@ Key generation dropped from ~321 µs to ~34.8 µs, and signing from ~385 µs to
 benchmark also computes the SM3 user hash each time, so the sign/verify ratio
 is somewhat inflated.
 
-Verification and public-key operations remain about 5x slower because the
-arbitrary-point multiplication still uses a 256-bit windowed loop and generic
-field/point arithmetic, without GmSSL's wNAF, endomorphism, or assembly
-backends. Verification also computes `s*G + t*PA` as two independent
-multiplications instead of a simultaneous double-base multiplication.
+Public-scalar verification now uses a 5-bit wNAF for the arbitrary point and
+the fixed-base comb for `G`. Secret-scalar operations (encryption/decryption)
+still use the constant-time 4-bit windowed loop, so they remain about 5x
+slower than GmSSL. Verification computes `s*G + t*PA` as two multiplications
+rather than a simultaneous double-base multiplication; the `G` part is already
+a 64-addition comb, so the remaining cost is the arbitrary-point wNAF.
 
 The SM9 numbers in the previous section are already within roughly 0.8–1.4x of
 GmSSL except key extraction (about 2.5x).

@@ -395,17 +395,63 @@ pub const SM2 = struct {
         return result;
     }
 
+    fn mulWnaf(p: SM2, s: [32]u8) SM2 {
+        if (p.z.isZero()) return SM2.identityElement;
+        const p2 = p.dbl();
+        const p2_aff = p2.affineCoordinates();
+        var flat: [8]SM2 = undefined;
+        flat[0] = p;
+        var j: usize = 1;
+        while (j < 8) : (j += 1) flat[j] = flat[j - 1].addMixed(p2_aff);
+        var table: [8]AffineCoordinates = undefined;
+        batchToAffine(&flat, &table);
+
+        var n: u512 = std.mem.readInt(u256, &s, .little);
+        var digits: [257]i8 = @splat(0);
+        var i: usize = 0;
+        while (n != 0 and i < digits.len) : (i += 1) {
+            if ((n & 1) == 1) {
+                var d: i16 = @intCast(n & 31);
+                if (d > 16) d -= 32;
+                digits[i] = @intCast(d);
+                if (d > 0) {
+                    n -= @as(u512, @intCast(d));
+                } else {
+                    n += @as(u512, @intCast(-d));
+                }
+            }
+            n >>= 1;
+        }
+
+        var r = SM2.identityElement;
+        var k = digits.len;
+        while (k > 0) {
+            k -= 1;
+            r = r.dbl();
+            const d = digits[k];
+            if (d != 0) {
+                const idx: usize = @intCast((@abs(@as(i16, d)) - 1) / 2);
+                const q = if (d > 0) table[idx] else table[idx].neg();
+                r = r.addMixed(q);
+            }
+        }
+        return r;
+    }
+
     /// Multiply an elliptic curve point by a *PUBLIC* scalar *IN VARIABLE TIME*
     /// This can be used for signature verification.
     pub fn mulPublic(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
-        return p.mul(s_, endian);
+        const s = if (endian == .little) s_ else orderSwap(s_);
+        const result = if (p.is_base) mulBase(s) else mulWnaf(p, s);
+        try result.rejectIdentity();
+        return result;
     }
 
     /// Double-base multiplication of public parameters - Compute (p1*s1)+(p2*s2) *IN VARIABLE TIME*
     /// This can be used for signature verification.
     pub fn mulDoubleBasePublic(p1: SM2, s1: [32]u8, p2: SM2, s2: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
-        const r1 = try p1.mul(s1, endian);
-        const r2 = try p2.mul(s2, endian);
+        const r1 = try p1.mulPublic(s1, endian);
+        const r2 = try p2.mulPublic(s2, endian);
         const result = r1.add(r2);
         try result.rejectIdentity();
         return result;
