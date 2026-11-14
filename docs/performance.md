@@ -110,3 +110,71 @@ cc -O3 -I ~/work/Crypto/GmSSL/include scripts/bench_sm9_gmssl.c \
   -Wl,-rpath,$HOME/work/Crypto/GmSSL/build/bin -o /tmp/bench_gmssl_sm9
 /tmp/bench_gmssl_sm9
 ```
+
+## Other algorithms vs GmSSL (2026-11-14)
+
+GmSSL 3.3.0-dev was benchmarked with
+[`scripts/bench_gmssl_all.c`](../scripts/bench_gmssl_all.c) on the same machine.
+The benchmark order in `zig build bench` is now:
+
+1. SM3
+2. SM4 (all modes)
+3. ZUC
+4. SM2
+5. SM9
+
+### SM3
+
+| Size | GmSSL | gm-zig | gm-zig / GmSSL |
+|---|---:|---:|---:|
+| 64 B | 0.530 µs | 0.433 µs | 0.82x |
+| 1 KB | 4.23 µs | 3.48 µs | 0.82x |
+| 64 KB | 254.8 µs | 203.6 µs | 0.80x |
+| 1 MB | 4.36 ms | 3.42 ms | 0.79x |
+
+gm-zig is slightly faster across the tested sizes.
+
+### SM4
+
+| Operation | GmSSL | gm-zig | gm-zig / GmSSL |
+|---|---:|---:|---:|
+| ECB encrypt 1 KB | 6.94 µs | 7.33 µs | 1.06x |
+| ECB encrypt 64 KB | 451.9 µs | 467.4 µs | 1.03x |
+| ECB encrypt 1 MB | 7.14 ms | 7.54 ms | 1.05x |
+
+SM4 ECB is at parity (within about 5%). The GmSSL SM4 decrypt harness includes
+per-iteration key scheduling, so the 16 B decrypt comparison is not
+representative and is omitted.
+
+### ZUC
+
+| Operation | GmSSL | gm-zig | gm-zig / GmSSL |
+|---|---:|---:|---:|
+| crypt 1 KB | 2.67 µs | 3.17 µs | 1.19x |
+| crypt 64 KB | 148.8 µs | 175.8 µs | 1.18x |
+
+ZUC is about 18–19% slower. ZUC-AEAD is a gm-zig-specific construction and has
+no direct GmSSL equivalent in this build.
+
+### SM2
+
+| Operation | GmSSL | gm-zig | gm-zig / GmSSL |
+|---|---:|---:|---:|
+| key generation | 7.86 µs | 321 µs | 41x |
+| sign | 85.0 µs | 385 µs | 4.5x |
+| verify | 66.9 µs | 666 µs | 10x |
+| encrypt (32 B) | 72.4 µs | 705 µs | 9.7x |
+| decrypt (32 B) | 60.3 µs | 326 µs | 5.4x |
+
+SM2 is the largest remaining gap among the non-SM9 algorithms. The GmSSL
+harness signs/verifies a precomputed digest, while gm-zig's benchmark also
+computes the SM3 user hash each time, so the sign/verify ratio is somewhat
+inflated. Key generation and encryption are clean comparisons and still show
+roughly 40x and 10x gaps. The main reason is scalar multiplication: gm-zig uses
+a plain 256-bit double-and-add with full projective additions, without a
+fixed-base table, windowing, endomorphism, or assembly backends. Verification
+also computes `s*G + t*PA` as two independent multiplications instead of a
+simultaneous double-base multiplication.
+
+The SM9 numbers in the previous section are already within roughly 0.8–1.4x of
+GmSSL except key extraction (about 2.5x).

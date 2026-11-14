@@ -192,16 +192,6 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     try bench.add("SM4 ECB E 1M  ", sm4_bench.benchSm4EcbEncrypt1M, .{});
     try bench.add("SM4 ECB D 1M  ", sm4_bench.benchSm4EcbDecrypt1M, .{});
 
-    // ZUC benchmarks
-    try bench.add("ZUC key stream ", zuc_bench.benchZucKeystream, .{});
-    try bench.add("ZUC crypt 1K   ", zuc_bench.benchZucCrypt1K, .{});
-    try bench.add("ZUC crypt 64K  ", zuc_bench.benchZucCrypt64K, .{});
-    try bench.add("ZUC crypt 1M   ", zuc_bench.benchZucCrypt1M, .{});
-    try bench.add("ZUC MAC 16B    ", zuc_bench.benchZucMac16B, .{});
-    try bench.add("ZUC MAC 4K     ", zuc_bench.benchZucMac4K, .{});
-    try bench.add("ZUC AEAD 1K    ", zuc_bench.benchZucAeadSeal1K, .{});
-    try bench.add("ZUC AEAD 64K   ", zuc_bench.benchZucAeadSeal64K, .{});
-
     // SM4 additional mode benchmarks
     try bench.add("SM4 CBC E 1K   ", sm4_bench.benchSm4CbcEncrypt1K, .{});
     try bench.add("SM4 CBC D 1K   ", sm4_bench.benchSm4CbcDecrypt1K, .{});
@@ -216,13 +206,15 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     try bench.add("SM4 XTS E 64K  ", sm4_bench.benchSm4XtsEncrypt64K, .{});
     try bench.add("SM4 XTS D 64K  ", sm4_bench.benchSm4XtsDecrypt64K, .{});
 
-    // SM9 standard benchmarks
-    try bench.add("SM9 pairing    ", sm9_bench.benchSm9Pairing, .{});
-    try bench.add("SM9 key extract", sm9_bench.benchSm9KeyExtractSign, .{});
-    try bench.add("SM9 sign       ", sm9_bench.benchSm9Sign, .{});
-    try bench.add("SM9 verify     ", sm9_bench.benchSm9Verify, .{});
-    try bench.add("SM9 encrypt    ", sm9_bench.benchSm9Encrypt, .{});
-    try bench.add("SM9 decrypt    ", sm9_bench.benchSm9Decrypt, .{});
+    // ZUC benchmarks
+    try bench.add("ZUC key stream ", zuc_bench.benchZucKeystream, .{});
+    try bench.add("ZUC crypt 1K   ", zuc_bench.benchZucCrypt1K, .{});
+    try bench.add("ZUC crypt 64K  ", zuc_bench.benchZucCrypt64K, .{});
+    try bench.add("ZUC crypt 1M   ", zuc_bench.benchZucCrypt1M, .{});
+    try bench.add("ZUC MAC 16B    ", zuc_bench.benchZucMac16B, .{});
+    try bench.add("ZUC MAC 4K     ", zuc_bench.benchZucMac4K, .{});
+    try bench.add("ZUC AEAD 1K    ", zuc_bench.benchZucAeadSeal1K, .{});
+    try bench.add("ZUC AEAD 64K   ", zuc_bench.benchZucAeadSeal64K, .{});
 
     // SM2 benchmarks
     try bench.add("SM2 key gen    ", sm2_bench.benchSm2KeyGen, .{});
@@ -234,4 +226,11 @@ fn addAllBenchmarks(bench: *zbench.Benchmark) !void {
     try bench.add("SM2 enc med    ", sm2_bench.benchSm2EncryptMedium, .{});
     try bench.add("SM2 dec small  ", sm2_bench.benchSm2DecryptSmall, .{});
     try bench.add("SM2 dec med    ", sm2_bench.benchSm2DecryptMedium, .{});
+    // SM9 standard benchmarks
+    try bench.add("SM9 pairing    ", sm9_bench.benchSm9Pairing, .{});
+    try bench.add("SM9 key extract", sm9_bench.benchSm9KeyExtractSign, .{});
+    try bench.add("SM9 sign       ", sm9_bench.benchSm9Sign, .{});
+    try bench.add("SM9 verify     ", sm9_bench.benchSm9Verify, .{});
+    try bench.add("SM9 encrypt    ", sm9_bench.benchSm9Encrypt, .{});
+    try bench.add("SM9 decrypt    ", sm9_bench.benchSm9Decrypt, .{});
 }
