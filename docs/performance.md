@@ -160,21 +160,25 @@ no direct GmSSL equivalent in this build.
 
 | Operation | GmSSL | gm-zig | gm-zig / GmSSL |
 |---|---:|---:|---:|
-| key generation | 7.86 µs | 321 µs | 41x |
-| sign | 85.0 µs | 385 µs | 4.5x |
-| verify | 66.9 µs | 666 µs | 10x |
-| encrypt (32 B) | 72.4 µs | 705 µs | 9.7x |
-| decrypt (32 B) | 60.3 µs | 326 µs | 5.4x |
+| key generation | 7.86 µs | 34.8 µs | 4.4x |
+| sign | 85.0 µs | 111.9 µs | 1.32x |
+| verify | 66.9 µs | 365.9 µs | 5.5x |
+| encrypt (32 B) | 72.4 µs | 370.4 µs | 5.1x |
+| decrypt (32 B) | 60.3 µs | 307.6 µs | 5.1x |
 
-SM2 is the largest remaining gap among the non-SM9 algorithms. The GmSSL
-harness signs/verifies a precomputed digest, while gm-zig's benchmark also
-computes the SM3 user hash each time, so the sign/verify ratio is somewhat
-inflated. Key generation and encryption are clean comparisons and still show
-roughly 40x and 10x gaps. The main reason is scalar multiplication: gm-zig uses
-a plain 256-bit double-and-add with full projective additions, without a
-fixed-base table, windowing, endomorphism, or assembly backends. Verification
-also computes `s*G + t*PA` as two independent multiplications instead of a
-simultaneous double-base multiplication.
+SM2 is still the largest remaining gap among the non-SM9 algorithms, but it
+improved substantially after adding a fixed-base comb table for `G` and a
+4-bit window with mixed addition and batch inversion for arbitrary points.
+Key generation dropped from ~321 µs to ~34.8 µs, and signing from ~385 µs to
+~112 µs. The GmSSL harness signs/verifies a precomputed digest, while gm-zig's
+benchmark also computes the SM3 user hash each time, so the sign/verify ratio
+is somewhat inflated.
+
+Verification and public-key operations remain about 5x slower because the
+arbitrary-point multiplication still uses a 256-bit windowed loop and generic
+field/point arithmetic, without GmSSL's wNAF, endomorphism, or assembly
+backends. Verification also computes `s*G + t*PA` as two independent
+multiplications instead of a simultaneous double-base multiplication.
 
 The SM9 numbers in the previous section are already within roughly 0.8–1.4x of
 GmSSL except key extraction (about 2.5x).

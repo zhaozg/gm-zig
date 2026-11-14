@@ -168,11 +168,11 @@ pub const SM2 = struct {
     /// Add SM2 points, the second being specified using affine coordinates.
     /// 由于有限域运算的特性，缺少这个因子会导致后续计算不匹配。
     pub fn addMixed(p: SM2, q: AffineCoordinates) SM2 {
-        if (p.z.isZero()) {
-            return .{ .x = q.x, .y = q.y, .z = Fe.one };
-        }
         if (q.x.isZero() and q.y.isZero()) {
             return p;
+        }
+        if (p.z.isZero()) {
+            return .{ .x = q.x, .y = q.y, .z = Fe.one };
         }
 
         const z1z1 = p.z.sq();
@@ -288,27 +288,112 @@ pub const SM2 = struct {
         return t;
     }
 
+    const CombTable = struct {
+        var points: [1024]AffineCoordinates = undefined;
+        var ready: bool = false;
+    };
+
+    fn batchToAffine(points: []const SM2, out: []AffineCoordinates) void {
+        var prefix: [1024]Fe = undefined;
+        var prod = Fe.one;
+        for (points, 0..) |p, i| {
+            prefix[i] = prod;
+            if (!p.z.isZero()) prod = prod.mul(p.z);
+        }
+        var inv_prod = prod.invert();
+        var i = points.len;
+        while (i > 0) {
+            i -= 1;
+            const p = points[i];
+            if (p.z.isZero()) {
+                out[i] = AffineCoordinates.identityElement;
+                continue;
+            }
+            const zinv = inv_prod.mul(prefix[i]);
+            inv_prod = inv_prod.mul(p.z);
+            const zinv2 = zinv.sq();
+            out[i] = .{ .x = p.x.mul(zinv2), .y = p.y.mul(zinv2).mul(zinv) };
+        }
+    }
+
+    fn selectAffine(points: *const [16]AffineCoordinates, digit: u4) AffineCoordinates {
+        var x = Fe.zero;
+        var y = Fe.zero;
+        for (0..16) |i| {
+            const m: u1 = @intFromBool(@as(usize, digit) == i);
+            x.cMov(points[i].x, m);
+            y.cMov(points[i].y, m);
+        }
+        return .{ .x = x, .y = y };
+    }
+
+    fn buildCombTable() void {
+        var flat: [1024]SM2 = undefined;
+        var base = SM2.basePoint;
+        for (0..64) |w| {
+            const base_aff = base.affineCoordinates();
+            var acc = SM2.identityElement;
+            flat[w * 16] = SM2.identityElement;
+            var d: usize = 1;
+            while (d < 16) : (d += 1) {
+                acc = if (d == 1) base else acc.addMixed(base_aff);
+                flat[w * 16 + d] = acc;
+            }
+            var k: usize = 0;
+            while (k < 4) : (k += 1) base = base.dbl();
+        }
+        batchToAffine(&flat, &CombTable.points);
+    }
+
+    fn ensureCombTable() void {
+        if (CombTable.ready) return;
+        if (CombTable.ready) return;
+        buildCombTable();
+        CombTable.ready = true;
+    }
+
+    fn mulBase(s: [32]u8) SM2 {
+        ensureCombTable();
+        var r = SM2.identityElement;
+        for (0..64) |w| {
+            const byte = s[w / 2];
+            const nobble: u4 = if (w % 2 == 0) @truncate(byte) else @truncate(byte >> 4);
+            r = r.addMixed(selectAffine(CombTable.points[w * 16 ..][0..16], nobble));
+        }
+        return r;
+    }
+
+    fn mulWindow(p: SM2, s: [32]u8) SM2 {
+        if (p.z.isZero()) return SM2.identityElement;
+        const p_aff = p.affineCoordinates();
+        var flat: [16]SM2 = undefined;
+        var table: [16]AffineCoordinates = undefined;
+        flat[0] = SM2.identityElement;
+        flat[1] = p;
+        var d: usize = 2;
+        while (d < 16) : (d += 1) {
+            flat[d] = flat[d - 1].addMixed(p_aff);
+        }
+        batchToAffine(&flat, &table);
+
+        var r = SM2.identityElement;
+        var w: usize = 64;
+        while (w > 0) {
+            w -= 1;
+            var k: usize = 0;
+            while (k < 4) : (k += 1) r = r.dbl();
+            const byte = s[w / 2];
+            const nobble: u4 = if (w % 2 == 0) @truncate(byte) else @truncate(byte >> 4);
+            r = r.addMixed(selectAffine(&table, nobble));
+        }
+        return r;
+    }
+
     /// Multiply an elliptic curve point by a scalar.
     /// Return error.IdentityElement if the result is the identity element.
     pub fn mul(p: SM2, s_: [32]u8, endian: std.builtin.Endian) IdentityElementError!SM2 {
         const s = if (endian == .little) s_ else orderSwap(s_);
-
-        var result = SM2.identityElement;
-        var addend = p;
-
-        // 从最低字节开始处理（小端序）
-        for (0..32) |i| {
-            const byte = s[i];
-            var bit_mask: u8 = 1;
-
-            while (bit_mask != 0) : (bit_mask <<= 1) {
-                if ((byte & bit_mask) != 0) {
-                    result = result.add(addend);
-                }
-                addend = addend.dbl();
-            }
-        }
-
+        const result = if (p.is_base) mulBase(s) else mulWindow(p, s);
         try result.rejectIdentity();
         return result;
     }

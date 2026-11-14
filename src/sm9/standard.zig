@@ -66,10 +66,10 @@ fn invN(a: bn.Fp) bn.Fp {
         }
         if (u >= v) {
             u -= v;
-            x1 = if (x1 >= x2) x1 - x2 else x1 +% bn.N - x2;
+            x1 = if (x1 >= x2) x1 - x2 else x1 -% x2 +% bn.N;
         } else {
             v -= u;
-            x2 = if (x2 >= x1) x2 - x1 else x2 +% bn.N - x1;
+            x2 = if (x2 >= x1) x2 - x1 else x2 -% x1 +% bn.N;
         }
     }
     return if (u == 1) x1 else x2;
