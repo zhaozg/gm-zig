@@ -16,12 +16,12 @@ Results:
 
 | Operation | Time |
 |---|---:|
-| SM9 pairing `e(P1, P2)` | 9.662 ms |
-| SM9 key extraction | 1.194 ms |
-| SM9 sign | 10.275 ms |
-| SM9 verify | 24.367 ms |
-| SM9 encrypt (32 B) | 10.358 ms |
-| SM9 decrypt (32 B) | 9.772 ms |
+| SM9 pairing `e(P1, P2)` | 9.298 ms |
+| SM9 key extraction | 0.335 ms |
+| SM9 sign | 10.389 ms |
+| SM9 verify | 24.765 ms |
+| SM9 encrypt (32 B) | 10.450 ms |
+| SM9 decrypt (32 B) | 10.566 ms |
 
 Each sign/verify/encrypt/decrypt operation includes one or two full R-ate
 pairings, so the pairing cost dominates. zbench reports a single run for these
@@ -37,9 +37,12 @@ Optimizations that have landed:
 4. G1/G2 scalar multiplication changed from affine to Jacobian coordinates,
    removing one Fp/Fp2 inversion per bit.
 5. Fp add/sub no longer use a `u512` division; they use carry/borrow checks.
+6. Fixed-base 4-bit comb tables for P1/P2 remove all doublings from generator
+   multiplication; key extraction now performs 64 mixed additions.
+7. Mod-N inverse uses binary extended Euclid instead of Fermat exponentiation.
 
-Together these reduced pairing from ~1.15 s to ~9.7 ms and ReleaseFast test
-time from ~55 s to ~1-2 s.
+Together these reduced pairing from ~1.15 s to ~9.3 ms and key extraction from
+~330 ms to ~0.34 ms. ReleaseFast tests run in ~1-2 s.
 
 These numbers are for this machine and this commit only. They are not a
 comparison against GmSSL or another SM9 implementation.
@@ -81,20 +84,23 @@ local `build/bin/libgmssl.dylib` on the same machine.
 
 | Operation | GmSSL | gm-zig | gm-zig / GmSSL |
 |---|---:|---:|---:|
-| pairing | 7.5 ms | 9.66 ms | 1.29x |
-| key extraction | 0.135 ms | 1.19 ms | 8.8x |
-| sign | 11.4 ms | 10.28 ms | 0.90x |
-| verify | 20.6 ms | 24.37 ms | 1.18x |
-| encrypt (32 B) | 12.3 ms | 10.36 ms | 0.84x |
-| decrypt (32 B) | 7.5 ms | 9.77 ms | 1.30x |
+| pairing | 7.5 ms | 9.30 ms | 1.24x |
+| key extraction | 0.135 ms | 0.335 ms | 2.5x |
+| sign | 11.4 ms | 10.39 ms | 0.91x |
+| verify | 20.6 ms | 24.77 ms | 1.20x |
+| encrypt (32 B) | 12.3 ms | 10.45 ms | 0.85x |
+| decrypt (32 B) | 7.5 ms | 10.57 ms | 1.41x |
 
 There is still substantial headroom. The remaining gap is dominated by:
 
-- Pairing is now within ~1.3x of GmSSL.
-- Key extraction is the largest remaining gap (~8.8x): it uses a 256-bit
-  double-and-add loop without a precomputed generator table/window.
-- Miller loop / line evaluation could still use projective sparse lines for
-  another modest gain.
+- Signature and encryption are slightly faster than GmSSL in this run.
+- Pairing is within ~1.24x and could be closed further with projective sparse
+  lines.
+- Key extraction is now ~2.5x slower; the remaining gap is mostly fixed-base
+  table size (4-bit vs GmSSL's 7-bit Booth table) and inversion overhead.
+- GLV/endomorphism was evaluated but not added: the fixed-base table already
+  removes the doublings that GLV would target, so the additional complexity is
+  not justified by the measured bottleneck.
 
 Build and run the GmSSL harness with:
 

@@ -520,3 +520,164 @@ pub fn f12Eq(a: Fp12, b: Fp12) bool {
 pub fn g1OnCurve(p: G1) bool {
     return mul(p.y, p.y) == add(mul(mul(p.x, p.x), p.x), 5);
 }
+
+// Fixed-base comb tables for the SM9 generators. A 4-bit comb removes all
+// doublings from scalar multiplication: k*P becomes 64 mixed additions.
+const G1_TABLE_WINDOWS = 64;
+const G2_TABLE_WINDOWS = 64;
+
+var g1_table: [G1_TABLE_WINDOWS][16]G1 = undefined;
+var g1_table_ready = false;
+var g1_table_mutex: std.Thread.Mutex = .{};
+
+var g2_table: [G2_TABLE_WINDOWS][16]G2 = undefined;
+var g2_table_ready = false;
+var g2_table_mutex: std.Thread.Mutex = .{};
+
+fn batchInvertFp(zs: []Fp) void {
+    var prefix: [1024]Fp = undefined;
+    var prod: Fp = 1;
+    for (zs, 0..) |z, i| {
+        prefix[i] = prod;
+        if (z != 0) prod = mul(prod, z);
+    }
+    var inv_prod = inv(prod);
+    var i = zs.len;
+    while (i > 0) {
+        i -= 1;
+        const z = zs[i];
+        if (z == 0) continue;
+        const zinv = mul(inv_prod, prefix[i]);
+        inv_prod = mul(inv_prod, z);
+        zs[i] = zinv;
+    }
+}
+
+fn batchInvertFp2(zs: []Fp2) void {
+    var prefix: [1024]Fp2 = undefined;
+    var prod = f2One();
+    for (zs, 0..) |z, i| {
+        prefix[i] = prod;
+        if (!f2IsZero(z)) prod = f2Mul(prod, z);
+    }
+    var inv_prod = f2Inv(prod);
+    var i = zs.len;
+    while (i > 0) {
+        i -= 1;
+        const z = zs[i];
+        if (f2IsZero(z)) continue;
+        const zinv = f2Mul(inv_prod, prefix[i]);
+        inv_prod = f2Mul(inv_prod, z);
+        zs[i] = zinv;
+    }
+}
+
+fn buildG1Table() void {
+    var jac: [G1_TABLE_WINDOWS][16]G1Jac = undefined;
+    var base_jac = G1Jac{ .x = P1.x, .y = P1.y, .z = 1 };
+    for (0..G1_TABLE_WINDOWS) |w| {
+        const base = g1JacToAffine(base_jac);
+        jac[w][0] = .{ .x = 0, .y = 0, .z = 0 };
+        jac[w][1] = base_jac;
+        var d: usize = 2;
+        while (d < 16) : (d += 1) {
+            jac[w][d] = g1JacAddAffine(jac[w][d - 1], base);
+        }
+        var k: usize = 0;
+        while (k < 4) : (k += 1) base_jac = g1JacDouble(base_jac);
+    }
+    var zs: [1024]Fp = undefined;
+    for (0..64) |w| {
+        for (0..16) |d| zs[w * 16 + d] = jac[w][d].z;
+    }
+    batchInvertFp(&zs);
+    for (0..64) |w| {
+        for (0..16) |d| {
+            const idx = w * 16 + d;
+            if (zs[idx] == 0) {
+                g1_table[w][d] = .{ .x = 0, .y = 0 };
+            } else {
+                const zinv2 = mul(zs[idx], zs[idx]);
+                g1_table[w][d] = .{
+                    .x = mul(jac[w][d].x, zinv2),
+                    .y = mul(jac[w][d].y, mul(zinv2, zs[idx])),
+                };
+            }
+        }
+    }
+}
+
+fn ensureG1Table() void {
+    if (g1_table_ready) return;
+    g1_table_mutex.lock();
+    defer g1_table_mutex.unlock();
+    if (g1_table_ready) return;
+    buildG1Table();
+    g1_table_ready = true;
+}
+
+fn g1MulFixed(k: Fp) G1 {
+    ensureG1Table();
+    var r = G1Jac{ .x = 0, .y = 0, .z = 0 };
+    var w: usize = 0;
+    while (w < G1_TABLE_WINDOWS) : (w += 1) {
+        const d: usize = @intCast((k >> @intCast(w * 4)) & 0xf);
+        if (d != 0) r = g1JacAddAffine(r, g1_table[w][d]);
+    }
+    return g1JacToAffine(r);
+}
+
+fn buildG2Table() void {
+    var jac: [G2_TABLE_WINDOWS][16]G2Jac = undefined;
+    var base_jac = G2Jac{ .x = P2.x, .y = P2.y, .z = f2One() };
+    for (0..G2_TABLE_WINDOWS) |w| {
+        const base = g2JacToAffine(base_jac);
+        jac[w][0] = .{ .x = f2Zero(), .y = f2Zero(), .z = f2Zero() };
+        jac[w][1] = base_jac;
+        var d: usize = 2;
+        while (d < 16) : (d += 1) {
+            jac[w][d] = g2JacAddAffine(jac[w][d - 1], base);
+        }
+        var kk: usize = 0;
+        while (kk < 4) : (kk += 1) base_jac = g2JacDouble(base_jac);
+    }
+    var zs: [1024]Fp2 = undefined;
+    for (0..64) |w| {
+        for (0..16) |d| zs[w * 16 + d] = jac[w][d].z;
+    }
+    batchInvertFp2(&zs);
+    for (0..64) |w| {
+        for (0..16) |d| {
+            const idx = w * 16 + d;
+            if (f2IsZero(zs[idx])) {
+                g2_table[w][d] = .{ .x = f2Zero(), .y = f2Zero() };
+            } else {
+                const zinv2 = f2Mul(zs[idx], zs[idx]);
+                g2_table[w][d] = .{
+                    .x = f2Mul(jac[w][d].x, zinv2),
+                    .y = f2Mul(jac[w][d].y, f2Mul(zinv2, zs[idx])),
+                };
+            }
+        }
+    }
+}
+
+fn ensureG2Table() void {
+    if (g2_table_ready) return;
+    g2_table_mutex.lock();
+    defer g2_table_mutex.unlock();
+    if (g2_table_ready) return;
+    buildG2Table();
+    g2_table_ready = true;
+}
+
+fn g2MulFixed(k: Fp) G2 {
+    ensureG2Table();
+    var r = G2Jac{ .x = f2Zero(), .y = f2Zero(), .z = f2Zero() };
+    var w: usize = 0;
+    while (w < G2_TABLE_WINDOWS) : (w += 1) {
+        const d: usize = @intCast((k >> @intCast(w * 4)) & 0xf);
+        if (d != 0) r = g2JacAddAffine(r, g2_table[w][d]);
+    }
+    return g2JacToAffine(r);
+}

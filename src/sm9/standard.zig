@@ -50,7 +50,29 @@ fn powN(a: bn.Fp, e: bn.Fp) bn.Fp {
     return r;
 }
 fn invN(a: bn.Fp) bn.Fp {
-    return powN(a, bn.N - 2);
+    if (a == 0) return 0;
+    var u = a;
+    var v: bn.Fp = bn.N;
+    var x1: bn.Fp = 1;
+    var x2: bn.Fp = 0;
+    while (u != 1 and v != 1) {
+        while ((u & 1) == 0) {
+            u >>= 1;
+            if ((x1 & 1) == 0) x1 >>= 1 else x1 = (x1 >> 1) + (bn.N >> 1) + 1;
+        }
+        while ((v & 1) == 0) {
+            v >>= 1;
+            if ((x2 & 1) == 0) x2 >>= 1 else x2 = (x2 >> 1) + (bn.N >> 1) + 1;
+        }
+        if (u >= v) {
+            u -= v;
+            x1 = if (x1 >= x2) x1 - x2 else x1 +% bn.N - x2;
+        } else {
+            v -= u;
+            x2 = if (x2 >= x1) x2 - x1 else x2 +% bn.N - x1;
+        }
+    }
+    return if (u == 1) x1 else x2;
 }
 
 fn h1(allocator: std.mem.Allocator, id: []const u8, hid: u8) !bn.Fp {
