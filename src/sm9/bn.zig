@@ -32,10 +32,12 @@ pub const P2 = G2{
 pub const B_TWIST = Fp2{ .c1 = 5, .c0 = 0 };
 
 pub fn add(a: Fp, b: Fp) Fp {
-    return @intCast((@as(u512, a) + b) % P);
+    const s = a +% b;
+    return if (s < a or s >= P) s -% P else s;
 }
 pub fn sub(a: Fp, b: Fp) Fp {
-    return @intCast((@as(u512, a) + P - b) % P);
+    const d = a -% b;
+    return if (a < b) d +% P else d;
 }
 const P_LIMBS = [4]u64{
     0xe56f9b27e351457d,
@@ -152,7 +154,7 @@ pub fn inv(a: Fp) Fp {
             if ((x1 & 1) == 0) {
                 x1 >>= 1;
             } else {
-                x1 = @intCast((@as(u512, x1) + P) >> 1);
+                x1 = (x1 >> 1) + (P >> 1) + 1;
             }
         }
         while ((v & 1) == 0) {
@@ -160,7 +162,7 @@ pub fn inv(a: Fp) Fp {
             if ((x2 & 1) == 0) {
                 x2 >>= 1;
             } else {
-                x2 = @intCast((@as(u512, x2) + P) >> 1);
+                x2 = (x2 >> 1) + (P >> 1) + 1;
             }
         }
         if (u >= v) {

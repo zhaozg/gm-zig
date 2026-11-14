@@ -16,12 +16,12 @@ Results:
 
 | Operation | Time |
 |---|---:|
-| SM9 pairing `e(P1, P2)` | 21.834 ms |
-| SM9 key extraction | 1.425 ms |
-| SM9 sign | 23.936 ms |
-| SM9 verify | 52.577 ms |
-| SM9 encrypt (32 B) | 22.079 ms |
-| SM9 decrypt (32 B) | 19.424 ms |
+| SM9 pairing `e(P1, P2)` | 9.662 ms |
+| SM9 key extraction | 1.194 ms |
+| SM9 sign | 10.275 ms |
+| SM9 verify | 24.367 ms |
+| SM9 encrypt (32 B) | 10.358 ms |
+| SM9 decrypt (32 B) | 9.772 ms |
 
 Each sign/verify/encrypt/decrypt operation includes one or two full R-ate
 pairings, so the pairing cost dominates. zbench reports a single run for these
@@ -36,8 +36,9 @@ Optimizations that have landed:
    factors.
 4. G1/G2 scalar multiplication changed from affine to Jacobian coordinates,
    removing one Fp/Fp2 inversion per bit.
+5. Fp add/sub no longer use a `u512` division; they use carry/borrow checks.
 
-Together these reduced pairing from ~1.15 s to ~21.8 ms and ReleaseFast test
+Together these reduced pairing from ~1.15 s to ~9.7 ms and ReleaseFast test
 time from ~55 s to ~1-2 s.
 
 These numbers are for this machine and this commit only. They are not a
@@ -80,20 +81,20 @@ local `build/bin/libgmssl.dylib` on the same machine.
 
 | Operation | GmSSL | gm-zig | gm-zig / GmSSL |
 |---|---:|---:|---:|
-| pairing | 7.5 ms | 21.8 ms | 2.9x |
-| key extraction | 0.135 ms | 1.43 ms | 10.6x |
-| sign | 11.4 ms | 23.9 ms | 2.1x |
-| verify | 20.6 ms | 52.6 ms | 2.6x |
-| encrypt (32 B) | 12.3 ms | 22.1 ms | 1.8x |
-| decrypt (32 B) | 7.5 ms | 19.4 ms | 2.6x |
+| pairing | 7.5 ms | 9.66 ms | 1.29x |
+| key extraction | 0.135 ms | 1.19 ms | 8.8x |
+| sign | 11.4 ms | 10.28 ms | 0.90x |
+| verify | 20.6 ms | 24.37 ms | 1.18x |
+| encrypt (32 B) | 12.3 ms | 10.36 ms | 0.84x |
+| decrypt (32 B) | 7.5 ms | 9.77 ms | 1.30x |
 
 There is still substantial headroom. The remaining gap is dominated by:
 
-- Miller loop and line evaluation still use Fp12 inversions; GmSSL uses
-  projective coordinates and sparse line multiplication.
-- Key extraction uses a 256-bit double-and-add loop without windowing, while
-  GmSSL uses a precomputed generator table/window.
-- Final exponentiation still uses generic Fp12 exponentiation helpers.
+- Pairing is now within ~1.3x of GmSSL.
+- Key extraction is the largest remaining gap (~8.8x): it uses a 256-bit
+  double-and-add loop without a precomputed generator table/window.
+- Miller loop / line evaluation could still use projective sparse lines for
+  another modest gain.
 
 Build and run the GmSSL harness with:
 
