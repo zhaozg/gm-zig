@@ -16,22 +16,26 @@ Results:
 
 | Operation | Time |
 |---|---:|
-| SM9 pairing `e(P1, P2)` | 1.151 s |
-| SM9 key extraction | 7.579 ms |
-| SM9 sign | 1.182 s |
-| SM9 verify | 2.227 s |
-| SM9 encrypt (32 B) | 1.109 s |
-| SM9 decrypt (32 B) | 1.113 s |
+| SM9 pairing `e(P1, P2)` | 204.0 ms |
+| SM9 key extraction | 4.764 ms |
+| SM9 sign | 229.3 ms |
+| SM9 verify | 427.4 ms |
+| SM9 encrypt (32 B) | 210.1 ms |
+| SM9 decrypt (32 B) | 218.9 ms |
 
 Each sign/verify/encrypt/decrypt operation includes one or two full R-ate
 pairings, so the pairing cost dominates. zbench reports a single run for these
 operations because one run already exceeds the default time budget.
 
-The field inverse was changed from Fermat exponentiation (`a^(p-2)`) to a binary
-extended Euclidean inverse. That reduced key extraction from roughly 330 ms to
-about 7.6 ms. Further gains require a Montgomery/Barrett field multiplier and a
-projective/sparse pairing implementation; those are tracked in
-[ROADMAP.md](../ROADMAP.md).
+Two optimizations have landed:
+
+1. Fp inverse changed from Fermat exponentiation to binary extended Euclid.
+2. Fp multiplication changed to a 4x64 Montgomery multiplier (`mul` now uses
+   two Montgomery multiplications, keeping the public representation normal).
+
+Together these reduced pairing from ~1.15 s to ~204 ms and ReleaseFast test time
+from ~55 s to ~10 s. Further gains require precomputed Frobenius factors and a
+projective/sparse pairing implementation.
 
 These numbers are for this machine and this commit only. They are not a
 comparison against GmSSL or another SM9 implementation.
@@ -63,3 +67,36 @@ new standard implementation performs the full BN254 R-ate pairing:
 
 The old numbers are still shown only to make clear why they cannot be used as
 a performance baseline for the standard implementation.
+
+
+## Comparison with GmSSL 3.3.0-dev
+
+GmSSL `3.3.0-dev.1183` was benchmarked with the C harness
+[`scripts/bench_sm9_gmssl.c`](../scripts/bench_sm9_gmssl.c), linked against the
+local `build/bin/libgmssl.dylib` on the same machine.
+
+| Operation | GmSSL | gm-zig | gm-zig / GmSSL |
+|---|---:|---:|---:|
+| pairing | 7.5 ms | 204 ms | 27x |
+| key extraction | 0.135 ms | 4.76 ms | 35x |
+| sign | 11.4 ms | 229 ms | 20x |
+| verify | 20.6 ms | 427 ms | 21x |
+| encrypt (32 B) | 12.3 ms | 210 ms | 17x |
+| decrypt (32 B) | 7.5 ms | 219 ms | 29x |
+
+There is still substantial headroom. The remaining gap is dominated by:
+
+- Frobenius currently computed as a full 256-bit Fp12 exponentiation; GmSSL
+  uses precomputed Frobenius coefficients.
+- Miller loop and line evaluation use Fp12 inversions; GmSSL uses projective
+  coordinates and sparse line multiplication.
+- Affine G2 scalar multiplication performs an Fp2 inversion per bit.
+
+Build and run the GmSSL harness with:
+
+```bash
+cc -O3 -I ~/work/Crypto/GmSSL/include scripts/bench_sm9_gmssl.c \
+  -L ~/work/Crypto/GmSSL/build/bin -lgmssl \
+  -Wl,-rpath,$HOME/work/Crypto/GmSSL/build/bin -o /tmp/bench_gmssl_sm9
+/tmp/bench_gmssl_sm9
+```

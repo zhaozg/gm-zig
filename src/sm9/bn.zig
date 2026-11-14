@@ -37,8 +37,93 @@ pub fn add(a: Fp, b: Fp) Fp {
 pub fn sub(a: Fp, b: Fp) Fp {
     return @intCast((@as(u512, a) + P - b) % P);
 }
+const P_LIMBS = [4]u64{
+    0xe56f9b27e351457d,
+    0x21f2934b1a7aeedb,
+    0xd603ab4ff58ec745,
+    0xb640000002a3a6f1,
+};
+const MONT_N0: u64 = 0x892bc42c2f2ee42b; // -P^-1 mod 2^64
+const MONT_R2 = [4]u64{
+    0x27dea312b417e2d2,
+    0x88f8105fae1a5d3f,
+    0xe479b522d6706e7b,
+    0x2ea795a656f62fbd,
+};
+
+fn toLimbs(a: Fp) [4]u64 {
+    return .{
+        @truncate(a),
+        @truncate(a >> 64),
+        @truncate(a >> 128),
+        @truncate(a >> 192),
+    };
+}
+
+fn fromLimbs(l: [4]u64) Fp {
+    return @as(Fp, l[0]) |
+        (@as(Fp, l[1]) << 64) |
+        (@as(Fp, l[2]) << 128) |
+        (@as(Fp, l[3]) << 192);
+}
+
+fn montMul(a: Fp, b: Fp) Fp {
+    const x = toLimbs(a);
+    const y = toLimbs(b);
+    var t: [9]u64 = @splat(0);
+
+    // 4x4 schoolbook product into t[0..8].
+    for (0..4) |i| {
+        var carry: u64 = 0;
+        for (0..4) |j| {
+            const idx = i + j;
+            const prod = @as(u128, x[i]) * y[j] + t[idx] + carry;
+            t[idx] = @truncate(prod);
+            carry = @truncate(prod >> 64);
+        }
+        t[i + 4] +%= carry;
+    }
+
+    // Montgomery reduction.
+    var i: usize = 0;
+    while (i < 4) : (i += 1) {
+        const m = t[i] *% MONT_N0;
+        var carry: u64 = 0;
+        for (0..4) |j| {
+            const idx = i + j;
+            const sum = @as(u128, m) * P_LIMBS[j] + t[idx] + carry;
+            t[idx] = @truncate(sum);
+            carry = @truncate(sum >> 64);
+        }
+        var k = i + 4;
+        while (carry != 0 and k < 9) : (k += 1) {
+            const sum = @as(u128, t[k]) + carry;
+            t[k] = @truncate(sum);
+            carry = @truncate(sum >> 64);
+        }
+    }
+
+    var r = [5]u64{ t[4], t[5], t[6], t[7], t[8] };
+    // Conditional subtraction if the 5-limb value is >= P.
+    if (r[4] != 0 or r[3] > P_LIMBS[3] or
+        (r[3] == P_LIMBS[3] and r[2] > P_LIMBS[2]) or
+        (r[3] == P_LIMBS[3] and r[2] == P_LIMBS[2] and r[1] > P_LIMBS[1]) or
+        (r[3] == P_LIMBS[3] and r[2] == P_LIMBS[2] and r[1] == P_LIMBS[1] and r[0] >= P_LIMBS[0]))
+    {
+        var borrow: u64 = 0;
+        for (0..5) |j| {
+            const pj: u64 = if (j < 4) P_LIMBS[j] else 0;
+            const diff = @as(u128, r[j]) -% pj -% borrow;
+            r[j] = @truncate(diff);
+            borrow = @as(u64, @truncate(diff >> 64)) & 1;
+        }
+    }
+    return fromLimbs(r[0..4].*);
+}
+
 pub fn mul(a: Fp, b: Fp) Fp {
-    return @intCast((@as(u512, a) * b) % P);
+    // a*b*R^-1 then *R^2*R^-1 = a*b.
+    return montMul(montMul(a, b), fromLimbs(MONT_R2));
 }
 pub fn neg(a: Fp) Fp {
     return if (a == 0) 0 else P - a;
