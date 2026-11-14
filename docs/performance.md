@@ -160,11 +160,11 @@ no direct GmSSL equivalent in this build.
 
 | Operation | GmSSL | gm-zig | gm-zig / GmSSL |
 |---|---:|---:|---:|
-| key generation | 7.86 µs | 34.8 µs | 4.4x |
-| sign | 85.0 µs | 111.9 µs | 1.32x |
-| verify | 66.9 µs | 365.9 µs | 5.5x |
-| encrypt (32 B) | 72.4 µs | 370.4 µs | 5.1x |
-| decrypt (32 B) | 60.3 µs | 307.6 µs | 5.1x |
+| key generation | 7.86 µs | 38.0 µs | 4.8x |
+| sign | 85.0 µs | 124.3 µs | 1.46x |
+| verify | 66.9 µs | 400.9 µs | 6.0x |
+| encrypt (32 B) | 72.4 µs | 368.1 µs | 5.1x |
+| decrypt (32 B) | 60.3 µs | 301.9 µs | 5.0x |
 
 SM2 is still the largest remaining gap among the non-SM9 algorithms, but it
 improved substantially after adding a fixed-base comb table for `G` and a

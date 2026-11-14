@@ -150,17 +150,14 @@ pub const SM2 = struct {
             return SM2.identityElement;
         }
 
-        const THREE = Fe.fromInt(3) catch unreachable;
-
-        const xx = p.x.sq(); // X1²
-        const yy = p.y.sq(); // Y1²
-        const yyyy = yy.sq(); // Y1⁴
-        const zz = p.z.sq(); // Z1²
-        const s = p.x.add(yy).sq().sub(xx).sub(yyyy).dbl(); // 2*(X1+Y1²)²-2*X1²-2*Y1⁴
-        const m = xx.mul(THREE).add(A.mul(zz.sq())); // 3*X1² + a*Z1⁴
-        const x3 = m.sq().sub(s.dbl()); // M² - 2*S
-        const y3 = m.mul(s.sub(x3)).sub(yyyy.dbl().dbl().dbl()); // M*(S-X3) - 8*Y1⁴
-        const z3 = p.y.mul(p.z).dbl(); // 2*Y1*Z1
+        // Jacobian doubling specialized for a = -3.
+        const delta = p.z.sq();
+        const gamma = p.y.sq();
+        const beta = p.x.mul(gamma);
+        const alpha = p.x.sub(delta).mul(p.x.add(delta)).mul(Fe.fromInt(3) catch unreachable);
+        const x3 = alpha.sq().sub(beta.dbl().dbl().dbl());
+        const z3 = p.y.add(p.z).sq().sub(gamma).sub(delta);
+        const y3 = alpha.mul(beta.dbl().dbl().sub(x3)).sub(gamma.sq().dbl().dbl().dbl());
 
         return .{ .x = x3, .y = y3, .z = z3 };
     }
