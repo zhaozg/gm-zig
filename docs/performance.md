@@ -35,3 +35,31 @@ projective/sparse pairing implementation; those are tracked in
 
 These numbers are for this machine and this commit only. They are not a
 comparison against GmSSL or another SM9 implementation.
+
+## Full benchmark comparison (2026-11-14)
+
+The full `zig build bench -Doptimize=ReleaseFast` run wrote
+[`BenchLog.txt`](../BenchLog.txt). It was compared with the previous committed
+log from 2026-05-25 on the same CPU/OS.
+
+For the 42 non-SM9 benchmarks that exist in both logs (SM3, SM4, ZUC, SM2),
+most results are within ±10%. There are isolated noise outliers, for example
+SM3 64K reports a higher average, but its minimum is essentially unchanged
+(182.5 µs vs 182.8 µs), so this is run-to-run noise rather than a code
+regression. No SM3/SM4/ZUC/SM2 implementation code changed in this period.
+
+SM9 timings are **not comparable** to the old log: the previous SM9 benchmark
+measured the removed simplified implementation, which did no real pairing. The
+new standard implementation performs the full BN254 R-ate pairing:
+
+| SM9 operation | Old simplified log | New standard log |
+|---|---:|---:|
+| key extraction | 14.9 ms | 7.4 ms |
+| sign | 45.5 ms | 1.221 s |
+| verify | 145.6 ms | 2.269 s |
+| encrypt (32 B) | 32.6 ms | 1.204 s |
+| decrypt (32 B) | 31.8 ms | 1.086 s |
+| pairing | not benchmarked | 1.211 s |
+
+The old numbers are still shown only to make clear why they cannot be used as
+a performance baseline for the standard implementation.
