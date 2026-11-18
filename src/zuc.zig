@@ -48,6 +48,13 @@ const KD = [16]u16{
     0x4D78, 0x2F13, 0x6BC4, 0x1AF1, 0x5E26, 0x3C4D, 0x789A, 0x47AC,
 };
 
+const ZUC256_D = [4][16]u8{
+    .{ 0x22, 0x2F, 0x24, 0x2A, 0x6D, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x52, 0x10, 0x30 },
+    .{ 0x22, 0x2F, 0x25, 0x2A, 0x6D, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x52, 0x10, 0x30 },
+    .{ 0x23, 0x2F, 0x24, 0x2A, 0x6D, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x52, 0x10, 0x30 },
+    .{ 0x23, 0x2F, 0x25, 0x2A, 0x6D, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x52, 0x10, 0x30 },
+};
+
 pub const ZUC = struct {
     lfsr: [16]u32,
     r1: u32,
@@ -88,6 +95,70 @@ pub const ZUC = struct {
         self.r2 = r2;
 
         return self;
+    }
+
+    fn make31(a: u8, b: u8, c: u8, d: u8) u32 {
+        return (@as(u32, a) << 23) | (@as(u32, b) << 16) | (@as(u32, c) << 8) | @as(u32, d);
+    }
+
+    fn init256WithMacbits(key: *const [32]u8, iv: *const [23]u8, macbits: u32) ZUC {
+        var self = ZUC{
+            .lfsr = undefined,
+            .r1 = 0,
+            .r2 = 0,
+        };
+
+        const iv17: u8 = iv[17] >> 2;
+        const iv18: u8 = ((iv[17] & 0x3) << 4) | (iv[18] >> 4);
+        const iv19: u8 = ((iv[18] & 0xf) << 2) | (iv[19] >> 6);
+        const iv20: u8 = iv[19] & 0x3f;
+        const iv21: u8 = iv[20] >> 2;
+        const iv22: u8 = ((iv[20] & 0x3) << 4) | (iv[21] >> 4);
+        const iv23: u8 = ((iv[21] & 0xf) << 2) | (iv[22] >> 6);
+        const iv24: u8 = iv[22] & 0x3f;
+
+        const idx = if (macbits / 32 < 3) macbits / 32 else 3;
+        const d = ZUC256_D[idx];
+
+        self.lfsr[0] = make31(key[0], d[0], key[21], key[16]);
+        self.lfsr[1] = make31(key[1], d[1], key[22], key[17]);
+        self.lfsr[2] = make31(key[2], d[2], key[23], key[18]);
+        self.lfsr[3] = make31(key[3], d[3], key[24], key[19]);
+        self.lfsr[4] = make31(key[4], d[4], key[25], key[20]);
+        self.lfsr[5] = make31(iv[0], d[5] | iv17, key[5], key[26]);
+        self.lfsr[6] = make31(iv[1], d[6] | iv18, key[6], key[27]);
+        self.lfsr[7] = make31(iv[10], d[7] | iv19, key[7], iv[2]);
+        self.lfsr[8] = make31(key[8], d[8] | iv20, iv[3], iv[11]);
+        self.lfsr[9] = make31(key[9], d[9] | iv21, iv[12], iv[4]);
+        self.lfsr[10] = make31(iv[5], d[10] | iv22, key[10], key[28]);
+        self.lfsr[11] = make31(key[11], d[11] | iv23, iv[6], iv[13]);
+        self.lfsr[12] = make31(key[12], d[12] | iv24, iv[7], iv[14]);
+        self.lfsr[13] = make31(key[13], d[13], iv[15], iv[8]);
+        self.lfsr[14] = make31(key[14], d[14] | (key[31] >> 4), iv[16], iv[9]);
+        self.lfsr[15] = make31(key[15], d[15] | (key[31] & 0x0F), key[30], key[29]);
+
+        var r1: u32 = 0;
+        var r2: u32 = 0;
+        var round: usize = 0;
+        while (round < 32) : (round += 1) {
+            const x0 = ((self.lfsr[15] & 0x7FFF8000) << 1) | (self.lfsr[14] & 0xFFFF);
+            const x1 = ((self.lfsr[11] & 0xFFFF) << 16) | (self.lfsr[9] >> 15);
+            const x2 = ((self.lfsr[7] & 0xFFFF) << 16) | (self.lfsr[5] >> 15);
+            const w = f(x0, x1, x2, &r1, &r2);
+            lfsrWithInitialisationMode(&self.lfsr, w >> 1);
+        }
+        const x1 = ((self.lfsr[11] & 0xFFFF) << 16) | (self.lfsr[9] >> 15);
+        const x2 = ((self.lfsr[7] & 0xFFFF) << 16) | (self.lfsr[5] >> 15);
+        f_(x1, x2, &r1, &r2);
+        lfsrWithWorkMode(&self.lfsr);
+        self.r1 = r1;
+        self.r2 = r2;
+        return self;
+    }
+
+    /// ZUC-256 initialisation with a 32-byte key and 23-byte IV.
+    pub fn init256(key: *const [32]u8, iv: *const [23]u8) ZUC {
+        return init256WithMacbits(key, iv, 0);
     }
 
     /// Overwrite the LFSR and register state with zeros.
@@ -239,6 +310,145 @@ pub const ZUC = struct {
     pub fn verifyMACWithKey(key: *const [16]u8, iv: *const [16]u8, message: []const u8, received_mac: u32) bool {
         var zuc = ZUC.init(key, iv);
         return zuc.verifyMAC(message, received_mac);
+    }
+};
+
+/// ZUC-256 stream cipher (32-byte key, 23-byte IV).
+pub const ZUC256 = struct {
+    state: ZUC,
+
+    pub fn init(key: *const [32]u8, iv: *const [23]u8) ZUC256 {
+        return .{ .state = ZUC.init256(key, iv) };
+    }
+
+    pub fn zeroize(self: *ZUC256) void {
+        self.state.zeroize();
+    }
+
+    pub fn generateKeyword(self: *ZUC256) u32 {
+        return self.state.generateKeyword();
+    }
+
+    pub fn generateKeystream(self: *ZUC256, keystream: []u32) void {
+        self.state.generateKeystream(keystream);
+    }
+
+    pub fn crypt(self: *ZUC256, input: []const u8, output: []u8) void {
+        self.state.crypt(input, output);
+    }
+};
+
+/// ZUC-256 MAC supporting 32-, 64-, and 128-bit tags.
+pub const ZUC256MAC = struct {
+    state: ZUC,
+    t: [4]u32,
+    k0: [4]u32,
+    macbits: u8,
+    buf: [4]u8,
+    buflen: u8,
+
+    pub fn init(key: *const [32]u8, iv: *const [23]u8, macbits_in: u32) ZUC256MAC {
+        const macbits: u32 = if (macbits_in < 32) 32 else if (macbits_in > 64) 128 else macbits_in;
+        var self = ZUC256MAC{
+            .state = ZUC.init256WithMacbits(key, iv, macbits),
+            .t = .{ 0, 0, 0, 0 },
+            .k0 = .{ 0, 0, 0, 0 },
+            .macbits = @intCast((macbits / 32) * 32),
+            .buf = .{ 0, 0, 0, 0 },
+            .buflen = 0,
+        };
+        const n = macbits / 32;
+        for (0..n) |i| self.t[i] = self.state.generateKeyword();
+        for (0..n) |i| self.k0[i] = self.state.generateKeyword();
+        return self;
+    }
+
+    fn processBlock(self: *ZUC256MAC, block: u32) void {
+        const n = self.macbits / 32;
+        var m = block;
+        const k1 = self.state.generateKeyword();
+        var next = k1;
+        for (0..32) |_| {
+            if ((m & 0x80000000) != 0) {
+                for (0..n) |j| self.t[j] ^= self.k0[j];
+            }
+            m <<= 1;
+            var j: usize = 0;
+            while (j + 1 < n) : (j += 1) {
+                self.k0[j] = (self.k0[j] << 1) | (self.k0[j + 1] >> 31);
+            }
+            self.k0[n - 1] = (self.k0[n - 1] << 1) | (next >> 31);
+            next <<= 1;
+        }
+    }
+
+    pub fn update(self: *ZUC256MAC, data: []const u8) void {
+        if (data.len == 0) return;
+        var input = data;
+        if (self.buflen != 0) {
+            const need = 4 - self.buflen;
+            if (input.len < need) {
+                @memcpy(self.buf[self.buflen..][0..input.len], input);
+                self.buflen += @intCast(input.len);
+                return;
+            }
+            @memcpy(self.buf[self.buflen..][0..need], input[0..need]);
+            self.processBlock(mem.readInt(u32, &self.buf, .big));
+            input = input[need..];
+            self.buflen = 0;
+        }
+        while (input.len >= 4) {
+            self.processBlock(mem.readInt(u32, input[0..4], .big));
+            input = input[4..];
+        }
+        if (input.len != 0) {
+            @memcpy(self.buf[0..input.len], input);
+            self.buflen = @intCast(input.len);
+        }
+    }
+
+    /// Finalize and write `macbits/8` bytes into `out`.
+    pub fn finish(self: *ZUC256MAC, data: []const u8, nbits_in: usize, out: []u8) void {
+        var nbits = nbits_in;
+        var input = data;
+        if (nbits >= 8) {
+            self.update(input[0 .. nbits / 8]);
+            input = input[nbits / 8 ..];
+            nbits %= 8;
+        }
+        if (nbits != 0) {
+            self.buf[self.buflen] = input[0];
+        }
+        if (self.buflen != 0 or nbits != 0) {
+            const total = @as(usize, self.buflen) * 8 + nbits;
+            const block = mem.readInt(u32, &self.buf, .big);
+            const k1 = self.state.generateKeyword();
+            var m = block;
+            var next = k1;
+            const n = self.macbits / 32;
+            for (0..total) |_| {
+                if ((m & 0x80000000) != 0) {
+                    for (0..n) |j| self.t[j] ^= self.k0[j];
+                }
+                m <<= 1;
+                var j: usize = 0;
+                while (j + 1 < n) : (j += 1) {
+                    self.k0[j] = (self.k0[j] << 1) | (self.k0[j + 1] >> 31);
+                }
+                self.k0[n - 1] = (self.k0[n - 1] << 1) | (next >> 31);
+                next <<= 1;
+            }
+        }
+        const n = self.macbits / 32;
+        for (0..n) |j| {
+            self.t[j] ^= self.k0[j];
+            mem.writeInt(u32, out[j * 4 ..][0..4], self.t[j], .big);
+        }
+        self.zeroize();
+    }
+
+    pub fn zeroize(self: *ZUC256MAC) void {
+        secure.zeroValue(ZUC256MAC, self);
     }
 };
 

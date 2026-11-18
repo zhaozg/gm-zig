@@ -14,7 +14,7 @@ An implementation of the Chinese National Cryptographic Standards (GM/T) algorit
 This is a work-in-progress implementation intended for study, prototyping, and integration work. It has not been independently audited and is not production-ready.
 
 - **ZUC, SM2, SM3, SM4, SM9**: Implemented and covered by the test suite. The SM9 tests include GM/T 0044-2016 known-answer and compliance cases.
-- **Tests**: `zig build test` currently passes on Zig 0.16.0 and 0.17.1 (183 tests in this checkout). Passing tests do not imply complete standards conformance or security.
+- **Tests**: `zig build test` currently passes on Zig 0.16.0 and 0.17.1 (188 tests in this checkout). Passing tests do not imply complete standards conformance or security.
 - **Standards**: The code follows the GM/T specifications where implemented, but no third-party conformance or security certification has been performed.
 - **Performance**: See [docs/performance.md](docs/performance.md) for the current ReleaseFast SM9 measurements.
 - **Known gaps**: See [ROADMAP.md](ROADMAP.md) for open security hardening, constant-time verification, fuzzing, and API cleanup work. Current security properties and limitations are summarized in [docs/security.md](docs/security.md).
@@ -33,6 +33,7 @@ The code uses Zig's compile-time checks and, in some paths, constant-time compar
   - 128-bit block size with 128-bit key (GM/T 0001.1-2012)
   - 128-EEA3: The encryption algorithm using ZUC. (GM/T 0001.2-2012)
   - 128-EIA3: The integrity algorithm using ZUC. (GM/T 0001.3-2012)
+  - ZUC-256: 256-bit key / 184-bit IV stream cipher and 32/64/128-bit MAC.
 
 - **🔐 SM2 Elliptic Curve Cryptography**
   - Digital signature algorithm (GM/T 0003.2-2012)
