@@ -10,6 +10,7 @@ test {
 
     _ = @import("zuc.zig");
     _ = @import("test/zuc256_test.zig");
+    _ = @import("test/zuc_modes_test.zig");
 
     _ = @import("sm9/bn.zig");
     _ = @import("sm9/pairing_bn.zig");

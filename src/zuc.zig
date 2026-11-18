@@ -313,6 +313,148 @@ pub const ZUC = struct {
     }
 };
 
+/// ZUC MAC used by 128-EIA3 (GM/T 0001.3-2012).
+pub const ZUC_MAC = struct {
+    state: ZUC,
+    t: u32,
+    k0: u32,
+    buf: [4]u8,
+    buflen: u8,
+
+    pub fn init(key: *const [16]u8, iv: *const [16]u8) ZUC_MAC {
+        var self = ZUC_MAC{
+            .state = ZUC.init(key, iv),
+            .t = 0,
+            .k0 = 0,
+            .buf = .{ 0, 0, 0, 0 },
+            .buflen = 0,
+        };
+        self.k0 = self.state.generateKeyword();
+        return self;
+    }
+
+    fn processBlock(self: *ZUC_MAC, block: u32) void {
+        var m = block;
+        const k1 = self.state.generateKeyword();
+        var next = k1;
+        for (0..32) |_| {
+            if ((m & 0x80000000) != 0) self.t ^= self.k0;
+            m <<= 1;
+            self.k0 = (self.k0 << 1) | (next >> 31);
+            next <<= 1;
+        }
+    }
+
+    pub fn update(self: *ZUC_MAC, data: []const u8) void {
+        if (data.len == 0) return;
+        var input = data;
+        if (self.buflen != 0) {
+            const need = 4 - self.buflen;
+            if (input.len < need) {
+                @memcpy(self.buf[self.buflen..][0..input.len], input);
+                self.buflen += @intCast(input.len);
+                return;
+            }
+            @memcpy(self.buf[self.buflen..][0..need], input[0..need]);
+            self.processBlock(mem.readInt(u32, &self.buf, .big));
+            input = input[need..];
+            self.buflen = 0;
+        }
+        while (input.len >= 4) {
+            self.processBlock(mem.readInt(u32, input[0..4], .big));
+            input = input[4..];
+        }
+        if (input.len != 0) {
+            @memcpy(self.buf[0..input.len], input);
+            self.buflen = @intCast(input.len);
+        }
+    }
+
+    pub fn finish(self: *ZUC_MAC, data: []const u8, nbits_in: usize) u32 {
+        var nbits = nbits_in;
+        var input = data;
+        if (nbits >= 8) {
+            self.update(input[0 .. nbits / 8]);
+            input = input[nbits / 8 ..];
+            nbits %= 8;
+        }
+        if (nbits != 0) self.buf[self.buflen] = input[0];
+        if (self.buflen != 0 or nbits != 0) {
+            const total = @as(usize, self.buflen) * 8 + nbits;
+            const block = mem.readInt(u32, &self.buf, .big);
+            const k1 = self.state.generateKeyword();
+            var m = block;
+            var next = k1;
+            for (0..total) |_| {
+                if ((m & 0x80000000) != 0) self.t ^= self.k0;
+                m <<= 1;
+                self.k0 = (self.k0 << 1) | (next >> 31);
+                next <<= 1;
+            }
+        }
+        self.t ^= self.k0;
+        const k1 = self.state.generateKeyword();
+        self.t ^= k1;
+        const result = self.t;
+        self.zeroize();
+        return result;
+    }
+
+    pub fn zeroize(self: *ZUC_MAC) void {
+        secure.zeroValue(ZUC_MAC, self);
+    }
+};
+
+fn setEeaKey(state: *ZUC, key: *const [16]u8, count: u32, bearer: u5, direction: u1) void {
+    var iv: [16]u8 = @splat(0);
+    iv[0] = @truncate(count >> 24);
+    iv[1] = @truncate(count >> 16);
+    iv[2] = @truncate(count >> 8);
+    iv[3] = @truncate(count);
+    iv[4] = (@as(u8, bearer) << 1 | @as(u8, direction)) << 2;
+    iv[8] = iv[0];
+    iv[9] = iv[1];
+    iv[10] = iv[2];
+    iv[11] = iv[3];
+    iv[12] = iv[4];
+    state.* = ZUC.init(key, &iv);
+}
+
+/// 128-EEA3 encryption. `nbits` is the bit length of the input.
+pub fn eea3Encrypt(input: []const u32, output: []u32, nbits: usize, key: *const [16]u8, count: u32, bearer: u5, direction: u1) void {
+    const nwords = (nbits + 31) / 32;
+    std.debug.assert(input.len >= nwords and output.len >= nwords);
+    var state: ZUC = undefined;
+    setEeaKey(&state, key, count, bearer, direction);
+    state.generateKeystream(output[0..nwords]);
+    for (0..nwords) |i| output[i] ^= input[i];
+    const rem = nbits % 32;
+    if (rem != 0) output[nwords - 1] &= @as(u32, 0xffffffff) << @as(u5, @intCast(32 - rem));
+}
+
+fn setEiaIv(iv: *[16]u8, count: u32, bearer: u5, direction: u1) void {
+    iv.* = @splat(0);
+    iv[0] = @truncate(count >> 24);
+    iv[1] = @truncate(count >> 16);
+    iv[2] = @truncate(count >> 8);
+    iv[3] = @truncate(count);
+    iv[4] = @as(u8, bearer) << 3;
+    iv[8] = iv[0] ^ (@as(u8, direction) << 7);
+    iv[9] = iv[1];
+    iv[10] = iv[2];
+    iv[11] = iv[3];
+    iv[12] = @as(u8, bearer) << 3;
+    iv[14] = @as(u8, direction) << 7;
+}
+
+/// 128-EIA3 MAC. `data` is the message bitstream, most significant bit first.
+pub fn eia3GenerateMac(data: []const u8, nbits: usize, key: *const [16]u8, count: u32, bearer: u5, direction: u1) u32 {
+    var iv: [16]u8 = undefined;
+    setEiaIv(&iv, count, bearer, direction);
+    var ctx = ZUC_MAC.init(key, &iv);
+    return ctx.finish(data, nbits);
+}
+
 /// ZUC-256 stream cipher (32-byte key, 23-byte IV).
 pub const ZUC256 = struct {
     state: ZUC,

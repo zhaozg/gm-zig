@@ -1,0 +1,61 @@
+const std = @import("std");
+const testing = std.testing;
+const zuc = @import("../zuc.zig");
+
+test "128-EEA3 GM/T 0001.2 vectors" {
+    const keys = [_][16]u8{
+        .{ 0x17, 0x3d, 0x14, 0xba, 0x50, 0x03, 0x73, 0x1d, 0x7a, 0x60, 0x04, 0x94, 0x70, 0xf0, 0x0a, 0x29 },
+        .{ 0xe5, 0xbd, 0x3e, 0xa0, 0xeb, 0x55, 0xad, 0xe8, 0x66, 0xc6, 0xac, 0x58, 0xbd, 0x54, 0x30, 0x2a },
+    };
+    const counts = [_]u32{ 0x66035492, 0x00056823 };
+    const bearers = [_]u5{ 0x0f, 0x18 };
+    const dirs = [_]u1{ 0, 1 };
+    const nbits = [_]usize{ 0xc1, 0x320 };
+    const input = [_][]const u32{
+        &.{ 0x6cf65340, 0x735552ab, 0x0c9752fa, 0x6f9025fe, 0x0bd675d9, 0x005875b2, 0x00000000 },
+        &.{
+            0x14a8ef69, 0x3d678507, 0xbbe7270a, 0x7f67ff50, 0x06c3525b, 0x9807e467, 0xc4e56000, 0xba338f5d,
+            0x42955903, 0x67518222, 0x46c80d3b, 0x38f07f4b, 0xe2d8ff58, 0x05f51322, 0x29bde93b, 0xbbdcaf38,
+            0x2bf1ee97, 0x2fbf9977, 0xbada8945, 0x847a2a6c, 0x9ad34a66, 0x7554e04d, 0x1f7fa2c3, 0x3241bd8f,
+            0x01ba220d,
+        },
+    };
+    const expected = [_][]const u32{
+        &.{ 0xa6c85fc6, 0x6afb8533, 0xaafc2518, 0xdfe78494, 0x0ee1e4b0, 0x30238cc8, 0x00000000 },
+        &.{
+            0x131d43e0, 0xdea1be5c, 0x5a1bfd97, 0x1d852cbf, 0x712d7b4f, 0x57961fea, 0x3208afa8, 0xbca433f4,
+            0x56ad09c7, 0x417e58bc, 0x69cf8866, 0xd1353f74, 0x865e8078, 0x1d202dfb, 0x3ecff7fc, 0xbc3b190f,
+            0xe82a204e, 0xd0e350fc, 0x0f6f2613, 0xb2f2bca6, 0xdf5a473a, 0x57a4a00d, 0x985ebad8, 0x80d6f238,
+            0x64a07b01,
+        },
+    };
+
+    for (keys, 0..) |key, i| {
+        var out: [130]u32 = undefined;
+        zuc.eea3Encrypt(input[i], &out, nbits[i], &key, counts[i], bearers[i], dirs[i]);
+        try testing.expectEqualSlices(u32, expected[i], out[0..expected[i].len]);
+    }
+}
+
+fn wordsToBytes(comptime n: usize, words: [n]u32) [n * 4]u8 {
+    var out: [n * 4]u8 = undefined;
+    for (words, 0..) |w, i| std.mem.writeInt(u32, out[i * 4 ..][0..4], w, .big);
+    return out;
+}
+
+test "128-EIA3 GM/T 0001.3 vectors" {
+    const key0 = @as([16]u8, @splat(0x00));
+    const key1 = [16]u8{ 0xc9, 0xe6, 0xce, 0xc4, 0x60, 0x7c, 0x72, 0xdb, 0x00, 0x0a, 0xef, 0xa8, 0x83, 0x85, 0xab, 0x0a };
+
+    const m0 = [_]u32{0};
+    const m1 = [_]u32{
+        0x983b41d4, 0x7d780c9e, 0x1ad11d7e, 0xb70391b1, 0xde0b35da, 0x2dc62f83, 0xe7b78d63, 0x06ca0ea0,
+        0x7e941b7b, 0xe91348f9, 0xfcb170e2, 0x217fecd9, 0x7f9f68ad, 0xb16e5d7d, 0x21e569d2, 0x80ed775c,
+        0xebde3f40, 0x93c53881, 0x00000000,
+    };
+    const b0 = wordsToBytes(1, m0);
+    const b1 = wordsToBytes(19, m1);
+
+    try testing.expectEqual(@as(u32, 0xc8a9595e), zuc.eia3GenerateMac(&b0, 1, &key0, 0, 0, 0));
+    try testing.expectEqual(@as(u32, 0xfae8ff0b), zuc.eia3GenerateMac(&b1, 0x241, &key1, 0xa94059da, 0x0a, 1));
+}

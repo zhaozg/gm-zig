@@ -2,7 +2,7 @@
 
 > A comprehensive implementation of Chinese National Cryptographic Standards (GM/T) in Zig.
 >
-> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 188 passing
+> **Current Version:** 0.0.0-alpha | **Zig:** 0.16.x / 0.17.x | **Tests:** 190 passing
 
 ---
 
@@ -171,8 +171,8 @@
 #### 3.5 ZUC Enhancements
 - [x] Add ZUC-256 keystream and 32/64/128-bit MAC
 - [x] Add GmSSL-aligned ZUC-256 draft vectors
-- [ ] Add stream cipher mode documentation
-- [ ] Add EEA3/EIA3 integration tests
+- [x] Add stream cipher mode documentation
+- [x] Add EEA3/EIA3 integration tests
 
 ---
 
